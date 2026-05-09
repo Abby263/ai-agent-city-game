@@ -6,17 +6,25 @@
 }
 
 :root {
-  --background: 12 15 16;
-  --foreground: 244 247 241;
-  --muted: 148 158 150;
-  --panel: 22 27 28;
-  --panel-strong: 32 38 39;
-  --border: 60 70 66;
-  --accent: 108 190 134;
-  --accent-2: 239 184 79;
-  --danger: 226 93 82;
-  --water: 87 163 199;
-  --violet: 151 132 210;
+  --background: 8 12 22;
+  --foreground: 240 246 255;
+  --muted: 148 163 184;
+  --muted-strong: 203 213 225;
+  --panel: 16 23 39;
+  --panel-strong: 28 38 60;
+  --panel-hi: 38 50 78;
+  --border: 56 72 104;
+  --border-soft: 42 56 84;
+  --accent: 56 189 248;
+  --accent-2: 251 191 36;
+  --accent-3: 244 114 182;
+  --success: 74 222 128;
+  --warning: 251 146 60;
+  --danger: 244 89 89;
+  --water: 56 189 248;
+  --violet: 167 139 250;
+  --sky-day: 18 27 45;
+  --sky-night: 5 8 18;
 }
 
 * {
@@ -33,7 +41,11 @@ body {
 body {
   margin: 0;
   overflow: hidden;
-  background: linear-gradient(135deg, rgb(11, 14, 15), rgb(17, 22, 21));
+  background:
+    radial-gradient(circle at 18% 12%, rgba(56, 189, 248, 0.10), transparent 42%),
+    radial-gradient(circle at 82% 0%, rgba(244, 114, 182, 0.07), transparent 36%),
+    radial-gradient(circle at 50% 100%, rgba(251, 191, 36, 0.05), transparent 50%),
+    linear-gradient(140deg, rgb(8, 12, 24), rgb(11, 17, 32) 60%, rgb(15, 23, 42));
 }
 
 button,
@@ -44,26 +56,158 @@ select {
 
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: rgb(var(--border)) transparent;
+  scrollbar-color: rgba(var(--border), 0.85) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(var(--border), 0.85);
+  border-radius: 999px;
 }
 
 .agentcity-shell {
   background:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    rgb(var(--background));
-  background-size: 28px 28px;
+    radial-gradient(circle at 8% 4%, rgba(56, 189, 248, 0.06), transparent 32%),
+    radial-gradient(circle at 92% 96%, rgba(251, 191, 36, 0.05), transparent 38%),
+    linear-gradient(180deg, rgba(8, 12, 24, 0.98), rgba(10, 16, 30, 0.98));
 }
 
 .glass-panel {
-  border: 1px solid rgba(var(--border), 0.92);
-  background: rgba(var(--panel), 0.92);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 42px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(var(--border), 0.85);
+  background: linear-gradient(180deg, rgba(22, 30, 50, 0.85), rgba(14, 20, 36, 0.92));
+  backdrop-filter: blur(8px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 24px 60px rgba(0, 0, 0, 0.45);
 }
 
 .story-card {
-  border: 1px solid rgba(var(--border), 0.86);
+  border: 1px solid rgba(var(--border-soft), 0.95);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 70%),
     rgba(var(--panel-strong), 0.78);
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+.story-card:hover {
+  border-color: rgba(var(--accent), 0.55);
+  transform: translateY(-1px);
+}
+
+.tile-card {
+  border: 1px solid rgba(var(--border-soft), 0.9);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent),
+    rgba(var(--panel), 0.85);
+  border-radius: 10px;
+}
+
+.metric-card {
+  border: 1px solid rgba(var(--border-soft), 0.9);
+  background: linear-gradient(150deg, rgba(56, 189, 248, 0.05), rgba(15, 22, 38, 0.85));
+  border-radius: 12px;
+  padding: 10px 12px;
+  position: relative;
+  overflow: hidden;
+}
+.metric-card::after {
+  content: "";
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: 90px;
+  height: 90px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.18), transparent 60%);
+  pointer-events: none;
+}
+
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--border-soft), 0.9);
+  background: rgba(var(--panel-strong), 0.85);
+  font-size: 11px;
+  color: rgb(var(--muted-strong));
+  transition: all 140ms ease;
+}
+.btn-pill:hover {
+  border-color: rgba(var(--accent), 0.6);
+  color: rgb(var(--foreground));
+}
+.btn-pill[data-active="true"] {
+  border-color: rgba(var(--accent), 0.8);
+  background: rgba(56, 189, 248, 0.18);
+  color: rgb(var(--foreground));
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.3);
+}
+
+.glow-accent {
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
+}
+.glow-warning {
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.45);
+}
+.glow-danger {
+  box-shadow: 0 0 18px rgba(244, 89, 89, 0.45);
+}
+
+.text-grad-accent {
+  background: linear-gradient(110deg, rgb(125, 211, 252), rgb(56, 189, 248) 60%, rgb(167, 139, 250));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@keyframes pulseSoft {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+.pulse-soft { animation: pulseSoft 2.4s ease-in-out infinite; }
+
+@keyframes blink {
+  0%, 60%, 100% { opacity: 1; }
+  30% { opacity: 0.35; }
+}
+.live-dot { animation: blink 1.6s ease-in-out infinite; }
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(160%); }
+}
+.shimmer-bar {
+  position: absolute; inset: 0; pointer-events: none;
+}
+.shimmer-bar::before {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  animation: shimmer 2.6s linear infinite;
+}
+
+.checkbox-pill {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(var(--border), 1);
+  background: rgba(var(--panel-strong), 0.85);
+  position: relative;
+  cursor: pointer;
+}
+.checkbox-pill:checked {
+  background: rgb(var(--accent));
+  border-color: rgb(var(--accent));
+}
+.checkbox-pill:checked::after {
+  content: "";
+  position: absolute;
+  inset: 2px 4px;
+  border-right: 2px solid #06121f;
+  border-bottom: 2px solid #06121f;
+  transform: rotate(45deg);
+  width: 4px; height: 7px;
 }
