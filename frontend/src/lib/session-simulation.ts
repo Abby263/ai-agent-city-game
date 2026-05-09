@@ -594,6 +594,7 @@ function applyCognition(
       game_minute: city.clock.minute_of_day,
       location_id: conversation.location_id ?? citizen.current_location_id,
       actor_ids: [citizen.citizen_id, target.citizen_id],
+      transcript: twoSidedTranscript(conversation.transcript, citizen, target, task.task),
     };
     const before = relationshipLabelFromScore(citizen.relationship_scores[target.citizen_id] ?? 38);
     strengthenRelationship(city, citizen, target, savedConversation.summary);
@@ -609,6 +610,31 @@ function applyCognition(
       priority: 2,
     });
   }
+}
+
+function twoSidedTranscript(
+  transcript: Conversation["transcript"],
+  citizen: CitizenAgent,
+  target: CitizenAgent,
+  taskText: string,
+) {
+  const lines = transcript
+    .filter((line) => line.speaker_id && line.text.trim())
+    .map((line) => ({ speaker_id: line.speaker_id, text: line.text.trim() }));
+  if (!lines.some((line) => line.speaker_id === citizen.citizen_id)) {
+    lines.unshift({
+      speaker_id: citizen.citizen_id,
+      text: `I wanted to ask you about this: ${taskText}`,
+    });
+  }
+  if (!lines.some((line) => line.speaker_id === target.citizen_id)) {
+    const targetLine = {
+      speaker_id: target.citizen_id,
+      text: "I am a little nervous, but it helps that you asked me directly.",
+    };
+    lines.splice(Math.min(1, lines.length), 0, targetLine);
+  }
+  return lines.slice(0, 8);
 }
 
 function completeTask(city: CityState, citizen: CitizenAgent, task: PlayerTaskData, locationId: string) {
