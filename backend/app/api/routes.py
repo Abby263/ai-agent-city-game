@@ -7,9 +7,10 @@ from sqlalchemy.orm import Session
 from app.cognition.pipeline import CognitionPipeline
 from app.config import get_settings
 from app.database import get_db
-from app.models import CitizenORM, CityEventORM, ConversationORM, MemoryORM, RelationshipORM
+from app.models import CitizenORM, ConversationORM, MemoryORM, RelationshipORM
 from app.realtime import manager
 from app.schemas import (
+    AssignTaskRequest,
     CitizenAgent,
     CityEvent,
     CityState,
@@ -34,13 +35,16 @@ def get_city_state(db: Session = Depends(get_db)) -> CityState:
 
 @router.get("/city/events", response_model=list[CityEvent])
 def get_city_events(limit: int = 80, db: Session = Depends(get_db)) -> list[CityEvent]:
-    events = list(db.scalars(select(CityEventORM).order_by(desc(CityEventORM.timestamp)).limit(limit)))
+    events = engine._recent_events(db, limit=limit)
     return [CityEvent.model_validate(event) for event in events]
 
 
 @router.get("/citizens", response_model=list[CitizenAgent])
-def get_citizens(db: Session = Depends(get_db)) -> list[CitizenAgent]:
-    citizens = list(db.scalars(select(CitizenORM).order_by(CitizenORM.citizen_id)))
+def get_citizens(include_inactive: bool = False, db: Session = Depends(get_db)) -> list[CitizenAgent]:
+    if include_inactive:
+        citizens = list(db.scalars(select(CitizenORM).order_by(CitizenORM.citizen_id)))
+    else:
+        citizens = engine._active_citizens(db)
     return [CitizenAgent.model_validate(citizen) for citizen in citizens]
 
 
@@ -72,6 +76,13 @@ def get_citizen_relationships(citizen_id: str, db: Session = Depends(get_db)) ->
     relationships = list(
         db.scalars(select(RelationshipORM).where(RelationshipORM.citizen_id == citizen_id))
     )
+    active_ids = set(engine._active_citizen_ids())
+    if active_ids:
+        relationships = [
+            relationship
+            for relationship in relationships
+            if relationship.other_citizen_id in active_ids
+        ]
     return [Relationship.model_validate(relationship) for relationship in relationships]
 
 
@@ -81,6 +92,13 @@ def get_citizen_conversations(citizen_id: str, db: Session = Depends(get_db)) ->
         db.scalars(select(ConversationORM).order_by(desc(ConversationORM.created_at)).limit(120))
     )
     conversations = [conversation for conversation in recent if citizen_id in conversation.actor_ids][:50]
+    active_ids = set(engine._active_citizen_ids())
+    if active_ids:
+        conversations = [
+            conversation
+            for conversation in conversations
+            if conversation.actor_ids and all(actor_id in active_ids for actor_id in conversation.actor_ids)
+        ]
     return [Conversation.model_validate(conversation) for conversation in conversations]
 
 
@@ -138,6 +156,26 @@ async def trigger_event(request: TriggerEventRequest, db: Session = Depends(get_
             "event_type": request.event_type,
             "location_id": request.location_id,
             "severity": request.severity,
+        },
+    )
+    return state
+
+
+@router.post("/citizens/{citizen_id}/task", response_model=CityState)
+async def assign_citizen_task(
+    citizen_id: str,
+    request: AssignTaskRequest,
+    db: Session = Depends(get_db),
+) -> CityState:
+    state = engine.assign_task(db, citizen_id, request)
+    await manager.broadcast("city_state", state.model_dump(mode="json"))
+    await manager.broadcast(
+        "event",
+        {
+            "event_type": "player_task",
+            "actors": [citizen_id],
+            "description": f"Player assigned a task to {citizen_id}: {request.task}",
+            "priority": 3,
         },
     )
     return state

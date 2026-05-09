@@ -2,6 +2,16 @@
 
 AgentCity is split into a playable Phaser city client and a FastAPI simulation server.
 
+The default MVP keeps the full seeded city in storage but exposes only five active student agents:
+
+- Ava Singh
+- Mateo Garcia
+- Noah Mensah
+- Iris Novak
+- Leo Brooks
+
+This is controlled by `ACTIVE_CITIZEN_IDS`. Set it to `all` to activate the full roster, or to any comma-separated citizen IDs for a custom cast.
+
 ## Runtime Flow
 
 1. The frontend opens the city with `GET /city/state`.
@@ -25,6 +35,8 @@ AgentCity is split into a playable Phaser city client and a FastAPI simulation s
 - Movement and need updates never call an LLM.
 - `MAX_LLM_CALLS_PER_TICK` limits cognition work.
 - `MAX_CONVERSATIONS_PER_TICK` limits social exchanges.
+- `LLM_COGNITION_INTERVAL_TICKS` avoids running cognition every movement tick.
+- The current defaults are two cognition calls and one conversation every fourth tick.
 - Stable citizen persona and city rules are kept in prompt prefixes.
 - Memory retrieval sends only the most relevant memories.
 

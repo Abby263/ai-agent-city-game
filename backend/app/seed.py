@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models import CitizenORM, LocationORM, MemoryORM, RelationshipORM, SimulationStateORM, utcnow
 
 
@@ -61,7 +62,51 @@ PEOPLE = [
     ("cit_023", "Felix Stone", 30, "Restaurant Cook", "loc_restaurant", ["cooking", "supply"]),
     ("cit_024", "Sofia Mendes", 27, "Nurse", "loc_hospital", ["care", "coordination"]),
     ("cit_025", "Kai Turner", 40, "Researcher", "loc_lab", ["epidemiology", "data"]),
+    ("cit_026", "Leo Brooks", 13, "Student", "loc_school", ["robotics", "sketching"]),
 ]
+
+PLAYABLE_STUDENTS: dict[str, dict[str, object]] = {
+    "cit_009": {
+        "name": "Ava Singh",
+        "age": 13,
+        "skills": ["science", "debate"],
+        "mood": "Curious",
+        "thought": "I want to understand what my friends are really worried about today.",
+        "goals": ["Ask one friend how they are doing", "Finish the science worksheet"],
+    },
+    "cit_010": {
+        "name": "Mateo Garcia",
+        "age": 14,
+        "skills": ["math", "music"],
+        "mood": "Playful",
+        "thought": "Maybe I can turn today's school drama into a song idea.",
+        "goals": ["Practice music at the park", "Help someone with math homework"],
+    },
+    "cit_021": {
+        "name": "Noah Mensah",
+        "age": 12,
+        "skills": ["biology", "sports"],
+        "mood": "Energetic",
+        "thought": "I want to get through class and still have energy for the park.",
+        "goals": ["Check on Leo after class", "Organize a small game at the park"],
+    },
+    "cit_022": {
+        "name": "Iris Novak",
+        "age": 15,
+        "skills": ["writing", "chemistry"],
+        "mood": "Observant",
+        "thought": "There is a story in how everyone is reacting today. I should pay attention.",
+        "goals": ["Write down one meaningful conversation", "Study chemistry at the library"],
+    },
+    "cit_026": {
+        "name": "Leo Brooks",
+        "age": 13,
+        "skills": ["robotics", "sketching"],
+        "mood": "Thoughtful",
+        "thought": "I'm new to the group, so I should find a natural way to join the conversation.",
+        "goals": ["Make one real friend", "Show someone my robot sketch"],
+    },
+}
 
 
 def schedule_for(profession: str, work_location_id: str | None) -> list[dict[str, object]]:
@@ -92,6 +137,9 @@ def schedule_for(profession: str, work_location_id: str | None) -> list[dict[str
 
 def ensure_seeded(db: Session) -> None:
     if db.scalar(select(SimulationStateORM).where(SimulationStateORM.id == "navora")):
+        ensure_locations(db)
+        ensure_playable_roster(db)
+        db.commit()
         return
 
     state = SimulationStateORM(
@@ -106,24 +154,7 @@ def ensure_seeded(db: Session) -> None:
     )
     db.add(state)
 
-    for location_id, name, location_type, x, y, width, height, capacity, services in LOCATIONS:
-        db.add(
-            LocationORM(
-                location_id=location_id,
-                name=name,
-                type=location_type,
-                x=x,
-                y=y,
-                width=width,
-                height=height,
-                capacity=capacity,
-                open_hours={"start": 420, "end": 1080},
-                services=services,
-                inventory={"food": 80, "medicine": 35, "cash": 5000},
-                workers=[],
-                visitors=[],
-            )
-        )
+    ensure_locations(db)
     db.flush()
 
     home_offsets = [(3, 3), (5, 3), (7, 4), (4, 6), (8, 7), (6, 5)]
@@ -204,4 +235,136 @@ def ensure_seeded(db: Session) -> None:
             )
         )
 
+    ensure_playable_roster(db)
     db.commit()
+
+
+def ensure_locations(db: Session) -> None:
+    for location_id, name, location_type, x, y, width, height, capacity, services in LOCATIONS:
+        location = db.get(LocationORM, location_id)
+        if not location:
+            location = LocationORM(
+                location_id=location_id,
+                inventory={"food": 80, "medicine": 35, "cash": 5000},
+                workers=[],
+                visitors=[],
+            )
+            db.add(location)
+        location.name = name
+        location.type = location_type
+        location.x = x
+        location.y = y
+        location.width = width
+        location.height = height
+        location.capacity = capacity
+        location.open_hours = {"start": 420, "end": 1080}
+        location.services = services
+
+
+def ensure_playable_roster(db: Session) -> None:
+    settings = get_settings()
+    active_ids = settings.parsed_active_citizen_ids or list(PLAYABLE_STUDENTS)
+    home_offsets = [(3, 3), (5, 3), (7, 4), (4, 6), (8, 7)]
+
+    for index, citizen_id in enumerate(active_ids):
+        profile = PLAYABLE_STUDENTS.get(citizen_id)
+        if not profile:
+            continue
+        citizen = _pending_by_id(db, CitizenORM, "citizen_id", citizen_id) or db.get(CitizenORM, citizen_id)
+        x, y = home_offsets[index % len(home_offsets)]
+        if not citizen:
+            citizen = CitizenORM(
+                citizen_id=citizen_id,
+                name=str(profile["name"]),
+                age=int(profile["age"]),
+                profession="Student",
+                home_location_id="loc_homes",
+                work_location_id="loc_school",
+                current_location_id="loc_homes",
+                x=x,
+                y=y,
+                target_x=x,
+                target_y=y,
+            )
+            db.add(citizen)
+
+        citizen.name = str(profile["name"])
+        citizen.age = int(profile["age"])
+        citizen.profession = "Student"
+        citizen.work_location_id = "loc_school"
+        citizen.skills = list(profile["skills"])  # type: ignore[arg-type]
+        citizen.daily_schedule = schedule_for("Student", "loc_school")
+        citizen.short_term_goals = list(profile["goals"])  # type: ignore[arg-type]
+        citizen.long_term_goals = [
+            "Build a real friendship circle in Navora",
+            "Become more confident at school",
+        ]
+        citizen.current_thought = str(profile["thought"])
+        citizen.memory_summary = (
+            f"{profile['name']} is one of five active student agents in Navora. "
+            "Their friendships, school stress, private goals, and conversations are the focus of this MVP."
+        )
+        citizen.mood = str(profile["mood"])
+        personality = dict(citizen.personality or {})
+        personality.update({"playable": True, "student_arc": True})
+        citizen.personality = personality
+        citizen.updated_at = utcnow()
+
+    for index, citizen_id in enumerate(active_ids):
+        if citizen_id not in PLAYABLE_STUDENTS:
+            continue
+        friends = [other_id for other_id in active_ids if other_id != citizen_id]
+        citizen = _pending_by_id(db, CitizenORM, "citizen_id", citizen_id) or db.get(CitizenORM, citizen_id)
+        if not citizen:
+            continue
+        citizen.friend_ids = friends[:2]
+        citizen.relationship_scores = {friend_id: 42.0 + index for friend_id in friends}
+        citizen.money = max(float(citizen.money or 0), 95.0)
+        citizen.health = max(float(citizen.health or 0), 82.0)
+        citizen.hunger = min(float(citizen.hunger or 20), 35.0)
+        citizen.energy = max(float(citizen.energy or 0), 72.0)
+        citizen.stress = min(float(citizen.stress or 20), 34.0)
+        citizen.happiness = max(float(citizen.happiness or 0), 64.0)
+        for other_id in friends:
+            relationship_id = f"rel_{citizen_id}_{other_id}"
+            relationship = _pending_by_id(db, RelationshipORM, "relationship_id", relationship_id) or db.get(
+                RelationshipORM,
+                relationship_id,
+            )
+            if not relationship:
+                relationship = RelationshipORM(
+                    relationship_id=relationship_id,
+                    citizen_id=citizen_id,
+                    other_citizen_id=other_id,
+                )
+                db.add(relationship)
+            relationship.trust = 36 + (index % 4) * 3
+            relationship.warmth = 38 + (index % 5) * 3
+            relationship.familiarity = 18 + (index % 3) * 4
+            relationship.notes = "They are part of the same small student circle and can become closer through repeated conversations."
+
+        seed_memory_id = f"mem_student_arc_{citizen_id}"
+        if not db.get(MemoryORM, seed_memory_id):
+            db.add(
+                MemoryORM(
+                    memory_id=seed_memory_id,
+                    citizen_id=citizen_id,
+                    kind="semantic",
+                    content=(
+                        f"{citizen.name} is part of the current five-student playable cast. "
+                        "The player is watching how this small group becomes friends over time."
+                    ),
+                    importance=0.72,
+                    salience=0.7,
+                    embedding=None,
+                    extra={"seed": True, "playable_student_arc": True},
+                    created_at=utcnow(),
+                )
+            )
+
+
+def _pending_by_id(db: Session, model: type, key: str, value: str):
+    for item in db.new:
+        if isinstance(item, model) and getattr(item, key) == value:
+            return item
+    return None

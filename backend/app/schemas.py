@@ -174,6 +174,12 @@ class MayorPolicyRequest(BaseModel):
     public_health_campaign: bool | None = None
 
 
+class AssignTaskRequest(BaseModel):
+    task: str = Field(min_length=3, max_length=240)
+    location_id: str | None = None
+    duration_ticks: int = Field(default=4, ge=1, le=16)
+
+
 class WebSocketEnvelope(BaseModel):
     type: str
     timestamp: datetime

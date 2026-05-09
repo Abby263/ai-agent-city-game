@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType, FormEvent, ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -116,7 +116,7 @@ const systemRows = [
   { key: "traffic_status", label: "Traffic Flow", icon: Bus, tone: "water" as ProgressTone },
 ];
 
-const professionFilters = ["All", "Doctor", "Teacher", "Student", "Engineer", "Driver", "Shopkeeper", "Farmer", "Mayor"];
+const professionFilters = ["All", "Student"];
 
 const AUTO_EVENT_TYPES: TriggerEventPayload["event_type"][] = [
   "city_festival",
@@ -146,7 +146,7 @@ export function AgentCityShell() {
   const [busy, setBusy] = useState(false);
   const [speed, setSpeed] = useState<SpeedKey>("1x");
   const [autoDirector, setAutoDirector] = useState(true);
-  const [autoFollow, setAutoFollow] = useState(true);
+  const [autoFollow, setAutoFollow] = useState(false);
   const [professionFilter, setProfessionFilter] = useState("All");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("life");
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
@@ -403,6 +403,9 @@ export function AgentCityShell() {
                 locationById={locationById}
                 tab={inspectorTab}
                 onTab={setInspectorTab}
+                busy={busy}
+                runAction={runAction}
+                onRefreshCitizen={() => selectCitizen(selectedCitizen.citizen_id)}
               />
             ) : (
               <EmptyLine text="Tap a citizen on the map to inspect them." />
@@ -767,7 +770,7 @@ function MobilePlayDock({
 }) {
   const items: Array<{ panel: ActivePanel; label: string; icon: ComponentType<{ className?: string }> }> = [
     { panel: null, label: "Map", icon: MapPin },
-    { panel: "citizen", label: "Agent", icon: UserRound },
+    { panel: "citizen", label: "Student", icon: UserRound },
     { panel: "city", label: "City", icon: Gauge },
     { panel: "story", label: "Story", icon: GalleryHorizontalEnd },
   ];
@@ -817,16 +820,16 @@ function PlayerGuideCard({
             Play as mayor-observer
           </div>
           <p className="mt-1 text-xs leading-snug text-[rgb(var(--muted-strong))]">
-            Watch citizens live, tap people to inspect them, then create events and see how memories and relationships change.
+            Follow five students, give them tasks, then watch their memories, conversations, and friendships change.
           </p>
         </div>
         <Badge tone={running ? "success" : "default"}>{running ? "live" : "paused"}</Badge>
       </div>
 
       <div className="grid gap-1.5 text-[11px]">
-        <GuideStep icon={Eye} label="Watch" detail="Citizens walk to work, school, food, home, and each other." />
+        <GuideStep icon={Eye} label="Watch" detail="Ava, Mateo, Noah, Iris, and Leo move between home, school, the library, and the park." />
         <GuideStep icon={MousePointerClick} label="Inspect" detail={`Tap ${focusName} or any dot on the map for thoughts, needs, memory, and social life.`} />
-        <GuideStep icon={Megaphone} label="Intervene" detail="Use event cards or mayor tools to create a story and observe reactions." />
+        <GuideStep icon={Megaphone} label="Intervene" detail="Assign a task or create an event, then step time forward to see who reacts." />
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -880,7 +883,7 @@ function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
             How to play AgentCity
           </div>
           <p className="mt-1 text-xs leading-relaxed text-[rgb(var(--muted-strong))]">
-            You do not control citizens directly. They are autonomous AI people with jobs, needs, memories, and relationships.
+            You follow five student agents. They move on their own, remember events, talk to each other, and form friendships over time.
           </p>
         </div>
         <button className="btn-pill px-2 py-1" onClick={onClose}>
@@ -890,8 +893,9 @@ function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
 
       <div className="grid gap-2 text-xs">
         <HowToRow icon={Play} title="Let the city run" body="Use 1x, 2x, or 4x in the top bar. Step 15m advances one simulation tick." />
-        <HowToRow icon={MousePointerClick} title="Tap a citizen" body="The citizen drawer shows their thought, mood, money, needs, schedule, goals, memories, relationships, and conversations." />
-        <HowToRow icon={MessageSquareText} title="Read the story" body="Open the Story drawer when you want the event feed. Conversations show what two agents discussed and how their relationship changed." />
+        <HowToRow icon={MousePointerClick} title="Tap a student" body="The citizen drawer shows their thought, mood, money, needs, schedule, goals, memories, relationships, and conversations." />
+        <HowToRow icon={Target} title="Give a task" body="Ask a student to talk, study, visit the park, check on someone, or follow a short instruction." />
+        <HowToRow icon={MessageSquareText} title="Read the talk tab" body="Conversations show what two students discussed and whether they are strangers, acquaintances, friends, or trusted friends." />
         <HowToRow icon={Sparkles} title="Create a situation" body="Use the event cards for flu, traffic, festival, school exam, food shortage, policy changes, or power outage." />
         <HowToRow icon={Handshake} title="Watch relationships develop" body="Citizens who meet repeatedly become acquaintances, then friends, then trusted friends as memories accumulate." />
       </div>
@@ -1298,6 +1302,9 @@ function CitizenPanel({
   locationById,
   tab,
   onTab,
+  busy,
+  runAction,
+  onRefreshCitizen,
 }: {
   citizen: CitizenAgent;
   memories: Memory[];
@@ -1307,6 +1314,9 @@ function CitizenPanel({
   locationById: Record<string, Location>;
   tab: InspectorTab;
   onTab: (tab: InspectorTab) => void;
+  busy: boolean;
+  runAction: (action: () => Promise<unknown>) => Promise<void>;
+  onRefreshCitizen: () => Promise<void>;
 }) {
   const currentLocation = locationById[citizen.current_location_id]?.name ?? citizen.current_location_id;
   const targetLocation =
@@ -1348,10 +1358,19 @@ function CitizenPanel({
         <p className="text-sm leading-relaxed">{citizen.current_thought}</p>
       </div>
 
+      <AssignTaskPanel
+        key={citizen.citizen_id}
+        citizen={citizen}
+        locations={Object.values(locationById)}
+        busy={busy}
+        runAction={runAction}
+        onRefreshCitizen={onRefreshCitizen}
+      />
+
       <div className="grid grid-cols-3 gap-1 rounded-xl bg-black/30 p-1">
         <InspectorTabButton active={tab === "life"} icon={Gauge} label="Life" onClick={() => onTab("life")} />
         <InspectorTabButton active={tab === "memory"} icon={Brain} label="Memory" onClick={() => onTab("memory")} />
-        <InspectorTabButton active={tab === "social"} icon={MessageCircle} label="Social" onClick={() => onTab("social")} />
+        <InspectorTabButton active={tab === "social"} icon={MessageCircle} label="Talk" onClick={() => onTab("social")} />
       </div>
 
       {tab === "life" ? (
@@ -1362,6 +1381,142 @@ function CitizenPanel({
         <SocialTab relationships={relationships} conversations={conversations} citizenNames={citizenNames} />
       ) : null}
     </div>
+  );
+}
+
+function AssignTaskPanel({
+  citizen,
+  locations,
+  busy,
+  runAction,
+  onRefreshCitizen,
+}: {
+  citizen: CitizenAgent;
+  locations: Location[];
+  busy: boolean;
+  runAction: (action: () => Promise<unknown>) => Promise<void>;
+  onRefreshCitizen: () => Promise<void>;
+}) {
+  const [task, setTask] = useState("");
+  const [locationId, setLocationId] = useState(citizen.current_location_id);
+  const playerTask = playerTaskFor(citizen);
+  const locationsById = useMemo(
+    () => Object.fromEntries(locations.map((location) => [location.location_id, location])),
+    [locations],
+  );
+  const locationChoices = useMemo(() => {
+    const preferred = ["loc_school", "loc_library", "loc_park", "loc_market", "loc_homes"];
+    const picked = preferred
+      .map((id) => locationsById[id])
+      .filter((location): location is Location => Boolean(location));
+    const current = locationsById[citizen.current_location_id];
+    if (current && !picked.some((location) => location.location_id === current.location_id)) {
+      picked.unshift(current);
+    }
+    return picked;
+  }, [citizen.current_location_id, locationsById]);
+  const quickTasks = [
+    "Talk to a classmate about today",
+    "Study with someone at the library",
+    "Invite a friend to the park",
+    "Ask how the group is feeling",
+  ];
+
+  async function submitTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmed = task.trim();
+    if (!trimmed) return;
+    await runAction(() =>
+      api.assignTask(citizen.citizen_id, {
+        task: trimmed,
+        location_id: locationId,
+        duration_ticks: 6,
+      }),
+    );
+    await onRefreshCitizen();
+    setTask("");
+  }
+
+  return (
+    <form
+      className="rounded-xl border border-[rgba(var(--accent),0.45)] bg-[rgba(56,189,248,0.08)] p-3"
+      onSubmit={submitTask}
+    >
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Target className="h-4 w-4 text-[rgb(var(--accent))]" />
+            Give {citizen.name.split(" ")[0]} a task
+          </div>
+          <p className="mt-0.5 text-[11px] leading-snug text-[rgb(var(--muted))]">
+            Player tasks become goals, memories, and conversation triggers on future ticks.
+          </p>
+        </div>
+        <Badge tone={playerTask?.status === "active" ? "success" : "default"}>
+          {playerTask?.status === "active" ? "active" : "ready"}
+        </Badge>
+      </div>
+
+      {playerTask ? (
+        <div className="mb-2 rounded-lg border border-[rgba(var(--border),0.72)] bg-black/20 p-2 text-xs">
+          <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted))]">
+            Current player task
+          </div>
+          <div className="leading-snug">{playerTask.task}</div>
+          <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
+            <MapPin className="h-3 w-3" />
+            {locationsById[playerTask.location_id ?? ""]?.name ?? "Current location"}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mb-2 flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
+        {quickTasks.map((quickTask) => (
+          <button
+            key={quickTask}
+            type="button"
+            className="btn-pill shrink-0"
+            onClick={() => setTask(quickTask)}
+          >
+            {quickTask}
+          </button>
+        ))}
+      </div>
+
+      <textarea
+        value={task}
+        onChange={(event) => setTask(event.target.value)}
+        maxLength={240}
+        rows={3}
+        className="min-h-[76px] w-full resize-none rounded-lg border border-[rgba(var(--border),0.85)] bg-[rgba(8,12,24,0.72)] px-3 py-2 text-sm leading-snug outline-none transition focus:border-[rgba(var(--accent),0.8)]"
+        placeholder="Example: Ask Iris if she wants to study together, then remember how she responds."
+      />
+
+      <div className="mt-2 flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
+        {locationChoices.map((location) => (
+          <button
+            key={location.location_id}
+            type="button"
+            className="btn-pill shrink-0"
+            data-active={locationId === location.location_id}
+            onClick={() => setLocationId(location.location_id)}
+          >
+            {locationIcon(location.type)}
+            {location.name}
+          </button>
+        ))}
+      </div>
+
+      <Button
+        className="mt-2 w-full"
+        type="submit"
+        size="sm"
+        disabled={busy || task.trim().length < 3}
+      >
+        <Target className="h-4 w-4" />
+        Assign Task
+      </Button>
+    </form>
   );
 }
 
@@ -1492,6 +1647,40 @@ function SocialTab({
         </div>
         Citizens start as strangers. Repeated talks, shared events, and useful help raise familiarity, warmth, and trust.
       </div>
+      <SectionTitle label="Recent conversations" count={conversations.length} />
+      <div className="space-y-2">
+        {conversations.slice(0, 5).map((conversation) => {
+          const speakers = conversation.actor_ids
+            .map((actorId) => citizenNames[actorId] ?? actorId)
+            .join(" and ");
+          return (
+            <div key={conversation.conversation_id} className="story-card rounded-md p-2 text-xs">
+              <div className="mb-1 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
+                <span className="truncate">{speakers || "Conversation"}</span>
+                <span className="shrink-0">Day {conversation.game_day} · {minutesLabel(conversation.game_minute)}</span>
+              </div>
+              <p className="mb-2 leading-snug text-[rgb(var(--muted-strong))]">{conversation.summary}</p>
+              <div className="space-y-1.5">
+                {conversation.transcript.slice(0, 6).map((line, index) => (
+                  <div
+                    key={`${conversation.conversation_id}-${index}`}
+                    className="rounded-lg border border-[rgba(var(--border-soft),0.8)] bg-black/20 p-2"
+                  >
+                    <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--accent))]">
+                      {citizenNames[line.speaker_id] ?? line.speaker_id}
+                    </div>
+                    <div className="leading-snug">{line.text}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        {conversations.length === 0 ? (
+          <EmptyLine text="No conversations yet. Keep auto mode on, assign a talk task, or step the city forward." />
+        ) : null}
+      </div>
+
       <SectionTitle label="Relationships" count={relationships.length} />
       <div className="space-y-2">
         {relationships.slice(0, 8).map((relationship) => (
@@ -1510,29 +1699,6 @@ function SocialTab({
           </div>
         ))}
         {relationships.length === 0 ? <EmptyLine text="No social history loaded yet." /> : null}
-      </div>
-
-      <SectionTitle label="Recent conversations" count={conversations.length} />
-      <div className="space-y-2">
-        {conversations.slice(0, 5).map((conversation) => (
-          <div key={conversation.conversation_id} className="story-card rounded-md p-2 text-xs">
-            <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-              Day {conversation.game_day} · {minutesLabel(conversation.game_minute)}
-            </div>
-            <p className="mb-1 leading-snug">{conversation.summary}</p>
-            <div className="space-y-1 text-[11px] text-[rgb(var(--muted))]">
-              {conversation.transcript.slice(0, 3).map((line, index) => (
-                <div key={`${conversation.conversation_id}-${index}`}>
-                  <span className="text-[rgb(var(--foreground))]">{citizenNames[line.speaker_id] ?? line.speaker_id}:</span>{" "}
-                  {line.text}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        {conversations.length === 0 ? (
-          <EmptyLine text="No conversations yet. Auto mode will create them as citizens cross paths." />
-        ) : null}
       </div>
     </div>
   );
@@ -1658,6 +1824,19 @@ function EmptyLine({ text }: { text: string }) {
       {text}
     </div>
   );
+}
+
+function playerTaskFor(citizen: CitizenAgent) {
+  const rawTask = citizen.personality?.player_task;
+  if (!rawTask || typeof rawTask !== "object") return null;
+  const taskData = rawTask as Record<string, unknown>;
+  const task = typeof taskData.task === "string" ? taskData.task : "";
+  if (!task) return null;
+  return {
+    task,
+    status: typeof taskData.status === "string" ? taskData.status : "active",
+    location_id: typeof taskData.location_id === "string" ? taskData.location_id : null,
+  };
 }
 
 function locationIcon(type: string) {

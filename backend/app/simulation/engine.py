@@ -19,6 +19,7 @@ from app.models import (
     utcnow,
 )
 from app.schemas import (
+    AssignTaskRequest,
     CitizenAgent,
     CityEvent,
     CityMetrics,
@@ -37,9 +38,9 @@ class SimulationEngine:
 
     def get_state(self, db: Session) -> CityState:
         state = self._state(db)
-        citizens = list(db.scalars(select(CitizenORM).order_by(CitizenORM.citizen_id)))
+        citizens = self._active_citizens(db)
         locations = list(db.scalars(select(LocationORM).order_by(LocationORM.location_id)))
-        events = list(db.scalars(select(CityEventORM).order_by(desc(CityEventORM.timestamp)).limit(80)))
+        events = self._recent_events(db, limit=80)
         metrics = self._metrics(citizens, events)
         state.metrics = metrics.model_dump()
         db.commit()
@@ -105,7 +106,7 @@ class SimulationEngine:
         state.updated_at = utcnow()
 
         locations = {location.location_id: location for location in db.scalars(select(LocationORM))}
-        citizens = list(db.scalars(select(CitizenORM).order_by(CitizenORM.citizen_id)))
+        citizens = self._active_citizens(db)
         events: list[CityEventORM] = []
         for citizen in citizens:
             events.extend(
@@ -123,7 +124,9 @@ class SimulationEngine:
         db.flush()
 
         cognition_results: list[dict] = []
-        if cognition:
+        should_run_cognition = state.tick % self.settings.llm_cognition_interval_ticks == 0
+        should_run_cognition = should_run_cognition or any(event.priority >= 3 for event in events)
+        if cognition and should_run_cognition:
             observations = observations_by_actor(events)
             event_context = recent_event_context(db)
             cognition_results = cognition.process_tick(
@@ -150,7 +153,7 @@ class SimulationEngine:
 
     def trigger_event(self, db: Session, request: TriggerEventRequest) -> CityState:
         state = self._state(db)
-        citizens = list(db.scalars(select(CitizenORM).order_by(CitizenORM.citizen_id)))
+        citizens = self._active_citizens(db)
         location_id = request.location_id or self._default_event_location(request.event_type)
         severity_multiplier = {"low": 0.6, "medium": 1.0, "high": 1.45}[request.severity]
         actors: list[str] = []
@@ -224,6 +227,7 @@ class SimulationEngine:
 
     def apply_policy(self, db: Session, request: MayorPolicyRequest) -> CityState:
         state = self._state(db)
+        active_actor_ids = [citizen.citizen_id for citizen in self._active_citizens(db)[:1]]
         policy = dict(state.policy)
         updates = request.model_dump(exclude_none=True)
         policy.update(updates)
@@ -242,11 +246,67 @@ class SimulationEngine:
             db,
             state=state,
             event_type="mayor_policy",
-            actors=["cit_011"],
+            actors=active_actor_ids,
             location_id="loc_city_hall",
             description=summary,
             payload=updates,
             priority=2,
+        )
+        db.commit()
+        return self.get_state(db)
+
+    def assign_task(self, db: Session, citizen_id: str, request: AssignTaskRequest) -> CityState:
+        state = self._state(db)
+        active_ids = self._active_citizen_ids()
+        if active_ids and citizen_id not in active_ids:
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="Citizen is inactive in the current playable roster")
+        citizen = db.get(CitizenORM, citizen_id)
+        if not citizen:
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="Citizen not found")
+
+        location_id = request.location_id or citizen.current_location_id
+        if location_id and not db.get(LocationORM, location_id):
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=400, detail="Unknown location_id")
+
+        task = request.task.strip()
+        personality = dict(citizen.personality or {})
+        personality["player_task"] = {
+            "task": task,
+            "location_id": location_id,
+            "assigned_day": state.day,
+            "assigned_minute": state.minute_of_day,
+            "expires_tick": state.tick + request.duration_ticks,
+            "status": "active",
+        }
+        citizen.personality = personality
+        citizen.current_activity = f"Task: {task}"
+        citizen.current_thought = f"The player asked me to: {task}. I should focus on that next."
+        existing_goals = [goal for goal in citizen.short_term_goals if not goal.startswith("Player task:")]
+        citizen.short_term_goals = [f"Player task: {task}", *existing_goals][:5]
+        self.memory_store.add_memory(
+            db,
+            citizen_id=citizen.citizen_id,
+            kind="episodic",
+            content=f"The player assigned me a task: {task}.",
+            importance=0.78,
+            salience=0.82,
+            extra={"source": "player_task", "location_id": location_id},
+        )
+        self._event(
+            db,
+            state=state,
+            event_type="player_task",
+            location_id=location_id,
+            actors=[citizen.citizen_id],
+            description=f"The player asked {citizen.name} to: {task}",
+            payload={"task": task, "duration_ticks": request.duration_ticks},
+            priority=3,
         )
         db.commit()
         return self.get_state(db)
@@ -262,7 +322,7 @@ class SimulationEngine:
     ) -> list[CityEventORM]:
         events: list[CityEventORM] = []
         old_location = citizen.current_location_id
-        target_location_id, activity = self._desired_location_and_activity(citizen, state.minute_of_day)
+        target_location_id, activity = self._desired_location_and_activity(citizen, state.minute_of_day, state.tick)
         citizen.current_activity = activity
 
         if citizen.health < 55 and citizen.profession not in {"Doctor", "Nurse"}:
@@ -486,7 +546,16 @@ class SimulationEngine:
                 )
         return events
 
-    def _desired_location_and_activity(self, citizen: CitizenORM, minute: int) -> tuple[str, str]:
+    def _desired_location_and_activity(self, citizen: CitizenORM, minute: int, tick: int) -> tuple[str, str]:
+        player_task = dict((citizen.personality or {}).get("player_task") or {})
+        if player_task.get("status") == "active":
+            if int(player_task.get("expires_tick", tick)) >= tick:
+                return str(player_task.get("location_id") or citizen.current_location_id), f"Task: {player_task.get('task')}"
+            player_task["status"] = "completed"
+            personality = dict(citizen.personality or {})
+            personality["player_task"] = player_task
+            citizen.personality = personality
+            citizen.current_thought = f"I finished the player task: {player_task.get('task')}."
         for entry in citizen.daily_schedule:
             start = int(entry["start"])
             end = int(entry["end"])
@@ -542,6 +611,35 @@ class SimulationEngine:
             sick_count=len([c for c in citizens if c.health < 65]),
             active_events=len([e for e in events if e.priority >= 2]),
         )
+
+    def _active_citizen_ids(self) -> list[str]:
+        return self.settings.parsed_active_citizen_ids
+
+    def _active_citizens(self, db: Session) -> list[CitizenORM]:
+        citizens = list(db.scalars(select(CitizenORM).order_by(CitizenORM.citizen_id)))
+        active_ids = self._active_citizen_ids()
+        if not active_ids:
+            return citizens
+        citizens_by_id = {citizen.citizen_id: citizen for citizen in citizens}
+        return [citizens_by_id[citizen_id] for citizen_id in active_ids if citizen_id in citizens_by_id]
+
+    def _recent_events(self, db: Session, limit: int = 80) -> list[CityEventORM]:
+        events = list(
+            db.scalars(
+                select(CityEventORM)
+                .order_by(desc(CityEventORM.timestamp))
+                .limit(max(limit, 1) * 4)
+            )
+        )
+        active_ids = set(self._active_citizen_ids())
+        if not active_ids:
+            return events[:limit]
+        filtered = [
+            event
+            for event in events
+            if not event.actors or any(actor in active_ids for actor in event.actors)
+        ]
+        return filtered[:limit]
 
     def _state(self, db: Session) -> SimulationStateORM:
         state = db.get(SimulationStateORM, self.settings.city_id)

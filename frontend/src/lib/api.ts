@@ -1,4 +1,5 @@
 import type {
+  AssignTaskPayload,
   CityState,
   Conversation,
   MayorPolicyPayload,
@@ -48,4 +49,9 @@ export const api = {
     request<Relationship[]>(`/citizens/${citizenId}/relationships`),
   getConversations: (citizenId: string) =>
     request<Conversation[]>(`/citizens/${citizenId}/conversations`),
+  assignTask: (citizenId: string, payload: AssignTaskPayload) =>
+    request<CityState>(`/citizens/${citizenId}/task`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };

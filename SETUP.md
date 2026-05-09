@@ -41,9 +41,11 @@ Set these in the root `.env`.
 | `OPENAI_API_KEY` | Required for real LLM | `sk-...` | Only needed when `LLM_MODE=real`. |
 | `OPENAI_MODEL` | Yes | `gpt-4.1-nano` | Citizen cognition model. |
 | `OPENAI_EMBEDDING_MODEL` | Yes | `text-embedding-3-small` | Memory embedding model. |
-| `MAX_LLM_CALLS_PER_TICK` | Yes | `4` | Caps citizen cognition calls per simulation tick. |
-| `MAX_CONVERSATIONS_PER_TICK` | Yes | `2` | Caps conversations created per tick. |
+| `MAX_LLM_CALLS_PER_TICK` | Yes | `2` | Caps citizen cognition calls per simulation tick. Movement and basic needs do not call the LLM. |
+| `MAX_CONVERSATIONS_PER_TICK` | Yes | `1` | Caps conversations created per tick. |
+| `LLM_COGNITION_INTERVAL_TICKS` | Yes | `4` | Runs LLM cognition every N ticks unless a high-priority in-tick event needs it. |
 | `TICK_MINUTES` | Yes | `15` | In-game minutes per tick. |
+| `ACTIVE_CITIZEN_IDS` | Yes | `cit_009,cit_010,cit_021,cit_022,cit_026` | Default playable roster: five student agents. Use `all` to activate the full city, or a comma-separated list for a custom cast. |
 | `CORS_ORIGINS` | Yes | `http://localhost:3000` | Comma-separated frontend origins. |
 
 Redis is not required for V1 gameplay.
@@ -92,6 +94,10 @@ LLM_MODE=real
 OPENAI_API_KEY=sk-your-key
 OPENAI_MODEL=gpt-4.1-nano
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+MAX_LLM_CALLS_PER_TICK=2
+MAX_CONVERSATIONS_PER_TICK=1
+LLM_COGNITION_INTERVAL_TICKS=4
+ACTIVE_CITIZEN_IDS=cit_009,cit_010,cit_021,cit_022,cit_026
 ```
 
 For local development without paid API calls:
@@ -127,9 +133,11 @@ Set these Vercel environment variables for Production, Preview, and Development:
 | `OPENAI_API_KEY` | Your OpenAI API key. Required for real intelligent mode. |
 | `OPENAI_MODEL` | `gpt-4.1-nano` |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` |
-| `MAX_LLM_CALLS_PER_TICK` | `4` |
-| `MAX_CONVERSATIONS_PER_TICK` | `2` |
+| `MAX_LLM_CALLS_PER_TICK` | `2` |
+| `MAX_CONVERSATIONS_PER_TICK` | `1` |
+| `LLM_COGNITION_INTERVAL_TICKS` | `4` |
 | `TICK_MINUTES` | `15` |
+| `ACTIVE_CITIZEN_IDS` | `cit_009,cit_010,cit_021,cit_022,cit_026` |
 | `CORS_ORIGINS` | `https://ai-agent-city-game.vercel.app` |
 | `NEXT_PUBLIC_API_URL` | `/api` |
 
@@ -150,6 +158,10 @@ npx vercel env add OPENAI_API_KEY production
 npx vercel env add LLM_MODE production
 npx vercel env add OPENAI_MODEL production
 npx vercel env add OPENAI_EMBEDDING_MODEL production
+npx vercel env add MAX_LLM_CALLS_PER_TICK production
+npx vercel env add MAX_CONVERSATIONS_PER_TICK production
+npx vercel env add LLM_COGNITION_INTERVAL_TICKS production
+npx vercel env add ACTIVE_CITIZEN_IDS production
 npx vercel env add NEXT_PUBLIC_API_URL production
 npx vercel --prod
 ```
@@ -200,13 +212,15 @@ http://localhost:3000
 ## How To Play After It Opens
 
 1. Use the top speed controls to run the city at `1x`, `2x`, or `4x`. `Step 15m` advances one tick manually.
-2. Tap or click a citizen on the map or in the left roster.
-3. Use the right panel tabs:
+2. Start with the default five-student cast: Ava, Mateo, Noah, Iris, and Leo. The older full-city citizens remain in the database/code but are inactive unless `ACTIVE_CITIZEN_IDS` changes.
+3. Tap or click a student on the map or in the roster.
+4. Use `Give [name] a task` in the citizen drawer to ask a student to talk, study, visit the park, or follow any short instruction.
+5. Step the game forward and open the `Talk` tab to read conversations and see whether the students are strangers, acquaintances, friends, or trusted friends.
+6. Use `Make Something Happen` to trigger an event, then open the `Story` drawer only when you want the event feed.
+7. Use the right panel tabs:
    - `Life`: current task, needs, money, goals, and schedule.
    - `Memory`: durable memories and personal summary.
-   - `Social`: relationships, friendship stage, and recent conversations.
-4. Use `Make Something Happen` to trigger an event, then read `What Just Happened` at the bottom.
-5. Use `Mayor Tools` to fund hospitals, schools, roads, or a public health campaign and observe how citizens respond.
+   - `Talk`: recent conversations, relationship stage, trust, warmth, and familiarity.
 
 ## Verify Setup
 

@@ -163,3 +163,9 @@ export type MayorPolicyPayload = {
   farmer_subsidy?: number;
   public_health_campaign?: boolean;
 };
+
+export type AssignTaskPayload = {
+  task: string;
+  location_id?: string | null;
+  duration_ticks?: number;
+};
