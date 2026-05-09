@@ -455,22 +455,29 @@ export function AgentCityShell() {
               </div>
             ) : null}
             {selectedCitizen ? (
-              <CitizenPanel
-                citizen={selectedCitizen}
-                memories={memories}
-                relationships={relationships}
-                conversations={conversations}
-                citizenNames={citizenNames}
-                locationById={locationById}
-                tab={inspectorTab}
-                onTab={setInspectorTab}
-                busy={busy}
-                runAction={runAction}
-                onRefreshCitizen={() => selectCitizen(selectedCitizen.citizen_id)}
-                citizens={city?.citizens ?? []}
-                gameMode={gameMode}
-                onTaskAssigned={handleTaskAssigned}
-              />
+              <>
+                <CitizenSwitcher
+                  citizens={city?.citizens ?? []}
+                  selectedCitizenId={selectedCitizen.citizen_id}
+                  onSelect={handleSelectCitizen}
+                />
+                <CitizenPanel
+                  citizen={selectedCitizen}
+                  memories={memories}
+                  relationships={relationships}
+                  conversations={conversations}
+                  citizenNames={citizenNames}
+                  locationById={locationById}
+                  tab={inspectorTab}
+                  onTab={setInspectorTab}
+                  busy={busy}
+                  runAction={runAction}
+                  onRefreshCitizen={() => selectCitizen(selectedCitizen.citizen_id)}
+                  citizens={city?.citizens ?? []}
+                  gameMode={gameMode}
+                  onTaskAssigned={handleTaskAssigned}
+                />
+              </>
             ) : (
               <EmptyLine text="Tap a citizen on the map to inspect them." />
             )}
@@ -1177,6 +1184,53 @@ function CitizenRoster({
             </span>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function CitizenSwitcher({
+  citizens,
+  selectedCitizenId,
+  onSelect,
+}: {
+  citizens: CitizenAgent[];
+  selectedCitizenId: string;
+  onSelect: (citizenId: string) => void;
+}) {
+  return (
+    <div className="mb-3 rounded-xl border border-[rgba(var(--border),0.82)] bg-black/20 p-2">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">
+          <Users className="h-3.5 w-3.5 text-[rgb(var(--accent))]" />
+          Students
+        </div>
+        <Badge tone="accent">{citizens.length}</Badge>
+      </div>
+      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+        {citizens.map((citizen) => {
+          const task = playerTaskFor(citizen);
+          const active = citizen.citizen_id === selectedCitizenId;
+          return (
+            <button
+              key={citizen.citizen_id}
+              className={`flex min-h-12 items-center gap-2 rounded-lg border px-2 py-2 text-left transition ${
+                active
+                  ? "border-[rgba(56,189,248,0.68)] bg-[rgba(56,189,248,0.13)]"
+                  : "border-[rgba(var(--border-soft),0.35)] bg-black/15 hover:border-[rgba(var(--accent),0.7)]"
+              }`}
+              onClick={() => onSelect(citizen.citizen_id)}
+            >
+              <CitizenAvatar citizen={citizen} small />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-semibold">{citizen.name}</span>
+                <span className="block truncate font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted))]">
+                  {task?.status === "active" ? "task active" : relationshipShort(citizen)}
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -2256,6 +2310,13 @@ function playerTaskFor(citizen: CitizenAgent): PlayerTask | null {
 
 function activePlayerTaskCount(citizens: CitizenAgent[]) {
   return citizens.filter((citizen) => playerTaskFor(citizen)?.status === "active").length;
+}
+
+function relationshipShort(citizen: CitizenAgent) {
+  const friendCount = citizen.friend_ids.length;
+  if (friendCount > 0) return `${friendCount} friend${friendCount === 1 ? "" : "s"}`;
+  const knownCount = Object.values(citizen.relationship_scores).filter((score) => score >= 35).length;
+  return `${knownCount} known`;
 }
 
 function locationIcon(type: string) {

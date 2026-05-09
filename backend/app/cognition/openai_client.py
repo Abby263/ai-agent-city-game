@@ -121,7 +121,10 @@ class CitizenCognitionClient:
             "nearby_citizens": nearby_citizens,
             "event_context": event_context,
             "rules": [
+                "Treat the first observation as the player's exact task context and satisfy it directly.",
                 "Use first-person inner thought for thought.",
+                "If the player asked someone to greet or say hi, make the transcript a natural greeting and response.",
+                "If the player asked a question, have the target answer it from their own perspective when they are the target.",
                 "Make memory specific enough to affect future behavior.",
                 "Only include conversation lines if a nearby citizen is a natural target.",
                 "Keep the result game-readable and concise.",
@@ -170,22 +173,58 @@ class CitizenCognitionClient:
         name = citizen["name"]
         observation = observations[0] if observations else "The city feels steady."
         memory = memories[0] if memories else f"{name} wants to be useful in Navora."
-        target = nearby_citizens[0]["citizen_id"] if nearby_citizens else None
+        task_text = self._task_from_observations(observations)
+        task_lower = task_text.lower()
+        target_person = nearby_citizens[0] if nearby_citizens else None
+        target = target_person["citizen_id"] if target_person else None
         conversation = {"target_citizen_id": None, "summary": "", "lines": []}
-        if target:
-            conversation = {
-                "target_citizen_id": target,
-                "summary": f"{name} briefly checks in about {observation.lower()}",
-                "lines": [
+        if target and target_person:
+            target_first = target_person["name"].split(" ")[0]
+            actor_first = name.split(" ")[0]
+            is_greeting = any(word in task_lower for word in ("hi", "hello", "greet", "say hey", "check in"))
+            is_question = "?" in task_text or any(
+                word in task_lower for word in ("ask", "find out", "how many", "what", "who", "why", "when", "where")
+            )
+            if is_greeting:
+                summary = f"{name} says hello to {target_person['name']} and checks how the day feels."
+                lines = [
                     {
                         "speaker_id": citizen["citizen_id"],
-                        "text": f"I am thinking about how this affects our day at {city_time}.",
+                        "text": f"Hi {target_first}. I wanted to say hello and see how your day is going.",
                     },
                     {
                         "speaker_id": target,
-                        "text": "Let's keep an eye on it and help where we can.",
+                        "text": f"Hi {actor_first}. Thanks for coming over. It helps to know someone is paying attention.",
                     },
-                ],
+                ]
+            elif is_question:
+                summary = f"{name} asks {target_person['name']} about the player task: {task_text}"
+                lines = [
+                    {
+                        "speaker_id": citizen["citizen_id"],
+                        "text": f"I wanted to ask you this: {task_text}",
+                    },
+                    {
+                        "speaker_id": target,
+                        "text": "I can answer from what I know. Thanks for asking me directly.",
+                    },
+                ]
+            else:
+                summary = f"{name} and {target_person['name']} talk through the player task: {task_text}"
+                lines = [
+                    {
+                        "speaker_id": citizen["citizen_id"],
+                        "text": f"I wanted to talk with you about this: {task_text}",
+                    },
+                    {
+                        "speaker_id": target,
+                        "text": "Thanks for checking in. I will remember that you came over to talk to me.",
+                    },
+                ]
+            conversation = {
+                "target_citizen_id": target,
+                "summary": summary,
+                "lines": lines,
             }
         mood = "Concerned" if "flu" in event_context.lower() or citizen["health"] < 55 else "Focused"
         return CognitionResult(
@@ -201,3 +240,12 @@ class CitizenCognitionClient:
             conversation=conversation,
             importance=0.65 if event_context else 0.45,
         )
+
+    @staticmethod
+    def _task_from_observations(observations: list[str]) -> str:
+        for observation in observations:
+            if observation.startswith("Player task:"):
+                parts = observation.split('"')
+                if len(parts) >= 2 and parts[1].strip():
+                    return parts[1].strip()
+        return observations[0] if observations else "the task"
