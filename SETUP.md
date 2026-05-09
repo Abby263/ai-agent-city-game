@@ -197,6 +197,17 @@ Open:
 http://localhost:3000
 ```
 
+## How To Play After It Opens
+
+1. Use the top speed controls to run the city at `1x`, `2x`, or `4x`. `Step 15m` advances one tick manually.
+2. Click a citizen on the map or in the left roster.
+3. Use the right panel tabs:
+   - `Life`: current task, needs, money, goals, and schedule.
+   - `Memory`: durable memories and personal summary.
+   - `Social`: relationships, friendship stage, and recent conversations.
+4. Use `Make Something Happen` to trigger an event, then read `What Just Happened` at the bottom.
+5. Use `Mayor Tools` to fund hospitals, schools, roads, or a public health campaign and observe how citizens respond.
+
 ## Verify Setup
 
 Backend health check:

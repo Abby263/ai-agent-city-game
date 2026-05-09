@@ -11,20 +11,25 @@ import {
   BriefcaseBusiness,
   Building2,
   Bus,
-  CalendarClock,
   CircleDollarSign,
   Cloud,
   Coffee,
+  Eye,
   Factory,
   FlaskConical,
   GalleryHorizontalEnd,
   Gauge,
+  Handshake,
   HeartPulse,
+  HelpCircle,
   Home,
   Library,
+  Megaphone,
   MapPin,
   MessageCircle,
+  MessageSquareText,
   Moon,
+  MousePointerClick,
   Pause,
   PiggyBank,
   Pill,
@@ -38,6 +43,7 @@ import {
   Sun,
   Sunrise,
   Sunset,
+  Target,
   TreePine,
   TrendingUp,
   UserRound,
@@ -141,6 +147,9 @@ export function AgentCityShell() {
   const [professionFilter, setProfessionFilter] = useState("All");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("life");
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
+  const [showGuide, setShowGuide] = useState(
+    () => typeof window !== "undefined" && window.localStorage.getItem("agentcity-guide-dismissed") !== "true",
+  );
   const lastUserSelectRef = useRef<number>(0);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -256,6 +265,11 @@ export function AgentCityShell() {
     }
   }
 
+  function closeGuide() {
+    window.localStorage.setItem("agentcity-guide-dismissed", "true");
+    setShowGuide(false);
+  }
+
   const clockLabel = city ? minutesLabel(city.clock.minute_of_day) : "--:--";
   const period = periodInfo(city?.clock.minute_of_day ?? 0);
 
@@ -283,10 +297,18 @@ export function AgentCityShell() {
         onAutoFollow={setAutoFollow}
         busy={busy}
         runAction={runAction}
+        onShowGuide={() => setShowGuide(true)}
       />
 
       <section className="grid min-h-0 grid-cols-[300px_minmax(420px,1fr)_380px] gap-3 px-3 pt-2 pb-1">
         <aside className="glass-panel min-h-0 overflow-y-auto rounded-xl p-3 scrollbar-thin">
+          <PlayerGuideCard
+            city={city}
+            selectedCitizen={selectedCitizen ?? null}
+            busy={busy}
+            onOpenGuide={() => setShowGuide(true)}
+            runAction={runAction}
+          />
           <HeroStats city={city} />
           <CitySystems city={city} />
           <CitizenRoster
@@ -313,6 +335,7 @@ export function AgentCityShell() {
             period={period}
             hover={hoverInfo}
           />
+          {showGuide ? <HowToPlayOverlay onClose={closeGuide} /> : null}
           <SceneLegend />
         </div>
 
@@ -359,6 +382,7 @@ function TopHeader({
   onAutoFollow,
   busy,
   runAction,
+  onShowGuide,
 }: {
   cityName: string | undefined;
   connectionStatus: string;
@@ -374,8 +398,10 @@ function TopHeader({
   onAutoFollow: (value: boolean) => void;
   busy: boolean;
   runAction: (action: () => Promise<unknown>) => Promise<void>;
+  onShowGuide: () => void;
 }) {
   const PeriodIcon = period.icon;
+  const isStreaming = connectionStatus === "connected";
   return (
     <header className="z-10 flex min-w-0 items-center justify-between gap-3 border-b border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.85)] px-4 backdrop-blur">
       <div className="flex min-w-0 items-center gap-3">
@@ -388,19 +414,19 @@ function TopHeader({
             <Badge tone="accent">AgentCity</Badge>
           </div>
           <div className="mt-0.5 flex min-w-0 items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            {connectionStatus === "connected" ? (
+            {isStreaming ? (
               <>
                 <Wifi className="h-3 w-3 text-[rgb(var(--success))]" />
                 <span className="live-dot text-[rgb(var(--success))]">live stream</span>
               </>
             ) : (
               <>
-                <WifiOff className="h-3 w-3" />
-                <span>{connectionStatus}</span>
+                <WifiOff className="h-3 w-3 text-[rgb(var(--accent-2))]" />
+                <span>cloud actions</span>
               </>
             )}
             <span className="opacity-60">·</span>
-            <span>autonomous mode {speed === "paused" ? "paused" : `running ${speed}`}</span>
+            <span>city clock {speed === "paused" ? "paused" : `running ${speed}`}</span>
           </div>
         </div>
       </div>
@@ -415,22 +441,27 @@ function TopHeader({
           className={`btn-pill ${autoDirector ? "" : ""}`}
           data-active={autoDirector}
           onClick={() => onAutoDirector(!autoDirector)}
-          title="Auto-director triggers ambient events to keep the city lively"
+          title="Auto Events creates occasional city incidents and celebrations"
         >
           <Sparkles className="h-3.5 w-3.5" />
-          Director
+          Auto Events
         </button>
         <button
           className="btn-pill"
           data-active={autoFollow}
           onClick={() => onAutoFollow(!autoFollow)}
-          title="Cycle the focused citizen automatically"
+          title="Follow interesting citizens automatically"
         >
           <UserRound className="h-3.5 w-3.5" />
-          Auto-Follow
+          Follow Citizen
         </button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => runAction(api.tick)} title="Advance one tick">
+        <button className="btn-pill" onClick={onShowGuide} title="Show how to play AgentCity">
+          <HelpCircle className="h-3.5 w-3.5" />
+          How to Play
+        </button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => runAction(api.tick)} title="Advance one 15-minute game tick">
           <Radio className="h-4 w-4" />
+          <span className="hidden xl:inline">Step 15m</span>
         </Button>
       </div>
     </header>
@@ -505,6 +536,132 @@ function ClockBlock({
           <span>·</span>
           <span className="text-[rgb(var(--muted-strong))]">{period.label}</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function PlayerGuideCard({
+  city,
+  selectedCitizen,
+  busy,
+  onOpenGuide,
+  runAction,
+}: {
+  city: CityState | null;
+  selectedCitizen: CitizenAgent | null;
+  busy: boolean;
+  onOpenGuide: () => void;
+  runAction: (action: () => Promise<unknown>) => Promise<void>;
+}) {
+  const running = Boolean(city?.clock.running);
+  const focusName = selectedCitizen?.name ?? "a citizen";
+  return (
+    <div className="mb-3 rounded-xl border border-[rgba(var(--accent),0.45)] bg-[linear-gradient(160deg,rgba(56,189,248,0.14),rgba(167,139,250,0.08)_55%,rgba(8,12,24,0.64))] p-3 shadow-[0_12px_34px_rgba(0,0,0,0.28)]">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <Target className="h-4 w-4 text-[rgb(var(--accent))]" />
+            Play as mayor-observer
+          </div>
+          <p className="mt-1 text-xs leading-snug text-[rgb(var(--muted-strong))]">
+            Watch citizens live, click people to inspect them, then create events and see how memories and relationships change.
+          </p>
+        </div>
+        <Badge tone={running ? "success" : "default"}>{running ? "live" : "paused"}</Badge>
+      </div>
+
+      <div className="grid gap-1.5 text-[11px]">
+        <GuideStep icon={Eye} label="Watch" detail="Citizens walk to work, school, food, home, and each other." />
+        <GuideStep icon={MousePointerClick} label="Inspect" detail={`Click ${focusName} or any dot on the map for thoughts, needs, memory, and social life.`} />
+        <GuideStep icon={Megaphone} label="Intervene" detail="Use event cards or mayor tools to create a story and observe reactions." />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button
+          size="sm"
+          variant={running ? "secondary" : "default"}
+          disabled={busy}
+          onClick={() => runAction(running ? api.tick : api.start)}
+        >
+          {running ? <Radio className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          {running ? "Advance 15m" : "Start City"}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onOpenGuide}>
+          <HelpCircle className="h-4 w-4" />
+          Full Guide
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function GuideStep({
+  icon: Icon,
+  label,
+  detail,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  detail: string;
+}) {
+  return (
+    <div className="flex gap-2 rounded-lg bg-black/20 p-2">
+      <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[rgba(56,189,248,0.16)] text-[rgb(var(--accent))]">
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+      <div className="min-w-0">
+        <div className="font-semibold text-[rgb(var(--foreground))]">{label}</div>
+        <div className="leading-snug text-[rgb(var(--muted))]">{detail}</div>
+      </div>
+    </div>
+  );
+}
+
+function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="absolute left-4 top-4 z-20 max-w-[430px] rounded-2xl border border-[rgba(var(--accent),0.55)] bg-[rgba(8,12,24,0.93)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur">
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-base font-semibold">
+            <HelpCircle className="h-5 w-5 text-[rgb(var(--accent))]" />
+            How to play AgentCity
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-[rgb(var(--muted-strong))]">
+            You do not control citizens directly. They are autonomous AI people with jobs, needs, memories, and relationships.
+          </p>
+        </div>
+        <button className="btn-pill px-2 py-1" onClick={onClose}>
+          Close
+        </button>
+      </div>
+
+      <div className="grid gap-2 text-xs">
+        <HowToRow icon={Play} title="Let the city run" body="Use 1x, 2x, or 4x in the top bar. Step 15m advances one simulation tick." />
+        <HowToRow icon={MousePointerClick} title="Click a citizen" body="The right panel shows their thought, mood, money, needs, schedule, goals, memories, relationships, and conversations." />
+        <HowToRow icon={MessageSquareText} title="Read the story" body="The bottom feed explains what just happened. Conversations show what two agents discussed and how their relationship changed." />
+        <HowToRow icon={Sparkles} title="Create a situation" body="Use the event cards for flu, traffic, festival, school exam, food shortage, policy changes, or power outage." />
+        <HowToRow icon={Handshake} title="Watch relationships develop" body="Citizens who meet repeatedly become acquaintances, then friends, then trusted friends as memories accumulate." />
+      </div>
+    </div>
+  );
+}
+
+function HowToRow({
+  icon: Icon,
+  title,
+  body,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  body: string;
+}) {
+  return (
+    <div className="flex gap-3 rounded-xl border border-[rgba(var(--border-soft),0.85)] bg-black/20 p-2.5">
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--accent))]" />
+      <div>
+        <div className="font-semibold">{title}</div>
+        <p className="mt-0.5 leading-snug text-[rgb(var(--muted))]">{body}</p>
       </div>
     </div>
   );
@@ -723,6 +880,10 @@ function SceneOverlay({
         <p className="mt-1 line-clamp-3 text-xs leading-snug text-[rgb(var(--muted))]">
           {citizen?.current_thought ?? "Citizens move, work, react, remember, and form plans as the simulation runs."}
         </p>
+        <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-black/25 px-2 py-1.5 text-[11px] text-[rgb(var(--muted-strong))]">
+          <MousePointerClick className="h-3.5 w-3.5 text-[rgb(var(--accent))]" />
+          Click a person on the map or roster to follow their life.
+        </div>
       </div>
 
       <div className="pointer-events-none absolute right-3 top-3 w-[260px] rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.86)] p-3 shadow-2xl backdrop-blur">
@@ -828,9 +989,12 @@ function ActionPanel({
     <div className="mt-4 space-y-5">
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">Event Deck</h2>
-          <Badge tone="warning">director-on stories</Badge>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">Make Something Happen</h2>
+          <Badge tone="warning">agents react</Badge>
         </div>
+        <p className="text-xs leading-snug text-[rgb(var(--muted))]">
+          Pick an event to test the city. Citizens will move, think, talk, remember, and update relationships.
+        </p>
         <div className="grid grid-cols-2 gap-2">
           {eventButtons.map((item) => {
             const Icon = item.icon;
@@ -858,11 +1022,14 @@ function ActionPanel({
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">Mayor Policy</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">Mayor Tools</h2>
           <Badge tone={city?.policy?.public_health_campaign ? "success" : "default"}>
             {city?.policy?.public_health_campaign ? "campaign on" : "standard"}
           </Badge>
         </div>
+        <p className="text-xs leading-snug text-[rgb(var(--muted))]">
+          Change budgets and campaigns to help the city recover from events.
+        </p>
         <div className="grid grid-cols-2 gap-2">
           <PolicyButton busy={busy} label="Hospital" icon={HeartPulse} onClick={() => runAction(() => api.applyPolicy({ hospital_budget: 72 }))} />
           <PolicyButton busy={busy} label="School" icon={BookOpen} onClick={() => runAction(() => api.applyPolicy({ school_budget: 70 }))} />
@@ -1089,15 +1256,27 @@ function SocialTab({
 }) {
   return (
     <div className="space-y-3">
+      <div className="rounded-xl border border-[rgba(var(--accent),0.35)] bg-[rgba(56,189,248,0.08)] p-3 text-xs leading-relaxed text-[rgb(var(--muted-strong))]">
+        <div className="mb-1 flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
+          <Handshake className="h-4 w-4 text-[rgb(var(--accent))]" />
+          How friendship forms
+        </div>
+        Citizens start as strangers. Repeated talks, shared events, and useful help raise familiarity, warmth, and trust.
+      </div>
       <SectionTitle label="Relationships" count={relationships.length} />
       <div className="space-y-2">
         {relationships.slice(0, 8).map((relationship) => (
           <div key={relationship.relationship_id} className="story-card rounded-md p-2 text-xs">
             <div className="mb-1 flex justify-between gap-2">
               <span className="truncate">{citizenNames[relationship.other_citizen_id] ?? relationship.other_citizen_id}</span>
-              <span className="font-mono text-[rgb(var(--muted))]">trust {Math.round(relationship.trust)}</span>
+              <span className="font-mono text-[rgb(var(--muted))]">{relationshipStage(relationship)}</span>
             </div>
-            <Progress value={relationship.trust} tone="accent" height={5} />
+            <div className="mb-1 grid grid-cols-3 gap-1 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted))]">
+              <span>Trust {Math.round(relationship.trust)}</span>
+              <span>Warm {Math.round(relationship.warmth)}</span>
+              <span>Know {Math.round(relationship.familiarity)}</span>
+            </div>
+            <Progress value={(relationship.trust + relationship.warmth + relationship.familiarity) / 3} tone="accent" height={5} />
             <p className="mt-1 line-clamp-2 text-[11px] text-[rgb(var(--muted))]">{relationship.notes}</p>
           </div>
         ))}
@@ -1136,12 +1315,12 @@ function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <GalleryHorizontalEnd className="h-4 w-4 text-[rgb(var(--accent))]" />
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">Story Feed</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">What Just Happened</h2>
           <Badge tone="accent">{timeline.length}</Badge>
         </div>
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
           <TrendingUp className="h-3.5 w-3.5" />
-          Newest first · auto-refreshing
+          Newest first · click citizens to see what they remember
         </div>
       </div>
       <div className="grid h-[148px] grid-cols-5 gap-2 overflow-y-auto scrollbar-thin">
@@ -1307,6 +1486,19 @@ function moodHex(citizen: CitizenAgent) {
   return "rgb(96,165,250)";
 }
 
+function relationshipStage(relationship: Relationship) {
+  if (relationship.trust >= 72 && relationship.warmth >= 70 && relationship.familiarity >= 65) {
+    return "trusted friend";
+  }
+  if (relationship.trust >= 58 && relationship.warmth >= 56 && relationship.familiarity >= 45) {
+    return "friend";
+  }
+  if (relationship.familiarity >= 24 || relationship.trust >= 45) {
+    return "acquaintance";
+  }
+  return "stranger";
+}
+
 function professionGlyph(profession: string) {
   const glyphs: Record<string, string> = {
     Doctor: "+",
@@ -1363,7 +1555,22 @@ function storyIcon(type: string) {
 }
 
 function storyTypeLabel(type: string) {
-  return type.replaceAll("_", " ");
+  const labels: Record<string, string> = {
+    social_opportunity: "chance to talk",
+    conversation: "conversation",
+    thought: "thought",
+    memory: "memory",
+    reflection: "reflection",
+    citizen_arrived: "arrived",
+    workday_started: "workday",
+    mayor_policy: "mayor decision",
+    simulation_started: "city started",
+    simulation_paused: "city paused",
+    farm_harvest: "farm harvest",
+    market_sale: "market sale",
+    doctor_treatment: "doctor helped",
+  };
+  return labels[type] ?? type.replaceAll("_", " ");
 }
 
 function minutesLabel(value: number) {

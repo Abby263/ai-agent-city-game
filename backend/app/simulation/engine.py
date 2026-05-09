@@ -328,20 +328,48 @@ class SimulationEngine:
             return []
 
         events: list[CityEventORM] = []
+        recent_social_events = list(
+            db.scalars(
+                select(CityEventORM)
+                .where(CityEventORM.event_type == "social_opportunity")
+                .order_by(desc(CityEventORM.timestamp))
+                .limit(18)
+            )
+        )
+        recent_pairs = {
+            tuple(sorted(event.actors[:2]))
+            for event in recent_social_events
+            if len(event.actors) >= 2
+        }
         by_location: dict[str, list[CitizenORM]] = {}
         for citizen in citizens:
             if citizen.energy < 18 or citizen.stress > 88:
                 continue
             by_location.setdefault(citizen.current_location_id, []).append(citizen)
 
+        emitted_pairs: set[tuple[str, str]] = set()
         for location_id, people in by_location.items():
             if len(people) < 2 or len(events) >= 2:
                 continue
             people = sorted(people, key=lambda item: item.citizen_id)
-            first = people[state.tick % len(people)]
-            second = people[(state.tick + 1) % len(people)]
-            if first.citizen_id == second.citizen_id:
+            first: CitizenORM | None = None
+            second: CitizenORM | None = None
+            pair: tuple[str, str] | None = None
+            for offset in range(len(people)):
+                candidate_first = people[(state.tick + offset) % len(people)]
+                candidate_second = people[(state.tick + offset + 1) % len(people)]
+                candidate_pair = tuple(sorted((candidate_first.citizen_id, candidate_second.citizen_id)))
+                if candidate_first.citizen_id == candidate_second.citizen_id:
+                    continue
+                if candidate_pair in recent_pairs or candidate_pair in emitted_pairs:
+                    continue
+                first = candidate_first
+                second = candidate_second
+                pair = candidate_pair
+                break
+            if not first or not second or not pair:
                 continue
+            emitted_pairs.add(pair)
             relationship = self._relationship_status(db, first.citizen_id, second.citizen_id)
             location_name = locations.get(location_id).name if location_id in locations else "the city"
             events.append(

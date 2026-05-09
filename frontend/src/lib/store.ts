@@ -63,6 +63,23 @@ function eventToTimeline(event: CityEvent): TimelineItem {
   };
 }
 
+function timelineFingerprint(item: TimelineItem) {
+  return `${item.type}|${item.time}|${item.text.slice(0, 180)}`;
+}
+
+function dedupeTimeline(items: TimelineItem[], limit: number) {
+  const seen = new Set<string>();
+  const result: TimelineItem[] = [];
+  for (const item of items) {
+    const fingerprint = timelineFingerprint(item);
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
 function updateCitizens(city: CityState, citizens: CitizenAgent[]) {
   return {
     ...city,
@@ -82,12 +99,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setCity: (city) =>
     set({
       city,
-      timeline: city.events.slice(-40).map(eventToTimeline).reverse(),
+      timeline: dedupeTimeline(city.events.slice(-60).map(eventToTimeline).reverse(), 40),
       error: null,
     }),
   appendTimeline: (item) =>
     set((state) => ({
-      timeline: [item, ...state.timeline].slice(0, 80),
+      timeline: dedupeTimeline([item, ...state.timeline], 80),
     })),
   selectCitizen: async (citizenId) => {
     set({ selectedCitizenId: citizenId });
