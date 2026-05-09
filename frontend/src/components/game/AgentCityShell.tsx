@@ -620,7 +620,7 @@ function GuideStep({
 
 function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
   return (
-    <div className="absolute left-4 top-4 z-20 max-w-[430px] rounded-2xl border border-[rgba(var(--accent),0.55)] bg-[rgba(8,12,24,0.93)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur">
+    <div className="scrollbar-thin absolute left-4 top-4 z-20 max-h-[calc(100%-92px)] max-w-[430px] overflow-y-auto rounded-2xl border border-[rgba(var(--accent),0.55)] bg-[rgba(8,12,24,0.93)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur">
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-base font-semibold">
