@@ -36,6 +36,7 @@ body {
   min-height: 100%;
   background: rgb(var(--background));
   color: rgb(var(--foreground));
+  scroll-behavior: smooth;
 }
 
 body {

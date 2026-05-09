@@ -108,12 +108,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     })),
   selectCitizen: async (citizenId) => {
     set({ selectedCitizenId: citizenId });
-    const [memories, relationships, conversations] = await Promise.all([
+    const [memories, relationships, conversations] = await Promise.allSettled([
       api.getMemories(citizenId),
       api.getRelationships(citizenId),
       api.getConversations(citizenId),
     ]);
-    set({ memories, relationships, conversations });
+    set({
+      memories: memories.status === "fulfilled" ? memories.value : [],
+      relationships: relationships.status === "fulfilled" ? relationships.value : [],
+      conversations: conversations.status === "fulfilled" ? conversations.value : [],
+    });
   },
   loadInitialState: async () => {
     try {

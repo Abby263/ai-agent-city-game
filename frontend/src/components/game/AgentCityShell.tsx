@@ -11,6 +11,8 @@ import {
   BriefcaseBusiness,
   Building2,
   Bus,
+  ChevronLeft,
+  ChevronRight,
   CircleDollarSign,
   Cloud,
   Coffee,
@@ -147,9 +149,7 @@ export function AgentCityShell() {
   const [professionFilter, setProfessionFilter] = useState("All");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("life");
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
-  const [showGuide, setShowGuide] = useState(
-    () => typeof window !== "undefined" && window.localStorage.getItem("agentcity-guide-dismissed") !== "true",
-  );
+  const [showGuide, setShowGuide] = useState(false);
   const lastUserSelectRef = useRef<number>(0);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -158,6 +158,13 @@ export function AgentCityShell() {
     socketRef.current = connectWebSocket();
     return () => socketRef.current?.close();
   }, [connectWebSocket, loadInitialState]);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setShowGuide(window.localStorage.getItem("agentcity-guide-dismissed") !== "true");
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   // Auto-start the simulation as soon as we have city state.
   useEffect(() => {
@@ -253,6 +260,18 @@ export function AgentCityShell() {
   }, [city?.citizens, professionFilter]);
   const activeEvent = city?.events.find((event) => event.priority >= 2) ?? city?.events[0] ?? null;
 
+  const selectAdjacentCitizen = useCallback(
+    (direction: -1 | 1) => {
+      const citizens = visibleCitizens.length > 0 ? visibleCitizens : (city?.citizens ?? []);
+      if (citizens.length === 0) return;
+      const currentIndex = citizens.findIndex((citizen) => citizen.citizen_id === selectedCitizen?.citizen_id);
+      const baseIndex = currentIndex >= 0 ? currentIndex : 0;
+      const nextIndex = (baseIndex + direction + citizens.length) % citizens.length;
+      handleSelectCitizen(citizens[nextIndex].citizen_id);
+    },
+    [city?.citizens, handleSelectCitizen, selectedCitizen?.citizen_id, visibleCitizens],
+  );
+
   async function runAction(action: () => Promise<unknown>) {
     setBusy(true);
     try {
@@ -274,7 +293,7 @@ export function AgentCityShell() {
   const period = periodInfo(city?.clock.minute_of_day ?? 0);
 
   return (
-    <main className="agentcity-shell min-h-[100dvh] w-screen overflow-x-hidden overflow-y-auto text-[rgb(var(--foreground))] lg:grid lg:h-[100dvh] lg:grid-rows-[68px_1fr_220px] lg:overflow-hidden">
+    <main className="agentcity-shell min-h-[100dvh] w-screen overflow-x-hidden overflow-y-auto pb-24 text-[rgb(var(--foreground))] lg:grid lg:h-[100dvh] lg:grid-rows-[68px_1fr_220px] lg:overflow-hidden lg:pb-0">
       <TopHeader
         cityName={city?.city_name}
         connectionStatus={connectionStatus}
@@ -301,7 +320,7 @@ export function AgentCityShell() {
       />
 
       <section className="grid min-h-0 grid-cols-1 gap-3 px-2 pt-2 pb-3 sm:px-3 lg:grid-cols-[300px_minmax(420px,1fr)_380px] lg:pb-1">
-        <aside className="glass-panel order-3 min-h-0 rounded-xl p-3 scrollbar-thin lg:order-1 lg:overflow-y-auto">
+        <aside id="city-panel" className="glass-panel order-4 min-h-0 scroll-mt-24 rounded-xl p-3 scrollbar-thin lg:order-1 lg:overflow-y-auto">
           <PlayerGuideCard
             city={city}
             selectedCitizen={selectedCitizen ?? null}
@@ -321,7 +340,7 @@ export function AgentCityShell() {
           />
         </aside>
 
-        <div className="glass-panel order-1 relative h-[62dvh] min-h-[360px] overflow-hidden rounded-xl bg-[#0a1226] sm:h-[66dvh] lg:order-2 lg:h-auto lg:min-h-0">
+        <div id="city-map" className="glass-panel order-1 relative h-[62dvh] min-h-[360px] scroll-mt-24 overflow-hidden rounded-xl bg-[#0a1226] sm:h-[66dvh] lg:order-2 lg:h-auto lg:min-h-0">
           <GameCanvas
             city={city}
             selectedCitizenId={selectedCitizen?.citizen_id ?? null}
@@ -339,7 +358,15 @@ export function AgentCityShell() {
           <SceneLegend />
         </div>
 
-        <aside className="glass-panel order-2 min-h-0 rounded-xl p-4 scrollbar-thin lg:order-3 lg:overflow-y-auto">
+        <MobileCitizenControls
+          citizen={selectedCitizen ?? null}
+          busy={busy}
+          runAction={runAction}
+          onPrevious={() => selectAdjacentCitizen(-1)}
+          onNext={() => selectAdjacentCitizen(1)}
+        />
+
+        <aside id="citizen-panel" className="glass-panel order-3 min-h-0 scroll-mt-24 rounded-xl p-4 scrollbar-thin lg:order-3 lg:overflow-y-auto">
           {error ? (
             <div className="mb-3 rounded-lg border border-[rgba(244,89,89,0.4)] bg-[rgba(244,89,89,0.1)] p-3 text-sm text-[rgb(252,165,165)]">
               {error}
@@ -363,6 +390,7 @@ export function AgentCityShell() {
       </section>
 
       <StoryTimeline timeline={timeline} />
+      <MobilePlayDock />
     </main>
   );
 }
@@ -403,7 +431,7 @@ function TopHeader({
   const PeriodIcon = period.icon;
   const isStreaming = connectionStatus === "connected";
   return (
-    <header className="z-10 flex min-w-0 flex-col gap-3 border-b border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.9)] px-3 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:py-0">
+    <header className="sticky top-0 z-30 flex min-w-0 flex-col gap-3 border-b border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.92)] px-3 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:static lg:py-0">
       <div className="flex min-w-0 items-center gap-3">
         <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[rgb(var(--accent))] via-[rgb(125_211_252)] to-[rgb(var(--violet))] text-[#06121f] shadow-[0_0_24px_rgba(56,189,248,0.32)]">
           <Building2 className="h-5 w-5" />
@@ -538,6 +566,80 @@ function ClockBlock({
         </div>
       </div>
     </div>
+  );
+}
+
+function MobileCitizenControls({
+  citizen,
+  busy,
+  runAction,
+  onPrevious,
+  onNext,
+}: {
+  citizen: CitizenAgent | null;
+  busy: boolean;
+  runAction: (action: () => Promise<unknown>) => Promise<void>;
+  onPrevious: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="glass-panel order-2 scroll-mt-24 rounded-xl p-3 lg:hidden">
+      <div className="mb-3 flex items-center gap-3">
+        {citizen ? <CitizenAvatar citizen={citizen} small /> : <UserRound className="h-8 w-8 text-[rgb(var(--accent))]" />}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold">{citizen?.name ?? "Choose a citizen"}</div>
+          <div className="truncate text-xs text-[rgb(var(--muted))]">
+            {citizen ? `${citizen.profession} · ${citizen.current_activity}` : "Tap a person or use Next Citizen"}
+          </div>
+        </div>
+        <Badge tone={citizen?.health && citizen.health < 65 ? "warning" : "accent"}>
+          {citizen ? `${Math.round(citizen.happiness)}%` : "ready"}
+        </Badge>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="secondary" size="sm" onClick={onPrevious}>
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
+        <Button variant="secondary" size="sm" onClick={onNext}>
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button className="col-span-1" variant="default" size="sm" disabled={busy} onClick={() => runAction(api.tick)}>
+          <Radio className="h-4 w-4" />
+          Step 15m
+        </Button>
+        <a className="btn-pill justify-center py-2.5 text-center" href="#citizen-panel">
+          Open Profile
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function MobilePlayDock() {
+  const items: Array<{ href: string; label: string; icon: ComponentType<{ className?: string }> }> = [
+    { href: "#city-map", label: "Map", icon: MapPin },
+    { href: "#citizen-panel", label: "Agent", icon: UserRound },
+    { href: "#city-panel", label: "City", icon: Gauge },
+    { href: "#story-feed", label: "Story", icon: GalleryHorizontalEnd },
+  ];
+  return (
+    <nav className="fixed inset-x-2 bottom-3 z-40 grid grid-cols-4 gap-1 rounded-2xl border border-[rgba(var(--border),0.9)] bg-[rgba(8,12,24,0.94)] p-1.5 shadow-[0_16px_42px_rgba(0,0,0,0.55)] backdrop-blur lg:hidden">
+      {items.map((item) => {
+        const Icon = item.icon;
+        return (
+          <a
+            key={item.href}
+            href={item.href}
+            className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium text-[rgb(var(--muted-strong))] transition hover:bg-white/5"
+          >
+            <Icon className="h-4 w-4 text-[rgb(var(--accent))]" />
+            {item.label}
+          </a>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -815,7 +917,7 @@ function CitizenRoster({
         {citizens.slice(0, 25).map((citizen) => (
           <button
             key={citizen.citizen_id}
-            className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-all ${
+            className={`flex min-h-14 w-full items-center gap-2 rounded-lg border px-2 py-2.5 text-left transition-all ${
               selectedCitizenId === citizen.citizen_id
                 ? "border-[rgba(56,189,248,0.6)] bg-[rgba(56,189,248,0.12)] shadow-[0_0_18px_rgba(56,189,248,0.18)]"
                 : "border-transparent bg-black/15 hover:border-[rgba(var(--border),0.85)] hover:bg-black/25"
@@ -995,7 +1097,7 @@ function ActionPanel({
         <p className="text-xs leading-snug text-[rgb(var(--muted))]">
           Pick an event to test the city. Citizens will move, think, talk, remember, and update relationships.
         </p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {eventButtons.map((item) => {
             const Icon = item.icon;
             return (
@@ -1003,7 +1105,7 @@ function ActionPanel({
                 key={item.event_type}
                 variant={item.tone}
                 size="sm"
-                className="h-auto justify-start px-2 py-2 text-left"
+                className="min-h-12 justify-start px-2 py-2 text-left"
                 disabled={busy}
                 onClick={() =>
                   runAction(() => api.triggerEvent({ event_type: item.event_type, severity: "medium" }))
@@ -1053,7 +1155,7 @@ function PolicyButton({
   onClick: () => void;
 }) {
   return (
-    <Button variant="secondary" size="sm" disabled={busy} onClick={onClick}>
+    <Button className="min-h-11" variant="secondary" size="sm" disabled={busy} onClick={onClick}>
       <Icon className="h-4 w-4" />
       <span className="truncate">{label}</span>
     </Button>
@@ -1149,7 +1251,7 @@ function InspectorTabButton({
 }) {
   return (
     <button
-      className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition ${
+      className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs transition ${
         active
           ? "bg-[rgba(56,189,248,0.18)] text-[rgb(125,211,252)] shadow-[inset_0_0_0_1px_rgba(56,189,248,0.4)]"
           : "text-[rgb(var(--muted))] hover:bg-white/5"
@@ -1311,7 +1413,7 @@ function SocialTab({
 
 function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
   return (
-    <footer className="z-10 border-t border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.85)] px-3 py-3 backdrop-blur sm:px-4">
+    <footer id="story-feed" className="z-10 scroll-mt-24 border-t border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.85)] px-3 py-3 backdrop-blur sm:px-4">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <GalleryHorizontalEnd className="h-4 w-4 text-[rgb(var(--accent))]" />

@@ -731,7 +731,7 @@ export function GameCanvas({
     };
   }, []);
 
-  return <div ref={containerRef} className="h-full min-h-0 w-full overflow-hidden" />;
+  return <div ref={containerRef} className="h-full min-h-0 w-full overflow-hidden [touch-action:manipulation]" />;
 }
 
 function labelFor(name: string) {
