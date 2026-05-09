@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+}
+
+:root {
+  --background: 12 15 16;
+  --foreground: 244 247 241;
+  --muted: 148 158 150;
+  --panel: 22 27 28;
+  --panel-strong: 32 38 39;
+  --border: 60 70 66;
+  --accent: 108 190 134;
+  --accent-2: 239 184 79;
+  --danger: 226 93 82;
+  --water: 87 163 199;
+  --violet: 151 132 210;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgb(11, 14, 15), rgb(17, 22, 21));
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border)) transparent;
+}
+
+.agentcity-shell {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    rgb(var(--background));
+  background-size: 28px 28px;
+}
+
+.glass-panel {
+  border: 1px solid rgba(var(--border), 0.92);
+  background: rgba(var(--panel), 0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 42px rgba(0, 0, 0, 0.22);
+}
+
+.story-card {
+  border: 1px solid rgba(var(--border), 0.86);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent),
+    rgba(var(--panel-strong), 0.78);
+}

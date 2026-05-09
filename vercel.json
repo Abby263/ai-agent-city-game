@@ -1,0 +1,13 @@
+{
+  "experimentalServices": {
+    "frontend": {
+      "entrypoint": "frontend",
+      "routePrefix": "/"
+    },
+    "api": {
+      "entrypoint": "backend/main.py",
+      "routePrefix": "/api",
+      "includeFiles": ["backend/app/**", "backend/main.py", "backend/requirements.txt", "backend/pyproject.toml"]
+    }
+  }
+}
