@@ -9,9 +9,12 @@ class Settings(BaseSettings):
     app_name: str = "AgentCity"
     city_id: str = "navora"
     city_name: str = "Navora"
+    memory_storage: Literal["short_term", "postgres"] = "short_term"
     database_url: str = ""
     supabase_database_url: str | None = None
     neon_database_url: str | None = None
+    database_fallback_url: str = "sqlite+pysqlite:////tmp/agentcity-short-term.db"
+    allow_ephemeral_db_fallback: bool = True
     redis_url: str | None = None
     cors_origins: str = "http://localhost:3000"
 
@@ -47,11 +50,17 @@ class Settings(BaseSettings):
 
     @property
     def resolved_database_url(self) -> str:
+        if self.memory_storage == "short_term":
+            return self.database_fallback_url
+
         url = self.database_url or self.supabase_database_url or self.neon_database_url or ""
+        if not url and self.allow_ephemeral_db_fallback:
+            return self.database_fallback_url
         if not url:
             raise ValueError(
                 "DATABASE_URL, SUPABASE_DATABASE_URL, or NEON_DATABASE_URL is required. "
-                "Use a cloud Postgres connection string for normal app runs."
+                "Set MEMORY_STORAGE=short_term for an ephemeral local/Vercel database, or use a cloud "
+                "Postgres connection string for durable memory."
             )
         return url
 

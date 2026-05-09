@@ -1,6 +1,6 @@
 # AgentCity Setup
 
-This guide sets up AgentCity with a hosted Postgres database, a FastAPI backend, and a Next.js + Phaser frontend.
+This guide sets up AgentCity with short-term memory by default, a FastAPI backend, and a Next.js + Phaser frontend.
 
 ## Prerequisites
 
@@ -8,7 +8,7 @@ This guide sets up AgentCity with a hosted Postgres database, a FastAPI backend,
 - npm 10+.
 - Python 3.10+.
 - `uv` for Python dependency management.
-- A hosted Postgres database. Neon is the expected deployment database; Supabase also works.
+- Optional: a hosted Postgres database if you want durable memory. Short-term memory works without Neon or Supabase.
 - Optional: an OpenAI API key for real citizen cognition.
 
 ## Environment Files
@@ -34,9 +34,12 @@ Set these in the root `.env`.
 
 | Variable | Required | Example | Notes |
 | --- | --- | --- | --- |
-| `DATABASE_URL` | Yes | `postgresql+psycopg://...` | Preferred single database URL. Neon or Supabase recommended. |
-| `SUPABASE_DATABASE_URL` | Optional | `postgresql+psycopg://postgres.PROJECT_REF:...@aws-0-REGION.pooler.supabase.com:5432/postgres` | Used if `DATABASE_URL` is empty. |
-| `NEON_DATABASE_URL` | Optional | `postgresql+psycopg://USER:PASSWORD@HOST.neon.tech/DB?sslmode=require` | Used if `DATABASE_URL` and `SUPABASE_DATABASE_URL` are empty. |
+| `MEMORY_STORAGE` | Optional | `short_term` | Default mode. Uses temporary SQLite memory and does not require Neon. Set `postgres` only when you want durable cloud memory. |
+| `DATABASE_FALLBACK_URL` | Optional | `sqlite+pysqlite:////tmp/agentcity-short-term.db` | Short-term memory database URL. This is not durable across cold starts. |
+| `DATABASE_URL` | Only for `MEMORY_STORAGE=postgres` | `postgresql+psycopg://...` | Preferred durable database URL. Neon or Supabase can be used later. |
+| `SUPABASE_DATABASE_URL` | Optional | `postgresql+psycopg://postgres.PROJECT_REF:...@aws-0-REGION.pooler.supabase.com:5432/postgres` | Used in Postgres mode if `DATABASE_URL` is empty. |
+| `NEON_DATABASE_URL` | Optional | `postgresql+psycopg://USER:PASSWORD@HOST.neon.tech/DB?sslmode=require` | Used in Postgres mode if `DATABASE_URL` and `SUPABASE_DATABASE_URL` are empty. |
+| `ALLOW_EPHEMERAL_DB_FALLBACK` | Optional | `true` | In Postgres mode, lets the API fall back to short-term memory if hosted Postgres is unreachable. |
 | `LLM_MODE` | Yes | `mock` or `real` | Use `mock` without an OpenAI key; use `real` for intelligent citizens. |
 | `OPENAI_API_KEY` | Required for real LLM | `sk-...` | Only needed when `LLM_MODE=real`. |
 | `OPENAI_MODEL` | Yes | `gpt-4.1-nano` | Citizen cognition model. |
@@ -50,9 +53,11 @@ Set these in the root `.env`.
 
 Redis is not required for V1 gameplay.
 
-## Supabase Setup
+## Optional Supabase/Neon Setup
 
-1. Create a Supabase project.
+Skip this section for the default short-term memory mode.
+
+1. Create a Supabase or Neon project.
 2. In the Supabase dashboard, open **Connect**.
 3. Copy a Postgres connection string.
 4. For a persistent local FastAPI server:
@@ -62,6 +67,7 @@ Redis is not required for V1 gameplay.
 
 ```bash
 DATABASE_URL=postgresql+psycopg://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres
+MEMORY_STORAGE=postgres
 ```
 
 The backend automatically:
@@ -128,7 +134,7 @@ Set these Vercel environment variables for Production, Preview, and Development:
 
 | Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | Neon Postgres URL, preferably with `sslmode=require`. |
+| `MEMORY_STORAGE` | `short_term` |
 | `LLM_MODE` | `real` for production, or `mock` if no OpenAI key is available. |
 | `OPENAI_API_KEY` | Your OpenAI API key. Required for real intelligent mode. |
 | `OPENAI_MODEL` | `gpt-4.1-nano` |
@@ -140,6 +146,7 @@ Set these Vercel environment variables for Production, Preview, and Development:
 | `ACTIVE_CITIZEN_IDS` | `cit_009,cit_010,cit_021,cit_022,cit_026` |
 | `CORS_ORIGINS` | `https://ai-agent-city-game.vercel.app` |
 | `NEXT_PUBLIC_API_URL` | `/api` |
+| `DATABASE_FALLBACK_URL` | `sqlite+pysqlite:////tmp/agentcity-short-term.db` |
 
 Optional only if you deploy the API separately:
 
@@ -153,7 +160,8 @@ Using the Vercel CLI:
 
 ```bash
 npx vercel link --yes --project ai-agent-city-game
-npx vercel env add DATABASE_URL production
+npx vercel env add MEMORY_STORAGE production
+npx vercel env add DATABASE_FALLBACK_URL production
 npx vercel env add OPENAI_API_KEY production
 npx vercel env add LLM_MODE production
 npx vercel env add OPENAI_MODEL production

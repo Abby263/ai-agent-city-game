@@ -2,6 +2,7 @@ from collections.abc import Generator
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
@@ -31,20 +32,46 @@ def _normalize_database_url(raw_url: str) -> str:
 
 database_url = _normalize_database_url(settings.resolved_database_url)
 
-connect_args = {}
-if ":6543/" in database_url or "pooler.supabase.com" in database_url:
-    # Supabase transaction pooler does not support prepared statements.
-    connect_args["prepare_threshold"] = None
+def _connect_args_for(url: str) -> dict:
+    connect_args = {}
+    if ":6543/" in url or "pooler.supabase.com" in url:
+        # Supabase transaction pooler does not support prepared statements.
+        connect_args["prepare_threshold"] = None
+    return connect_args
 
-engine = create_engine(database_url, pool_pre_ping=True, connect_args=connect_args)
+def _create_engine(url: str):
+    return create_engine(url, pool_pre_ping=True, connect_args=_connect_args_for(url))
+
+
+engine = _create_engine(database_url)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
+def _switch_to_fallback_database(reason: Exception) -> None:
+    global database_url, engine
+
+    if not settings.allow_ephemeral_db_fallback or not settings.database_fallback_url:
+        raise reason
+    fallback_url = _normalize_database_url(settings.database_fallback_url)
+    if fallback_url == database_url:
+        raise reason
+
+    database_url = fallback_url
+    engine = _create_engine(database_url)
+    SessionLocal.configure(bind=engine)
+
+
 def init_db() -> None:
-    if engine.dialect.name.startswith("postgresql"):
-        with engine.begin() as connection:
-            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    Base.metadata.create_all(bind=engine)
+    global engine
+
+    try:
+        if engine.dialect.name.startswith("postgresql"):
+            with engine.begin() as connection:
+                connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        Base.metadata.create_all(bind=engine)
+    except SQLAlchemyError as error:
+        _switch_to_fallback_database(error)
+        Base.metadata.create_all(bind=engine)
 
 
 def get_db() -> Generator[Session, None, None]:
