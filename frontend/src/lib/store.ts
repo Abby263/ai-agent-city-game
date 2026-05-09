@@ -36,11 +36,13 @@ type GameStore = {
   memories: Memory[];
   relationships: Relationship[];
   conversations: Conversation[];
+  cityConversations: Conversation[];
   connectionStatus: "idle" | "connecting" | "connected" | "offline";
   error: string | null;
   setCity: (city: CityState) => void;
   selectCitizen: (citizenId: string) => Promise<void>;
   loadInitialState: () => Promise<void>;
+  refreshCityConversations: () => Promise<void>;
   connectWebSocket: () => WebSocket | null;
   appendTimeline: (item: TimelineItem) => void;
 };
@@ -95,6 +97,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   memories: [],
   relationships: [],
   conversations: [],
+  cityConversations: [],
   connectionStatus: "idle",
   error: null,
   setCity: (city) =>
@@ -122,11 +125,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   loadInitialState: async () => {
     try {
-      const city = await api.getState();
-      get().setCity(city);
+      const [city, cityConversations] = await Promise.allSettled([
+        api.getState(),
+        api.getCityConversations(),
+      ]);
+      if (city.status !== "fulfilled") {
+        throw city.reason;
+      }
+      get().setCity(city.value);
+      set({
+        cityConversations: cityConversations.status === "fulfilled" ? cityConversations.value : [],
+      });
     } catch (error) {
       set({ error: error instanceof Error ? error.message : "Unable to load city" });
     }
+  },
+  refreshCityConversations: async () => {
+    const cityConversations = await api.getCityConversations();
+    set({ cityConversations });
   },
   connectWebSocket: () => {
     const wsUrl = resolveWebSocketUrl();
@@ -216,6 +232,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
                 },
                 ...current.conversations,
               ].slice(0, 50),
+            }));
+          }
+          if (typeof payload.conversation_id === "string") {
+            set((current) => ({
+              cityConversations: [
+                {
+                  conversation_id: payload.conversation_id as string,
+                  game_day: current.city?.clock.day ?? 1,
+                  game_minute: current.city?.clock.minute_of_day ?? 0,
+                  location_id: null,
+                  actor_ids: actorIds,
+                  transcript: Array.isArray(payload.transcript)
+                    ? (payload.transcript as Array<{ speaker_id: string; text: string }>)
+                    : [],
+                  summary,
+                },
+                ...current.cityConversations,
+              ].slice(0, 80),
             }));
           }
           return;

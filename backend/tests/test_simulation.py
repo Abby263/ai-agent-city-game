@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.config import Settings
-from app.models import Base, CitizenORM, CityEventORM, MemoryORM
+from app.models import Base, CitizenORM, CityEventORM, ConversationORM, MemoryORM
 from app.schemas import AssignTaskRequest, TriggerEventRequest
 from app.seed import ensure_seeded
 from app.simulation.engine import SimulationEngine
@@ -91,6 +91,38 @@ def test_recent_events_hide_inactive_citizen_history():
 
     assert "evt_active_only" in event_ids
     assert "evt_mixed_inactive" not in event_ids
+
+
+def test_city_conversations_endpoint_filters_inactive_history():
+    from app.api.routes import get_city_conversations
+
+    db = session_factory()
+    db.add_all(
+        [
+            ConversationORM(
+                conversation_id="conv_active",
+                game_day=1,
+                game_minute=540,
+                actor_ids=["cit_009", "cit_010"],
+                transcript=[{"speaker_id": "cit_009", "text": "Want to study later?"}],
+                summary="Ava and Mateo make a study plan.",
+            ),
+            ConversationORM(
+                conversation_id="conv_mixed_inactive",
+                game_day=1,
+                game_minute=540,
+                actor_ids=["cit_009", "cit_002"],
+                transcript=[{"speaker_id": "cit_002", "text": "This should stay hidden."}],
+                summary="An inactive citizen is involved.",
+            ),
+        ]
+    )
+    db.commit()
+
+    conversation_ids = {conversation.conversation_id for conversation in get_city_conversations(db=db)}
+
+    assert "conv_active" in conversation_ids
+    assert "conv_mixed_inactive" not in conversation_ids
 
 
 def test_cognition_candidate_selection_is_selective():

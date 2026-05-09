@@ -39,6 +39,21 @@ def get_city_events(limit: int = 80, db: Session = Depends(get_db)) -> list[City
     return [CityEvent.model_validate(event) for event in events]
 
 
+@router.get("/city/conversations", response_model=list[Conversation])
+def get_city_conversations(limit: int = 50, db: Session = Depends(get_db)) -> list[Conversation]:
+    recent = list(
+        db.scalars(select(ConversationORM).order_by(desc(ConversationORM.created_at)).limit(max(limit, 1) * 3))
+    )
+    active_ids = set(engine._active_citizen_ids())
+    if active_ids:
+        recent = [
+            conversation
+            for conversation in recent
+            if conversation.actor_ids and all(actor_id in active_ids for actor_id in conversation.actor_ids)
+        ]
+    return [Conversation.model_validate(conversation) for conversation in recent[:limit]]
+
+
 @router.get("/citizens", response_model=list[CitizenAgent])
 def get_citizens(include_inactive: bool = False, db: Session = Depends(get_db)) -> list[CitizenAgent]:
     if include_inactive:

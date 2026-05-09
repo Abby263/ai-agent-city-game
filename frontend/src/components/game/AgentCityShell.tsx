@@ -15,7 +15,6 @@ import {
   ChevronRight,
   CircleDollarSign,
   Coffee,
-  Eye,
   Factory,
   FlaskConical,
   GalleryHorizontalEnd,
@@ -25,7 +24,6 @@ import {
   HelpCircle,
   Home,
   Library,
-  Megaphone,
   MapPin,
   MessageCircle,
   MessageSquareText,
@@ -136,9 +134,11 @@ export function AgentCityShell() {
     memories,
     relationships,
     conversations,
+    cityConversations,
     connectionStatus,
     error,
     loadInitialState,
+    refreshCityConversations,
     connectWebSocket,
     setCity,
     selectCitizen,
@@ -227,6 +227,11 @@ export function AgentCityShell() {
     if (!city || selectedCitizenId || !city.citizens[0]) return;
     void selectCitizen(city.citizens[0].citizen_id);
   }, [city, selectedCitizenId, selectCitizen]);
+
+  useEffect(() => {
+    if (activePanel !== "story") return;
+    void refreshCityConversations().catch(() => undefined);
+  }, [activePanel, refreshCityConversations]);
 
   const handleSelectCitizen = useCallback(
     (citizenId: string) => {
@@ -358,13 +363,6 @@ export function AgentCityShell() {
             side="left"
             onClose={() => setActivePanel(null)}
           >
-            <PlayerGuideCard
-              city={city}
-              selectedCitizen={selectedCitizen ?? null}
-              busy={busy}
-              onOpenGuide={() => setShowGuide(true)}
-              runAction={runAction}
-            />
             <HeroStats city={city} />
             <CitySystems city={city} />
             <ActionPanel busy={busy} city={city} runAction={runAction} />
@@ -416,13 +414,18 @@ export function AgentCityShell() {
         {activePanel === "story" ? (
           <GameDrawer
             id="story-feed"
-            title="Story Feed"
-            subtitle="Recent city events and conversations"
-            icon={GalleryHorizontalEnd}
+            title="Conversation Feed"
+            subtitle="Latest talks, memories, and city moments"
+            icon={MessageSquareText}
             side="bottom"
             onClose={() => setActivePanel(null)}
           >
-            <StoryTimeline timeline={timeline} />
+            <ConversationFeed
+              conversations={cityConversations}
+              city={city}
+              timeline={timeline}
+              onSelectCitizen={handleSelectCitizen}
+            />
           </GameDrawer>
         ) : null}
       </section>
@@ -626,11 +629,11 @@ function MapPanelDock({
   }> = [
     { panel: "city", label: "City", detail: "events", icon: Gauge },
     { panel: "citizen", label: "Citizen", detail: citizen?.name ?? "select", icon: UserRound },
-    { panel: "story", label: "Story", detail: "feed", icon: GalleryHorizontalEnd, count: String(timelineCount) },
+    { panel: "story", label: "Talk", detail: "conversations", icon: MessageSquareText, count: String(timelineCount) },
   ];
 
   return (
-    <div className="pointer-events-auto absolute right-2 top-2 z-20 hidden flex-col gap-2 sm:flex">
+    <div className="pointer-events-auto absolute left-1/2 top-2 z-40 hidden -translate-x-1/2 gap-2 sm:flex">
       {controls.map((control) => {
         const Icon = control.icon;
         const active = activePanel === control.panel;
@@ -681,14 +684,14 @@ function GameDrawer({
       ? "lg:left-3 lg:right-auto lg:top-3 lg:bottom-3 lg:w-[360px]"
       : side === "right"
         ? "lg:left-auto lg:right-3 lg:top-3 lg:bottom-3 lg:w-[420px]"
-        : "lg:left-3 lg:right-3 lg:top-auto lg:bottom-3 lg:max-h-[300px] lg:w-auto";
+        : "lg:left-3 lg:right-3 lg:top-auto lg:bottom-3 lg:h-[44dvh] lg:min-h-[300px] lg:max-h-[520px] lg:w-auto";
 
   return (
     <aside
       id={id}
-      className={`fixed inset-x-2 bottom-20 z-50 max-h-[74dvh] overflow-hidden rounded-2xl border border-[rgba(var(--border),0.88)] bg-[rgba(8,12,24,0.95)] shadow-[0_28px_80px_rgba(0,0,0,0.62)] backdrop-blur-xl lg:absolute lg:inset-x-auto lg:bottom-auto lg:max-h-none ${sideClass}`}
+      className={`fixed inset-x-2 bottom-20 z-50 flex max-h-[74dvh] min-h-0 flex-col overflow-hidden rounded-2xl border border-[rgba(var(--border),0.88)] bg-[rgba(8,12,24,0.95)] shadow-[0_28px_80px_rgba(0,0,0,0.62)] backdrop-blur-xl lg:absolute lg:inset-x-auto lg:max-h-none ${sideClass}`}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-[rgba(var(--border),0.7)] px-3 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(var(--border),0.7)] px-3 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgba(56,189,248,0.16)] text-[rgb(var(--accent))]">
             <Icon className="h-4 w-4" />
@@ -704,7 +707,7 @@ function GameDrawer({
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="scrollbar-thin max-h-[calc(74dvh-64px)] overflow-y-auto p-3 lg:h-[calc(100%-64px)] lg:max-h-none">
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
         {children}
       </div>
     </aside>
@@ -772,7 +775,7 @@ function MobilePlayDock({
     { panel: null, label: "Map", icon: MapPin },
     { panel: "citizen", label: "Student", icon: UserRound },
     { panel: "city", label: "City", icon: Gauge },
-    { panel: "story", label: "Story", icon: GalleryHorizontalEnd },
+    { panel: "story", label: "Talk", icon: MessageSquareText },
   ];
   return (
     <nav className="fixed inset-x-2 bottom-3 z-40 grid grid-cols-4 gap-1 rounded-2xl border border-[rgba(var(--border),0.9)] bg-[rgba(8,12,24,0.94)] p-1.5 shadow-[0_16px_42px_rgba(0,0,0,0.55)] backdrop-blur lg:hidden">
@@ -793,83 +796,6 @@ function MobilePlayDock({
         );
       })}
     </nav>
-  );
-}
-
-function PlayerGuideCard({
-  city,
-  selectedCitizen,
-  busy,
-  onOpenGuide,
-  runAction,
-}: {
-  city: CityState | null;
-  selectedCitizen: CitizenAgent | null;
-  busy: boolean;
-  onOpenGuide: () => void;
-  runAction: (action: () => Promise<unknown>) => Promise<void>;
-}) {
-  const running = Boolean(city?.clock.running);
-  const focusName = selectedCitizen?.name ?? "a citizen";
-  return (
-    <div className="mb-3 rounded-xl border border-[rgba(var(--accent),0.45)] bg-[linear-gradient(160deg,rgba(56,189,248,0.14),rgba(167,139,250,0.08)_55%,rgba(8,12,24,0.64))] p-3 shadow-[0_12px_34px_rgba(0,0,0,0.28)]">
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Target className="h-4 w-4 text-[rgb(var(--accent))]" />
-            Play as mayor-observer
-          </div>
-          <p className="mt-1 text-xs leading-snug text-[rgb(var(--muted-strong))]">
-            Follow five students, give them tasks, then watch their memories, conversations, and friendships change.
-          </p>
-        </div>
-        <Badge tone={running ? "success" : "default"}>{running ? "live" : "paused"}</Badge>
-      </div>
-
-      <div className="grid gap-1.5 text-[11px]">
-        <GuideStep icon={Eye} label="Watch" detail="Ava, Mateo, Noah, Iris, and Leo move between home, school, the library, and the park." />
-        <GuideStep icon={MousePointerClick} label="Inspect" detail={`Tap ${focusName} or any dot on the map for thoughts, needs, memory, and social life.`} />
-        <GuideStep icon={Megaphone} label="Intervene" detail="Assign a task or create an event, then step time forward to see who reacts." />
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button
-          size="sm"
-          variant={running ? "secondary" : "default"}
-          disabled={busy}
-          onClick={() => runAction(running ? api.tick : api.start)}
-        >
-          {running ? <Radio className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-          {running ? "Advance 15m" : "Start City"}
-        </Button>
-        <Button size="sm" variant="ghost" onClick={onOpenGuide}>
-          <HelpCircle className="h-4 w-4" />
-          Full Guide
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function GuideStep({
-  icon: Icon,
-  label,
-  detail,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  detail: string;
-}) {
-  return (
-    <div className="flex gap-2 rounded-lg bg-black/20 p-2">
-      <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[rgba(56,189,248,0.16)] text-[rgb(var(--accent))]">
-        <Icon className="h-3.5 w-3.5" />
-      </div>
-      <div className="min-w-0">
-        <div className="font-semibold text-[rgb(var(--foreground))]">{label}</div>
-        <div className="leading-snug text-[rgb(var(--muted))]">{detail}</div>
-      </div>
-    </div>
   );
 }
 
@@ -1555,6 +1481,8 @@ function LifeTab({
   currentLocation: string;
   targetLocation: string;
 }) {
+  const visibleGoals = [...new Set([...citizen.short_term_goals, ...citizen.long_term_goals.slice(0, 2)])];
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1570,10 +1498,10 @@ function LifeTab({
         <Need label="Calm" value={100 - citizen.stress} tone={citizen.stress > 65 ? "danger" : "accent"} icon={Sparkles} />
       </div>
 
-      <SectionTitle label="Goals" count={citizen.short_term_goals.length + citizen.long_term_goals.length} />
+      <SectionTitle label="Goals" count={visibleGoals.length} />
       <div className="space-y-1">
-        {[...citizen.short_term_goals, ...citizen.long_term_goals.slice(0, 2)].map((goal) => (
-          <div key={goal} className="story-card rounded-md px-2 py-1.5 text-xs">
+        {visibleGoals.map((goal, index) => (
+          <div key={`${goal}-${index}`} className="story-card rounded-md px-2 py-1.5 text-xs">
             {goal}
           </div>
         ))}
@@ -1704,7 +1632,120 @@ function SocialTab({
   );
 }
 
-function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
+function ConversationFeed({
+  conversations,
+  city,
+  timeline,
+  onSelectCitizen,
+}: {
+  conversations: Conversation[];
+  city: CityState | null;
+  timeline: TimelineItem[];
+  onSelectCitizen: (citizenId: string) => void;
+}) {
+  const citizenById = useMemo(
+    () => Object.fromEntries(city?.citizens.map((citizen) => [citizen.citizen_id, citizen]) ?? []),
+    [city?.citizens],
+  );
+  const locationById = useMemo(
+    () => Object.fromEntries(city?.locations.map((location) => [location.location_id, location]) ?? []),
+    [city?.locations],
+  );
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <MessageSquareText className="h-4 w-4 text-[rgb(var(--accent))]" />
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">
+              Conversations
+            </h2>
+            <Badge tone="accent">{conversations.length}</Badge>
+          </div>
+          <div className="hidden text-[10px] uppercase tracking-wide text-[rgb(var(--muted))] sm:block">
+            newest first
+          </div>
+        </div>
+
+        <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-3">
+          {conversations.slice(0, 9).map((conversation) => {
+            const speakers = conversation.actor_ids.map((actorId) => citizenById[actorId]).filter(Boolean);
+            const locationName = conversation.location_id
+              ? locationById[conversation.location_id]?.name ?? conversation.location_id
+              : "City";
+            const stage = conversationRelationshipStage(conversation, citizenById);
+
+            return (
+              <article key={conversation.conversation_id} className="story-card rounded-xl p-3">
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      {speakers.map((speaker) => (
+                        <button
+                          key={speaker.citizen_id}
+                          className="inline-flex max-w-[9rem] items-center gap-1 rounded-full border border-[rgba(var(--border),0.8)] bg-black/20 px-2 py-1 text-left text-[11px] font-semibold hover:border-[rgba(var(--accent),0.75)]"
+                          onClick={() => onSelectCitizen(speaker.citizen_id)}
+                          title={`Open ${speaker.name}`}
+                        >
+                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: moodHex(speaker) }} />
+                          <span className="truncate">{speaker.name.split(" ")[0]}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
+                      <span>Day {conversation.game_day}</span>
+                      <span>{minutesLabel(conversation.game_minute)}</span>
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {locationName}
+                      </span>
+                    </div>
+                  </div>
+                  <Badge tone={stage === "friend" || stage === "trusted friend" ? "success" : "default"}>
+                    {stage}
+                  </Badge>
+                </div>
+
+                <p className="mb-2 text-xs leading-relaxed text-[rgb(var(--muted-strong))]">
+                  {conversation.summary}
+                </p>
+
+                <div className="space-y-1.5">
+                  {conversation.transcript.slice(0, 8).map((line, index) => {
+                    const speaker = citizenById[line.speaker_id];
+                    return (
+                      <div
+                        key={`${conversation.conversation_id}-${index}`}
+                        className="rounded-lg border border-[rgba(var(--border-soft),0.75)] bg-black/20 p-2"
+                      >
+                        <div className="mb-0.5 text-[10px] font-semibold text-[rgb(var(--accent))]">
+                          {speaker?.name ?? line.speaker_id}
+                        </div>
+                        <div className="text-xs leading-snug">{line.text}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+            );
+          })}
+
+          {conversations.length === 0 ? (
+            <div className="rounded-xl border border-[rgba(var(--border),0.85)] bg-black/20 p-4 text-sm leading-relaxed text-[rgb(var(--muted-strong))] lg:col-span-2 xl:col-span-3">
+              No conversations yet. Assign a task like “Talk to Iris about today” or trigger a school exam,
+              then step time forward.
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <StoryTimeline timeline={timeline} compact />
+    </div>
+  );
+}
+
+function StoryTimeline({ timeline, compact = false }: { timeline: TimelineItem[]; compact?: boolean }) {
   return (
     <div className="z-10">
       <div className="mb-2 flex items-center justify-between">
@@ -1718,7 +1759,11 @@ function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
           Newest first · tap citizens to see what they remember
         </div>
       </div>
-      <div className="grid max-h-[320px] grid-cols-1 gap-2 overflow-y-auto scrollbar-thin sm:grid-cols-2 lg:max-h-[210px] lg:grid-cols-4">
+      <div
+        className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${
+          compact ? "lg:grid-cols-3 xl:grid-cols-4" : "max-h-[320px] overflow-y-auto scrollbar-thin lg:max-h-[210px] lg:grid-cols-4"
+        }`}
+      >
         {timeline.map((item) => (
           <div key={item.id} className="story-card rounded-lg p-2">
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -1895,6 +1940,19 @@ function relationshipStage(relationship: Relationship) {
   if (relationship.familiarity >= 24 || relationship.trust >= 45) {
     return "acquaintance";
   }
+  return "stranger";
+}
+
+function conversationRelationshipStage(
+  conversation: Conversation,
+  citizenById: Record<string, CitizenAgent>,
+) {
+  const [firstId, secondId] = conversation.actor_ids;
+  const score = firstId && secondId ? citizenById[firstId]?.relationship_scores?.[secondId] : undefined;
+  if (typeof score !== "number") return "new talk";
+  if (score >= 72) return "trusted friend";
+  if (score >= 58) return "friend";
+  if (score >= 35) return "acquaintance";
   return "stranger";
 }
 

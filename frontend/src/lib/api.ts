@@ -31,6 +31,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getState: () => request<CityState>("/city/state"),
+  getCityConversations: () => request<Conversation[]>("/city/conversations"),
   start: () => request<CityState>("/simulation/start", { method: "POST" }),
   pause: () => request<CityState>("/simulation/pause", { method: "POST" }),
   tick: () => request<CityState>("/simulation/tick", { method: "POST" }),
