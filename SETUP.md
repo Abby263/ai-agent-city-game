@@ -211,13 +211,15 @@ http://localhost:3000
 
 ## How To Play After It Opens
 
-1. Use the top speed controls to run the city at `1x`, `2x`, or `4x`. `Step 15m` advances one tick manually.
+1. Start in `Manual`. Manual mode keeps the city quiet until you assign a task.
 2. Start with the default five-student cast: Ava, Mateo, Noah, Iris, and Leo. The older full-city citizens remain in the database/code but are inactive unless `ACTIVE_CITIZEN_IDS` changes.
 3. Tap or click a student on the map or in the roster.
-4. Use `Give [name] a task` in the citizen drawer to ask a student to talk, study, visit the park, or follow any short instruction.
-5. Step the game forward and open the `Talk` tab to read conversations and see whether the students are strangers, acquaintances, friends, or trusted friends.
-6. Use `Make Something Happen` to trigger an event, then open the `Story` drawer only when you want the event feed.
-7. Use the right panel tabs:
+4. Use `Give [name] a task`, choose a conversation target, and click `Assign Task`.
+5. Open `Talk` to follow the latest conversation transcript, relationship stage, task context, and recent city moments.
+6. Let the task finish automatically, click `Pause`, or use `Close Task` in the student profile.
+7. Switch to `Auto` when you want students to move, meet, talk, remember, and react autonomously.
+8. In `Auto`, use `Make Something Happen` to trigger an event, then open `Talk` when you want the feed.
+9. Use the right panel tabs:
    - `Life`: current task, needs, money, goals, and schedule.
    - `Memory`: durable memories and personal summary.
    - `Talk`: recent conversations, relationship stage, trust, warmth, and familiarity.

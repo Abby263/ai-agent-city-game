@@ -84,6 +84,7 @@ export type CityState = {
   city_name: string;
   map_width: number;
   map_height: number;
+  simulation_mode: SimulationMode;
   clock: SimulationClock;
   policy: Record<string, unknown>;
   metrics: CityMetrics;
@@ -91,6 +92,8 @@ export type CityState = {
   citizens: CitizenAgent[];
   events: CityEvent[];
 };
+
+export type SimulationMode = "manual" | "autonomous";
 
 export type Memory = {
   memory_id: string;
@@ -167,5 +170,6 @@ export type MayorPolicyPayload = {
 export type AssignTaskPayload = {
   task: string;
   location_id?: string | null;
+  target_citizen_id?: string | null;
   duration_ticks?: number;
 };

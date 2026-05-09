@@ -14,6 +14,7 @@ DEFAULT_POLICY = {
     "road_budget": 48,
     "farmer_subsidy": 35,
     "public_health_campaign": False,
+    "simulation_mode": "manual",
 }
 
 

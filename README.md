@@ -19,7 +19,7 @@ Play online: https://ai-agent-city-game.vercel.app
 
 AgentCity uses a Hermes-inspired loop: citizens collect observations, retrieve memories, reason selectively, form plans, talk to nearby citizens, and write new memories back into the city. The linked Hermes Agent project is a useful reference for self-improving agents with persistent memory, skill learning, cross-session recall, scheduled automations, and subagents. AgentCity applies those ideas inside a game simulation rather than embedding Hermes as a runtime dependency.
 
-Auto Mode in the UI starts the city and keeps ticks flowing from the browser. As the five students cross paths, the backend creates social opportunities, LLM cognition can generate conversations, and relationships shift from strangers to acquaintances to friends over time.
+Manual Mode is the easiest way to follow the game: the city waits, the player assigns one student task, the task runs, conversations/memories are written, and the city pauses when the task completes. Autonomous Mode starts the living-city loop: students follow routines, meet naturally, LLM cognition can generate conversations, and relationships shift from strangers to acquaintances to friends over time.
 
 ## Local Setup
 
@@ -79,19 +79,20 @@ On startup the backend enables pgvector with `CREATE EXTENSION IF NOT EXISTS vec
 
 - Watch five student agents move across a 40x40 top-down city map.
 - Tap or click any student to see thoughts, memory, relationships, mood, needs, money, schedule, and goals.
-- Assign a task to any student and watch it become a goal, memory, and possible conversation trigger.
-- Trigger city events such as flu outbreak, traffic accident, food shortage, school exam, festival, bank policy change, and power outage.
-- Change mayor policies for tax, hospitals, school funding, roads, farming subsidies, and public health.
+- Use Manual Mode to assign a focused task to any student, choose a conversation target, and watch the task close when complete.
+- Use Autonomous Mode to trigger city events such as flu outbreak, traffic accident, food shortage, school exam, festival, bank policy change, and power outage.
+- Change mayor policies for tax, hospitals, school funding, roads, farming subsidies, and public health in Autonomous Mode.
 - Observe WebSocket-streamed thoughts, conversations, memories, reflections, and city metrics.
 - Play from desktop or mobile; the UI stacks the city map, citizen panel, roster, and story feed on smaller screens.
 
 ## How To Play
 
-1. Open the city and let the clock run at `1x` or use `Step 15m`.
+1. Start in `Manual`.
 2. Tap Ava, Mateo, Noah, Iris, or Leo on the map to follow one student.
-3. Use `Give [name] a task` to ask them to talk, study, visit the park, or check on someone.
-4. Read `Life`, `Memory`, and `Talk` to understand their goals, memories, conversations, and relationship stage.
-5. Use `Make Something Happen` for a school exam, festival, flu outbreak, or power outage, then open `Story` when you want the feed.
+3. Use `Give [name] a task`, choose a conversation target, and click `Assign Task`.
+4. Open `Talk` to read the latest conversation as a transcript.
+5. Let the task finish automatically, or use `Pause` / `Close Task`.
+6. Switch to `Auto` when you want the students to move, meet, talk, and react without direct player instructions.
 
 ## Verification
 

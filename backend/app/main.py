@@ -7,7 +7,7 @@ from app.api.routes import cognition, engine, router
 from app.config import get_settings
 from app.database import SessionLocal, init_db
 from app.realtime import manager
-from app.schemas import TriggerEventRequest
+from app.schemas import SimulationModeRequest, TriggerEventRequest
 from app.seed import ensure_seeded
 
 settings = get_settings()
@@ -66,6 +66,10 @@ async def websocket_city(websocket: WebSocket) -> None:
                     await manager.broadcast("city_state", state.model_dump(mode="json"))
                 elif command == "pause":
                     state = engine.pause(db)
+                    await manager.broadcast("city_state", state.model_dump(mode="json"))
+                elif command == "set_mode":
+                    request = SimulationModeRequest(**message.get("payload", {}))
+                    state = engine.set_mode(db, request)
                     await manager.broadcast("city_state", state.model_dump(mode="json"))
     except WebSocketDisconnect:
         manager.disconnect(websocket)

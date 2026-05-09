@@ -18,6 +18,7 @@ from app.schemas import (
     MayorPolicyRequest,
     Memory,
     Relationship,
+    SimulationModeRequest,
     TriggerEventRequest,
 )
 from app.simulation.engine import SimulationEngine
@@ -131,6 +132,13 @@ async def pause_simulation(db: Session = Depends(get_db)) -> CityState:
     return state
 
 
+@router.post("/simulation/mode", response_model=CityState)
+async def set_simulation_mode(request: SimulationModeRequest, db: Session = Depends(get_db)) -> CityState:
+    state = engine.set_mode(db, request)
+    await manager.broadcast("city_state", state.model_dump(mode="json"))
+    return state
+
+
 @router.post("/simulation/tick", response_model=CityState)
 async def tick_simulation(db: Session = Depends(get_db)) -> CityState:
     result = engine.tick(db, cognition)
@@ -191,6 +199,25 @@ async def assign_citizen_task(
             "actors": [citizen_id],
             "description": f"Player assigned a task to {citizen_id}: {request.task}",
             "priority": 3,
+        },
+    )
+    return state
+
+
+@router.post("/citizens/{citizen_id}/task/close", response_model=CityState)
+async def close_citizen_task(
+    citizen_id: str,
+    db: Session = Depends(get_db),
+) -> CityState:
+    state = engine.close_task(db, citizen_id)
+    await manager.broadcast("city_state", state.model_dump(mode="json"))
+    await manager.broadcast(
+        "event",
+        {
+            "event_type": "player_task_closed",
+            "actors": [citizen_id],
+            "description": f"Player closed the task for {citizen_id}.",
+            "priority": 2,
         },
     )
     return state

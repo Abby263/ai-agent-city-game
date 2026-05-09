@@ -3,7 +3,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.config import Settings
 from app.models import Base, CitizenORM, CityEventORM, ConversationORM, MemoryORM
-from app.schemas import AssignTaskRequest, TriggerEventRequest
+from app.schemas import AssignTaskRequest, SimulationModeRequest, TriggerEventRequest
 from app.seed import ensure_seeded
 from app.simulation.engine import SimulationEngine
 
@@ -20,6 +20,7 @@ def session_factory():
 def test_tick_progresses_clock_and_moves_citizens():
     db = session_factory()
     engine = SimulationEngine(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    engine.set_mode(db, SimulationModeRequest(mode="autonomous"))
     before = engine.get_state(db)
     result = engine.tick(db)
     after = result["state"]
@@ -137,8 +138,65 @@ def test_cognition_candidate_selection_is_selective():
     from app.cognition.pipeline import CognitionPipeline
 
     pipeline = CognitionPipeline(settings)
+    engine.set_mode(db, SimulationModeRequest(mode="autonomous"))
     engine.trigger_event(db, TriggerEventRequest(event_type="traffic_accident", severity="high"))
     result = engine.tick(db, pipeline)
 
     assert 0 < len(result["cognition"]) <= 3
     assert all("thought" in item for item in result["cognition"])
+
+
+def test_manual_mode_waits_until_player_assigns_task():
+    db = session_factory()
+    engine = SimulationEngine(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    before = engine.get_state(db)
+
+    result = engine.tick(db)
+    after = result["state"]
+
+    assert after.simulation_mode == "manual"
+    assert after.clock.tick == before.clock.tick
+    assert not after.clock.running
+    assert result["events"] == []
+
+
+def test_manual_task_runs_then_autopauses_when_completed():
+    db = session_factory()
+    engine = SimulationEngine(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    assigned = engine.assign_task(
+        db,
+        "cit_009",
+        AssignTaskRequest(
+            task="Talk with Mateo about the science project",
+            target_citizen_id="cit_010",
+            duration_ticks=1,
+        ),
+    )
+
+    assert assigned.clock.running
+    assert assigned.simulation_mode == "manual"
+
+    result = engine.tick(db)
+    after = result["state"]
+    citizen = db.get(CitizenORM, "cit_009")
+
+    assert after.clock.tick == assigned.clock.tick + 1
+    assert not after.clock.running
+    assert citizen.personality["player_task"]["status"] == "completed"
+    assert any(event.event_type == "player_task_completed" for event in result["events"])
+
+
+def test_close_task_stops_manual_task_run():
+    db = session_factory()
+    engine = SimulationEngine(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    engine.assign_task(
+        db,
+        "cit_009",
+        AssignTaskRequest(task="Ask Iris how she is feeling", target_citizen_id="cit_022"),
+    )
+
+    state = engine.close_task(db, "cit_009")
+    citizen = db.get(CitizenORM, "cit_009")
+
+    assert not state.clock.running
+    assert citizen.personality["player_task"]["status"] == "closed"

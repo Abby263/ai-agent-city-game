@@ -27,6 +27,7 @@ from app.schemas import (
     Location,
     MayorPolicyRequest,
     SimulationClock,
+    SimulationModeRequest,
     TriggerEventRequest,
 )
 
@@ -47,6 +48,7 @@ class SimulationEngine:
         return CityState(
             city_id=state.id,
             city_name=state.city_name,
+            simulation_mode=self._simulation_mode(state),
             clock=SimulationClock(
                 day=state.day,
                 minute_of_day=state.minute_of_day,
@@ -62,6 +64,19 @@ class SimulationEngine:
 
     def start(self, db: Session) -> CityState:
         state = self._state(db)
+        if self._simulation_mode(state) == "manual" and not self._active_task_citizens(self._active_citizens(db)):
+            state.running = False
+            state.updated_at = utcnow()
+            self._event(
+                db,
+                state=state,
+                event_type="manual_mode_waiting",
+                description="Manual mode is waiting for the player to assign a student task.",
+                priority=1,
+            )
+            db.commit()
+            return self.get_state(db)
+
         state.running = True
         state.updated_at = utcnow()
         self._event(
@@ -71,6 +86,31 @@ class SimulationEngine:
             description="The city simulation started.",
             priority=1,
         )
+        db.commit()
+        return self.get_state(db)
+
+    def set_mode(self, db: Session, request: SimulationModeRequest) -> CityState:
+        state = self._state(db)
+        policy = dict(state.policy or {})
+        previous_mode = self._simulation_mode(state)
+        policy["simulation_mode"] = request.mode
+        state.policy = policy
+        state.running = request.mode == "autonomous"
+        state.updated_at = utcnow()
+        event_type = "manual_mode_enabled" if request.mode == "manual" else "autonomous_mode_enabled"
+        description = (
+            "Manual mode enabled. The city waits until the player assigns a student task."
+            if request.mode == "manual"
+            else "Autonomous mode enabled. Students resume daily life, conversations, and city reactions."
+        )
+        if previous_mode != request.mode:
+            self._event(
+                db,
+                state=state,
+                event_type=event_type,
+                description=description,
+                priority=2,
+            )
         db.commit()
         return self.get_state(db)
 
@@ -90,6 +130,21 @@ class SimulationEngine:
 
     def tick(self, db: Session, cognition: CognitionPipeline | None = None) -> dict:
         state = self._state(db)
+        simulation_mode = self._simulation_mode(state)
+        citizens = self._active_citizens(db)
+        update_citizens = citizens
+        if simulation_mode == "manual":
+            update_citizens = self._active_task_citizens(citizens)
+            if not update_citizens:
+                state.running = False
+                state.updated_at = utcnow()
+                db.commit()
+                return {
+                    "state": self.get_state(db),
+                    "events": [],
+                    "cognition": [],
+                }
+
         previous_minute = state.minute_of_day
         state.tick += 1
         state.minute_of_day += self.settings.tick_minutes
@@ -106,9 +161,8 @@ class SimulationEngine:
         state.updated_at = utcnow()
 
         locations = {location.location_id: location for location in db.scalars(select(LocationORM))}
-        citizens = self._active_citizens(db)
         events: list[CityEventORM] = []
-        for citizen in citizens:
+        for citizen in update_citizens:
             events.extend(
                 self._update_citizen(
                     db,
@@ -119,8 +173,9 @@ class SimulationEngine:
                 )
             )
 
-        events.extend(self._run_profession_systems(db, state, citizens, locations))
-        events.extend(self._run_social_systems(db, state, citizens, locations))
+        if simulation_mode == "autonomous":
+            events.extend(self._run_profession_systems(db, state, citizens, locations))
+            events.extend(self._run_social_systems(db, state, citizens, locations))
         db.flush()
 
         cognition_results: list[dict] = []
@@ -140,6 +195,10 @@ class SimulationEngine:
                 observations=observations,
                 event_context=event_context,
             )
+
+        if simulation_mode == "manual" and not self._active_task_citizens(citizens):
+            state.running = False
+            state.updated_at = utcnow()
 
         db.commit()
         return {
@@ -270,7 +329,21 @@ class SimulationEngine:
 
             raise HTTPException(status_code=404, detail="Citizen not found")
 
+        target_citizen = None
+        if request.target_citizen_id:
+            if active_ids and request.target_citizen_id not in active_ids:
+                from fastapi import HTTPException
+
+                raise HTTPException(status_code=404, detail="Target citizen is inactive in the current playable roster")
+            target_citizen = db.get(CitizenORM, request.target_citizen_id)
+            if not target_citizen:
+                from fastapi import HTTPException
+
+                raise HTTPException(status_code=404, detail="Target citizen not found")
+
         location_id = request.location_id or citizen.current_location_id
+        if target_citizen and not request.location_id:
+            location_id = target_citizen.current_location_id
         if location_id and not db.get(LocationORM, location_id):
             from fastapi import HTTPException
 
@@ -286,11 +359,16 @@ class SimulationEngine:
             "expires_tick": state.tick + request.duration_ticks,
             "status": "active",
         }
+        if target_citizen:
+            personality["player_task"]["target_citizen_id"] = target_citizen.citizen_id
         citizen.personality = personality
         citizen.current_activity = f"Task: {task}"
         citizen.current_thought = f"The player asked me to: {task}. I should focus on that next."
         existing_goals = [goal for goal in citizen.short_term_goals if not goal.startswith("Player task:")]
         citizen.short_term_goals = [f"Player task: {task}", *existing_goals][:5]
+        if self._simulation_mode(state) == "manual":
+            state.running = True
+            state.updated_at = utcnow()
         self.memory_store.add_memory(
             db,
             citizen_id=citizen.citizen_id,
@@ -305,11 +383,63 @@ class SimulationEngine:
             state=state,
             event_type="player_task",
             location_id=location_id,
-            actors=[citizen.citizen_id],
-            description=f"The player asked {citizen.name} to: {task}",
-            payload={"task": task, "duration_ticks": request.duration_ticks},
+            actors=[actor for actor in [citizen.citizen_id, target_citizen.citizen_id if target_citizen else None] if actor],
+            description=(
+                f"The player asked {citizen.name} to: {task}"
+                if not target_citizen
+                else f"The player asked {citizen.name} to work with {target_citizen.name}: {task}"
+            ),
+            payload={
+                "task": task,
+                "duration_ticks": request.duration_ticks,
+                "target_citizen_id": target_citizen.citizen_id if target_citizen else None,
+            },
             priority=3,
         )
+        db.commit()
+        return self.get_state(db)
+
+    def close_task(self, db: Session, citizen_id: str) -> CityState:
+        state = self._state(db)
+        citizen = db.get(CitizenORM, citizen_id)
+        if not citizen:
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="Citizen not found")
+        task = self._player_task(citizen)
+        if not task:
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=400, detail="Citizen does not have a player task")
+
+        task["status"] = "closed"
+        personality = dict(citizen.personality or {})
+        personality["player_task"] = task
+        citizen.personality = personality
+        citizen.current_activity = "Waiting for the next player task"
+        citizen.current_thought = f"The player closed the task: {task.get('task')}."
+        self.memory_store.add_memory(
+            db,
+            citizen_id=citizen.citizen_id,
+            kind="episodic",
+            content=f"The player closed my task before it finished: {task.get('task')}.",
+            importance=0.55,
+            salience=0.6,
+            extra={"source": "player_task_closed"},
+        )
+        self._event(
+            db,
+            state=state,
+            event_type="player_task_closed",
+            location_id=str(task.get("location_id") or citizen.current_location_id),
+            actors=[citizen.citizen_id],
+            description=f"The player closed {citizen.name}'s task: {task.get('task')}",
+            payload={"task": task.get("task")},
+            priority=2,
+        )
+        if self._simulation_mode(state) == "manual" and not self._active_task_citizens(self._active_citizens(db)):
+            state.running = False
+        state.updated_at = utcnow()
         db.commit()
         return self.get_state(db)
 
@@ -324,16 +454,18 @@ class SimulationEngine:
     ) -> list[CityEventORM]:
         events: list[CityEventORM] = []
         old_location = citizen.current_location_id
+        player_task = self._player_task(citizen)
+        task_was_active = player_task.get("status") == "active" if player_task else False
         target_location_id, activity = self._desired_location_and_activity(citizen, state.minute_of_day, state.tick)
         citizen.current_activity = activity
 
-        if citizen.health < 55 and citizen.profession not in {"Doctor", "Nurse"}:
+        if not task_was_active and citizen.health < 55 and citizen.profession not in {"Doctor", "Nurse"}:
             target_location_id = "loc_hospital"
             citizen.current_activity = "Seeking medical help"
-        elif citizen.hunger > 74 and citizen.money >= 4:
+        elif not task_was_active and citizen.hunger > 74 and citizen.money >= 4:
             target_location_id = "loc_market"
             citizen.current_activity = "Buying food"
-        elif citizen.energy < 22:
+        elif not task_was_active and citizen.energy < 22:
             target_location_id = citizen.home_location_id
             citizen.current_activity = "Resting at home"
 
@@ -363,7 +495,40 @@ class SimulationEngine:
                 )
             )
 
-        if previous_minute < 480 <= state.minute_of_day and citizen.work_location_id:
+        if task_was_active:
+            latest_task = self._player_task(citizen) or player_task
+            target_id = str(latest_task.get("target_citizen_id") or "")
+            actors = [citizen.citizen_id, target_id] if target_id else [citizen.citizen_id]
+            task_text = str(latest_task.get("task") or "the player task")
+            if int(latest_task.get("expires_tick", state.tick)) <= state.tick:
+                self._complete_player_task(db, state, citizen, latest_task, target_location.location_id)
+                events.append(
+                    self._event(
+                        db,
+                        state=state,
+                        event_type="player_task_completed",
+                        location_id=target_location.location_id,
+                        actors=actors,
+                        description=f"{citizen.name} completed the player task: {task_text}",
+                        payload={"task": task_text},
+                        priority=3,
+                    )
+                )
+            else:
+                events.append(
+                    self._event(
+                        db,
+                        state=state,
+                        event_type="player_task_progress",
+                        location_id=target_location.location_id,
+                        actors=actors,
+                        description=f"{citizen.name} is working on the player task: {task_text}",
+                        payload={"task": task_text},
+                        priority=3,
+                    )
+                )
+
+        if not task_was_active and previous_minute < 480 <= state.minute_of_day and citizen.work_location_id:
             events.append(
                 self._event(
                     db,
@@ -551,13 +716,7 @@ class SimulationEngine:
     def _desired_location_and_activity(self, citizen: CitizenORM, minute: int, tick: int) -> tuple[str, str]:
         player_task = dict((citizen.personality or {}).get("player_task") or {})
         if player_task.get("status") == "active":
-            if int(player_task.get("expires_tick", tick)) >= tick:
-                return str(player_task.get("location_id") or citizen.current_location_id), f"Task: {player_task.get('task')}"
-            player_task["status"] = "completed"
-            personality = dict(citizen.personality or {})
-            personality["player_task"] = player_task
-            citizen.personality = personality
-            citizen.current_thought = f"I finished the player task: {player_task.get('task')}."
+            return str(player_task.get("location_id") or citizen.current_location_id), f"Task: {player_task.get('task')}"
         for entry in citizen.daily_schedule:
             start = int(entry["start"])
             end = int(entry["end"])
@@ -593,6 +752,53 @@ class SimulationEngine:
             citizen.happiness = self._clamp(citizen.happiness + 4)
         if location.location_id == "loc_school" and citizen.profession == "Student":
             citizen.happiness = self._clamp(citizen.happiness + 1)
+
+    def _complete_player_task(
+        self,
+        db: Session,
+        state: SimulationStateORM,
+        citizen: CitizenORM,
+        task: dict,
+        location_id: str,
+    ) -> None:
+        task["status"] = "completed"
+        task["completed_day"] = state.day
+        task["completed_minute"] = state.minute_of_day
+        personality = dict(citizen.personality or {})
+        personality["player_task"] = task
+        citizen.personality = personality
+        citizen.current_activity = "Task completed"
+        citizen.current_thought = f"I finished the player task: {task.get('task')}."
+        citizen.short_term_goals = [
+            goal for goal in citizen.short_term_goals if not goal.startswith("Player task:")
+        ][:5]
+        self.memory_store.add_memory(
+            db,
+            citizen_id=citizen.citizen_id,
+            kind="episodic",
+            content=f"I completed the player task: {task.get('task')}.",
+            importance=0.72,
+            salience=0.78,
+            related_citizen_id=str(task.get("target_citizen_id") or "") or None,
+            extra={"source": "player_task_completed", "location_id": location_id},
+        )
+
+    @staticmethod
+    def _simulation_mode(state: SimulationStateORM) -> str:
+        mode = (state.policy or {}).get("simulation_mode", "manual")
+        return "autonomous" if mode == "autonomous" else "manual"
+
+    @staticmethod
+    def _player_task(citizen: CitizenORM) -> dict:
+        task = (citizen.personality or {}).get("player_task") or {}
+        return dict(task) if isinstance(task, dict) else {}
+
+    def _active_task_citizens(self, citizens: list[CitizenORM]) -> list[CitizenORM]:
+        return [
+            citizen
+            for citizen in citizens
+            if self._player_task(citizen).get("status") == "active"
+        ]
 
     def _metrics(self, citizens: list[CitizenORM], events: list[CityEventORM]) -> CityMetrics:
         population = len(citizens) or 1

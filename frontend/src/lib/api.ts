@@ -5,6 +5,7 @@ import type {
   MayorPolicyPayload,
   Memory,
   Relationship,
+  SimulationMode,
   TriggerEventPayload,
 } from "@/lib/types";
 
@@ -34,6 +35,11 @@ export const api = {
   getCityConversations: () => request<Conversation[]>("/city/conversations"),
   start: () => request<CityState>("/simulation/start", { method: "POST" }),
   pause: () => request<CityState>("/simulation/pause", { method: "POST" }),
+  setMode: (mode: SimulationMode) =>
+    request<CityState>("/simulation/mode", {
+      method: "POST",
+      body: JSON.stringify({ mode }),
+    }),
   tick: () => request<CityState>("/simulation/tick", { method: "POST" }),
   triggerEvent: (payload: TriggerEventPayload) =>
     request<CityState>("/events/trigger", {
@@ -54,5 +60,9 @@ export const api = {
     request<CityState>(`/citizens/${citizenId}/task`, {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+  closeTask: (citizenId: string) =>
+    request<CityState>(`/citizens/${citizenId}/task/close`, {
+      method: "POST",
     }),
 };

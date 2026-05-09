@@ -143,6 +143,7 @@ class CityState(BaseModel):
     city_name: str
     map_width: int = 40
     map_height: int = 40
+    simulation_mode: Literal["manual", "autonomous"] = "manual"
     clock: SimulationClock
     policy: dict[str, Any]
     metrics: CityMetrics
@@ -177,7 +178,12 @@ class MayorPolicyRequest(BaseModel):
 class AssignTaskRequest(BaseModel):
     task: str = Field(min_length=3, max_length=240)
     location_id: str | None = None
+    target_citizen_id: str | None = None
     duration_ticks: int = Field(default=4, ge=1, le=16)
+
+
+class SimulationModeRequest(BaseModel):
+    mode: Literal["manual", "autonomous"]
 
 
 class WebSocketEnvelope(BaseModel):
