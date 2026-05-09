@@ -95,7 +95,7 @@ export function AgentCityShell() {
     selectCitizen,
   } = useGameStore();
   const [busy, setBusy] = useState(false);
-  const [autoTick, setAutoTick] = useState(true);
+  const [autoTick, setAutoTick] = useState(false);
   const [professionFilter, setProfessionFilter] = useState("All");
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("life");
   const socketRef = useRef<WebSocket | null>(null);
