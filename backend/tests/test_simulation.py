@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.config import Settings
-from app.models import Base, CitizenORM, MemoryORM
+from app.models import Base, CitizenORM, CityEventORM, MemoryORM
 from app.schemas import AssignTaskRequest, TriggerEventRequest
 from app.seed import ensure_seeded
 from app.simulation.engine import SimulationEngine
@@ -60,6 +60,37 @@ def test_flu_outbreak_changes_health_and_writes_memories():
     assert after < before
     assert state.metrics.sick_count >= 1
     assert db.query(MemoryORM).filter(MemoryORM.citizen_id == "cit_009").count() >= 2
+
+
+def test_recent_events_hide_inactive_citizen_history():
+    db = session_factory()
+    engine = SimulationEngine(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    db.add_all(
+        [
+            CityEventORM(
+                event_id="evt_active_only",
+                game_day=1,
+                game_minute=480,
+                event_type="social_opportunity",
+                actors=["cit_009", "cit_010"],
+                description="Ava Singh and Mateo Garcia talk after class.",
+            ),
+            CityEventORM(
+                event_id="evt_mixed_inactive",
+                game_day=1,
+                game_minute=480,
+                event_type="social_opportunity",
+                actors=["cit_009", "cit_002"],
+                description="Ava Singh and inactive Milo Chen talk after class.",
+            ),
+        ]
+    )
+    db.commit()
+
+    event_ids = {event.event_id for event in engine._recent_events(db, limit=20)}
+
+    assert "evt_active_only" in event_ids
+    assert "evt_mixed_inactive" not in event_ids
 
 
 def test_cognition_candidate_selection_is_selective():

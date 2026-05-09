@@ -5,7 +5,7 @@ from uuid import uuid4
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.cognition.pipeline import CognitionPipeline, observations_by_actor, recent_event_context
+from app.cognition.pipeline import CognitionPipeline, observations_by_actor
 from app.config import Settings
 from app.memory.store import MemoryStore
 from app.models import (
@@ -128,7 +128,9 @@ class SimulationEngine:
         should_run_cognition = should_run_cognition or any(event.priority >= 3 for event in events)
         if cognition and should_run_cognition:
             observations = observations_by_actor(events)
-            event_context = recent_event_context(db)
+            event_context = " ".join(
+                event.description for event in self._recent_events(db, limit=5) if event.priority >= 2
+            )
             cognition_results = cognition.process_tick(
                 db,
                 citizens=citizens,
@@ -637,7 +639,7 @@ class SimulationEngine:
         filtered = [
             event
             for event in events
-            if not event.actors or any(actor in active_ids for actor in event.actors)
+            if not event.actors or all(actor in active_ids for actor in event.actors)
         ]
         return filtered[:limit]
 
