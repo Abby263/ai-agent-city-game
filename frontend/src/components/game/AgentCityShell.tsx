@@ -274,7 +274,7 @@ export function AgentCityShell() {
   const period = periodInfo(city?.clock.minute_of_day ?? 0);
 
   return (
-    <main className="agentcity-shell grid h-[100dvh] w-screen grid-rows-[68px_1fr_220px] overflow-hidden text-[rgb(var(--foreground))]">
+    <main className="agentcity-shell min-h-[100dvh] w-screen overflow-x-hidden overflow-y-auto text-[rgb(var(--foreground))] lg:grid lg:h-[100dvh] lg:grid-rows-[68px_1fr_220px] lg:overflow-hidden">
       <TopHeader
         cityName={city?.city_name}
         connectionStatus={connectionStatus}
@@ -300,8 +300,8 @@ export function AgentCityShell() {
         onShowGuide={() => setShowGuide(true)}
       />
 
-      <section className="grid min-h-0 grid-cols-[300px_minmax(420px,1fr)_380px] gap-3 px-3 pt-2 pb-1">
-        <aside className="glass-panel min-h-0 overflow-y-auto rounded-xl p-3 scrollbar-thin">
+      <section className="grid min-h-0 grid-cols-1 gap-3 px-2 pt-2 pb-3 sm:px-3 lg:grid-cols-[300px_minmax(420px,1fr)_380px] lg:pb-1">
+        <aside className="glass-panel order-3 min-h-0 rounded-xl p-3 scrollbar-thin lg:order-1 lg:overflow-y-auto">
           <PlayerGuideCard
             city={city}
             selectedCitizen={selectedCitizen ?? null}
@@ -321,7 +321,7 @@ export function AgentCityShell() {
           />
         </aside>
 
-        <div className="glass-panel relative min-h-0 overflow-hidden rounded-xl bg-[#0a1226]">
+        <div className="glass-panel order-1 relative h-[62dvh] min-h-[360px] overflow-hidden rounded-xl bg-[#0a1226] sm:h-[66dvh] lg:order-2 lg:h-auto lg:min-h-0">
           <GameCanvas
             city={city}
             selectedCitizenId={selectedCitizen?.citizen_id ?? null}
@@ -339,7 +339,7 @@ export function AgentCityShell() {
           <SceneLegend />
         </div>
 
-        <aside className="glass-panel min-h-0 overflow-y-auto rounded-xl p-4 scrollbar-thin">
+        <aside className="glass-panel order-2 min-h-0 rounded-xl p-4 scrollbar-thin lg:order-3 lg:overflow-y-auto">
           {error ? (
             <div className="mb-3 rounded-lg border border-[rgba(244,89,89,0.4)] bg-[rgba(244,89,89,0.1)] p-3 text-sm text-[rgb(252,165,165)]">
               {error}
@@ -403,7 +403,7 @@ function TopHeader({
   const PeriodIcon = period.icon;
   const isStreaming = connectionStatus === "connected";
   return (
-    <header className="z-10 flex min-w-0 items-center justify-between gap-3 border-b border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.85)] px-4 backdrop-blur">
+    <header className="z-10 flex min-w-0 flex-col gap-3 border-b border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.9)] px-3 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:py-0">
       <div className="flex min-w-0 items-center gap-3">
         <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[rgb(var(--accent))] via-[rgb(125_211_252)] to-[rgb(var(--violet))] text-[#06121f] shadow-[0_0_24px_rgba(56,189,248,0.32)]">
           <Building2 className="h-5 w-5" />
@@ -435,10 +435,10 @@ function TopHeader({
         <ClockBlock day={day} time={clock} period={period} running={running} icon={PeriodIcon} />
       </div>
 
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex w-full min-w-0 items-center gap-2 overflow-x-auto pb-1 scrollbar-thin sm:w-auto sm:pb-0">
         <SpeedControl speed={speed} onSpeed={onSpeed} busy={busy} />
         <button
-          className={`btn-pill ${autoDirector ? "" : ""}`}
+          className={`btn-pill shrink-0 ${autoDirector ? "" : ""}`}
           data-active={autoDirector}
           onClick={() => onAutoDirector(!autoDirector)}
           title="Auto Events creates occasional city incidents and celebrations"
@@ -447,7 +447,7 @@ function TopHeader({
           Auto Events
         </button>
         <button
-          className="btn-pill"
+          className="btn-pill shrink-0"
           data-active={autoFollow}
           onClick={() => onAutoFollow(!autoFollow)}
           title="Follow interesting citizens automatically"
@@ -455,13 +455,13 @@ function TopHeader({
           <UserRound className="h-3.5 w-3.5" />
           Follow Citizen
         </button>
-        <button className="btn-pill" onClick={onShowGuide} title="Show how to play AgentCity">
+        <button className="btn-pill shrink-0" onClick={onShowGuide} title="Show how to play AgentCity">
           <HelpCircle className="h-3.5 w-3.5" />
           How to Play
         </button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => runAction(api.tick)} title="Advance one 15-minute game tick">
+        <Button className="shrink-0" size="sm" variant="ghost" disabled={busy} onClick={() => runAction(api.tick)} title="Advance one 15-minute game tick">
           <Radio className="h-4 w-4" />
-          <span className="hidden xl:inline">Step 15m</span>
+          <span>Step 15m</span>
         </Button>
       </div>
     </header>
@@ -484,7 +484,7 @@ function SpeedControl({
     { key: "4x", label: "4×", icon: Play },
   ];
   return (
-    <div className="flex items-center gap-1 rounded-full border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel-strong),0.85)] p-1">
+    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel-strong),0.85)] p-1">
       {choices.map((choice) => {
         const Icon = choice.icon;
         const active = speed === choice.key;
@@ -565,7 +565,7 @@ function PlayerGuideCard({
             Play as mayor-observer
           </div>
           <p className="mt-1 text-xs leading-snug text-[rgb(var(--muted-strong))]">
-            Watch citizens live, click people to inspect them, then create events and see how memories and relationships change.
+            Watch citizens live, tap people to inspect them, then create events and see how memories and relationships change.
           </p>
         </div>
         <Badge tone={running ? "success" : "default"}>{running ? "live" : "paused"}</Badge>
@@ -573,7 +573,7 @@ function PlayerGuideCard({
 
       <div className="grid gap-1.5 text-[11px]">
         <GuideStep icon={Eye} label="Watch" detail="Citizens walk to work, school, food, home, and each other." />
-        <GuideStep icon={MousePointerClick} label="Inspect" detail={`Click ${focusName} or any dot on the map for thoughts, needs, memory, and social life.`} />
+        <GuideStep icon={MousePointerClick} label="Inspect" detail={`Tap ${focusName} or any dot on the map for thoughts, needs, memory, and social life.`} />
         <GuideStep icon={Megaphone} label="Intervene" detail="Use event cards or mayor tools to create a story and observe reactions." />
       </div>
 
@@ -620,7 +620,7 @@ function GuideStep({
 
 function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
   return (
-    <div className="scrollbar-thin absolute left-4 top-4 z-20 max-h-[calc(100%-92px)] max-w-[430px] overflow-y-auto rounded-2xl border border-[rgba(var(--accent),0.55)] bg-[rgba(8,12,24,0.93)] p-4 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur">
+    <div className="scrollbar-thin absolute left-2 right-2 top-2 z-20 max-h-[calc(100%-24px)] overflow-y-auto rounded-2xl border border-[rgba(var(--accent),0.55)] bg-[rgba(8,12,24,0.93)] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur sm:left-4 sm:right-auto sm:top-4 sm:max-h-[calc(100%-92px)] sm:max-w-[430px] sm:p-4">
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-base font-semibold">
@@ -638,7 +638,7 @@ function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
 
       <div className="grid gap-2 text-xs">
         <HowToRow icon={Play} title="Let the city run" body="Use 1x, 2x, or 4x in the top bar. Step 15m advances one simulation tick." />
-        <HowToRow icon={MousePointerClick} title="Click a citizen" body="The right panel shows their thought, mood, money, needs, schedule, goals, memories, relationships, and conversations." />
+        <HowToRow icon={MousePointerClick} title="Tap a citizen" body="The right panel shows their thought, mood, money, needs, schedule, goals, memories, relationships, and conversations." />
         <HowToRow icon={MessageSquareText} title="Read the story" body="The bottom feed explains what just happened. Conversations show what two agents discussed and how their relationship changed." />
         <HowToRow icon={Sparkles} title="Create a situation" body="Use the event cards for flu, traffic, festival, school exam, food shortage, policy changes, or power outage." />
         <HowToRow icon={Handshake} title="Watch relationships develop" body="Citizens who meet repeatedly become acquaintances, then friends, then trusted friends as memories accumulate." />
@@ -864,7 +864,7 @@ function SceneOverlay({
   const PeriodIcon = period.icon;
   return (
     <>
-      <div className="pointer-events-none absolute left-3 top-3 max-w-[380px] rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.86)] p-3 shadow-2xl backdrop-blur">
+      <div className="pointer-events-none absolute left-2 right-2 top-2 rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.86)] p-2 shadow-2xl backdrop-blur sm:left-3 sm:right-auto sm:top-3 sm:max-w-[380px] sm:p-3">
         <div className="mb-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
             <Route className="h-3.5 w-3.5" />
@@ -882,11 +882,11 @@ function SceneOverlay({
         </p>
         <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-black/25 px-2 py-1.5 text-[11px] text-[rgb(var(--muted-strong))]">
           <MousePointerClick className="h-3.5 w-3.5 text-[rgb(var(--accent))]" />
-          Click a person on the map or roster to follow their life.
+          Tap a person on the map or roster to follow their life.
         </div>
       </div>
 
-      <div className="pointer-events-none absolute right-3 top-3 w-[260px] rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.86)] p-3 shadow-2xl backdrop-blur">
+      <div className="pointer-events-none absolute right-3 top-3 hidden w-[260px] rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.86)] p-3 shadow-2xl backdrop-blur md:block">
         <div className="mb-2 flex items-center justify-between">
           <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
             <PeriodIcon className="h-3.5 w-3.5" />
@@ -959,7 +959,7 @@ function SceneLegend() {
     { icon: TreePine, label: "Park", color: "text-[rgb(74,222,128)]" },
   ];
   return (
-    <div className="absolute bottom-3 left-3 right-3 flex gap-1.5 overflow-x-auto rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.82)] p-2 backdrop-blur scrollbar-thin">
+    <div className="absolute bottom-2 left-2 right-2 hidden gap-1.5 overflow-x-auto rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.82)] p-2 backdrop-blur scrollbar-thin sm:flex">
       {items.map((item) => {
         const Icon = item.icon;
         return (
@@ -1311,7 +1311,7 @@ function SocialTab({
 
 function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
   return (
-    <footer className="z-10 border-t border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.85)] px-4 py-3 backdrop-blur">
+    <footer className="z-10 border-t border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.85)] px-3 py-3 backdrop-blur sm:px-4">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <GalleryHorizontalEnd className="h-4 w-4 text-[rgb(var(--accent))]" />
@@ -1320,10 +1320,10 @@ function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
         </div>
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
           <TrendingUp className="h-3.5 w-3.5" />
-          Newest first · click citizens to see what they remember
+          Newest first · tap citizens to see what they remember
         </div>
       </div>
-      <div className="grid h-[148px] grid-cols-5 gap-2 overflow-y-auto scrollbar-thin">
+      <div className="grid max-h-[320px] grid-cols-1 gap-2 overflow-y-auto scrollbar-thin sm:grid-cols-2 lg:h-[148px] lg:grid-cols-5">
         {timeline.map((item) => (
           <div key={item.id} className="story-card rounded-lg p-2">
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -1337,7 +1337,7 @@ function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
           </div>
         ))}
         {timeline.length === 0 ? (
-          <div className="col-span-5 flex items-center justify-center text-xs text-[rgb(var(--muted))]">
+          <div className="flex items-center justify-center text-xs text-[rgb(var(--muted))] sm:col-span-2 lg:col-span-5">
             Waiting for the first story…
           </div>
         ) : null}

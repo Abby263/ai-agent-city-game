@@ -57,7 +57,6 @@ export function GameCanvas({
       class CityScene extends Phaser.Scene implements SyncableScene {
         private buildings = new Map<string, Phaser.GameObjects.Container>();
         private citizens = new Map<string, Phaser.GameObjects.Container>();
-        private vehicles: Array<{ rect: Phaser.GameObjects.Container; pathIndex: number; t: number; speed: number }> = [];
         private fireflies: Phaser.GameObjects.Arc[] = [];
         private skyOverlay?: Phaser.GameObjects.Rectangle;
         private streetLights: Phaser.GameObjects.Arc[] = [];
@@ -80,7 +79,6 @@ export function GameCanvas({
             .rectangle(0, 0, MAP_PX, MAP_PX, 0x050912, 0)
             .setOrigin(0)
             .setDepth(80);
-          this.spawnVehicles();
           this.spawnFireflies();
           if (latestCityRef.current) {
             this.syncCity(latestCityRef.current, selectedRef.current);
@@ -88,7 +86,6 @@ export function GameCanvas({
         }
 
         update(_: number, delta: number) {
-          this.advanceVehicles(delta);
           this.driftFireflies(delta);
         }
 
@@ -326,95 +323,6 @@ export function GameCanvas({
           this.streetLights.push(glow);
         }
 
-        private spawnVehicles() {
-          // Define lane paths (loops). Each segment is moveTo / lineTo style.
-          const paths: Array<{ pts: Array<[number, number]>; color: number; speed: number }> = [
-            {
-              pts: [
-                [13.4, 0],
-                [13.4, MAP_TILES],
-              ],
-              color: 0xf97316,
-              speed: 0.05,
-            },
-            {
-              pts: [
-                [13.4, MAP_TILES],
-                [13.4, 0],
-              ],
-              color: 0x60a5fa,
-              speed: 0.045,
-            },
-            {
-              pts: [
-                [26.4, 0],
-                [26.4, MAP_TILES],
-              ],
-              color: 0xfacc15,
-              speed: 0.05,
-            },
-            {
-              pts: [
-                [0, 13.4],
-                [MAP_TILES, 13.4],
-              ],
-              color: 0xa78bfa,
-              speed: 0.04,
-            },
-            {
-              pts: [
-                [MAP_TILES, 25.4],
-                [0, 25.4],
-              ],
-              color: 0xfb7185,
-              speed: 0.05,
-            },
-            {
-              pts: [
-                [13.4, 0],
-                [13.4, 13.4],
-                [25.4, 13.4],
-                [25.4, 25.4],
-                [13.4, 25.4],
-                [13.4, MAP_TILES],
-              ],
-              color: 0x34d399,
-              speed: 0.035,
-            },
-          ];
-          for (const path of paths) {
-            const orientation = path.pts[0][0] === path.pts[1][0] ? "vertical" : "horizontal";
-            const car = this.add.container(path.pts[0][0] * TILE, path.pts[0][1] * TILE).setDepth(8);
-            const w = orientation === "vertical" ? 9 : 16;
-            const h = orientation === "vertical" ? 16 : 9;
-            const body = this.add.rectangle(0, 0, w, h, path.color, 1).setOrigin(0.5);
-            body.setStrokeStyle(1, 0x111827, 1);
-            const stripe = this.add.rectangle(0, 0, w - 4, h - 4, 0xfef3c7, 0.32).setOrigin(0.5);
-            const headlight = this.add.circle(orientation === "vertical" ? 0 : w / 2 - 1, orientation === "vertical" ? -h / 2 + 1 : 0, 1.2, 0xfff7d6, 1);
-            car.add([body, stripe, headlight]);
-            this.vehicles.push({ rect: car, pathIndex: 0, t: 0, speed: path.speed });
-            (car as Phaser.GameObjects.Container & { __path?: typeof path }).__path = path;
-          }
-        }
-
-        private advanceVehicles(delta: number) {
-          for (const vehicle of this.vehicles) {
-            const path = (vehicle.rect as Phaser.GameObjects.Container & { __path?: { pts: Array<[number, number]>; speed: number; color: number } }).__path;
-            if (!path) continue;
-            vehicle.t += vehicle.speed * (delta / 16);
-            if (vehicle.t >= 1) {
-              vehicle.t = 0;
-              vehicle.pathIndex = (vehicle.pathIndex + 1) % (path.pts.length - 1);
-              if (vehicle.pathIndex === path.pts.length - 1) vehicle.pathIndex = 0;
-            }
-            const a = path.pts[vehicle.pathIndex];
-            const b = path.pts[(vehicle.pathIndex + 1) % path.pts.length];
-            const x = (a[0] + (b[0] - a[0]) * vehicle.t) * TILE;
-            const y = (a[1] + (b[1] - a[1]) * vehicle.t) * TILE;
-            vehicle.rect.setPosition(x, y);
-          }
-        }
-
         private spawnFireflies() {
           for (let i = 0; i < 26; i += 1) {
             const x = Phaser.Math.Between(0, MAP_PX);
@@ -640,12 +548,15 @@ export function GameCanvas({
               const glyph = this.add
                 .text(0, 12, professionGlyph(citizen.profession), {
                   fontFamily: "Geist Mono, monospace",
-                  fontSize: "8px",
+                  fontSize: "9px",
                   color: "#e2e8f0",
                   backgroundColor: "rgba(11,18,32,0.85)",
                   padding: { x: 2, y: 0 },
                 })
                 .setOrigin(0.5, 0);
+              const tapHalo = this.add
+                .circle(0, -1, 17, 0xffffff, 0)
+                .setStrokeStyle(1, 0xe2e8f0, 0.18);
               const nameLabel = this.add
                 .text(0, -28, citizen.name.split(" ")[0], {
                   fontFamily: "Geist, Inter, Arial",
@@ -657,27 +568,32 @@ export function GameCanvas({
                 .setOrigin(0.5)
                 .setVisible(false);
               inner.add([legs, body, arms, head, hat, hatBrim, leftEye, rightEye, mood, glyph]);
-              container.add([shadow, inner, nameLabel]);
+              container.add([shadow, tapHalo, inner, nameLabel]);
               container.setData("body", body);
               container.setData("badge", mood);
               container.setData("hat", hat);
               container.setData("hatBrim", hatBrim);
+              container.setData("tapHalo", tapHalo);
               container.setData("label", nameLabel);
               container.setData("inner", inner);
               container.setData("bobOffset", Math.random() * Math.PI * 2);
-              container.setSize(20, 30);
+              container.setSize(56, 56);
               container.setInteractive(
-                new Phaser.Geom.Circle(0, 0, 14),
+                new Phaser.Geom.Circle(0, 0, 28),
                 Phaser.Geom.Circle.Contains,
               );
               container.on("pointerdown", () => onSelectRef.current(citizen.citizen_id));
-              container.on("pointerover", () =>
+              container.on("pointerover", () => {
+                nameLabel.setVisible(true);
                 onHoverRef.current?.({
                   kind: "citizen",
                   data: { name: citizen.name, subtitle: `${citizen.profession} · ${citizen.current_activity}` },
-                }),
-              );
-              container.on("pointerout", () => onHoverRef.current?.(null));
+                });
+              });
+              container.on("pointerout", () => {
+                nameLabel.setVisible(selectedRef.current === citizen.citizen_id);
+                onHoverRef.current?.(null);
+              });
               this.citizens.set(citizen.citizen_id, container);
             }
 
@@ -715,12 +631,14 @@ export function GameCanvas({
             const label = container.getData("label") as Phaser.GameObjects.Text;
             const hat = container.getData("hat") as Phaser.GameObjects.Rectangle;
             const hatBrim = container.getData("hatBrim") as Phaser.GameObjects.Rectangle;
+            const tapHalo = container.getData("tapHalo") as Phaser.GameObjects.Arc;
             body.setStrokeStyle(isSelected ? 2 : 1, isSelected ? 0xfacc15 : 0x0b1220, 1);
             badge.setFillStyle(moodColor(citizen), 1);
             hat.setFillStyle(professionAccent(citizen.profession), 1);
             hatBrim.setFillStyle(professionAccent(citizen.profession), 1);
             label.setVisible(isSelected);
-            container.setScale(isSelected ? 1.18 : 1);
+            tapHalo.setStrokeStyle(isSelected ? 2 : 1, isSelected ? 0xfacc15 : 0xe2e8f0, isSelected ? 0.7 : 0.2);
+            container.setScale(isSelected ? 1.45 : 1.25);
 
             if (isSelected) {
               this.drawSelectionRing(x, y);

@@ -200,7 +200,7 @@ http://localhost:3000
 ## How To Play After It Opens
 
 1. Use the top speed controls to run the city at `1x`, `2x`, or `4x`. `Step 15m` advances one tick manually.
-2. Click a citizen on the map or in the left roster.
+2. Tap or click a citizen on the map or in the left roster.
 3. Use the right panel tabs:
    - `Life`: current task, needs, money, goals, and schedule.
    - `Memory`: durable memories and personal summary.

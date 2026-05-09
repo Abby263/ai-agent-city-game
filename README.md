@@ -67,15 +67,16 @@ On startup the backend enables pgvector with `CREATE EXTENSION IF NOT EXISTS vec
 ## Core Gameplay
 
 - Watch citizens move across a 40x40 top-down city map.
-- Inspect any citizen to see thoughts, memory, relationships, mood, needs, money, schedule, and goals.
+- Tap or click any citizen to see thoughts, memory, relationships, mood, needs, money, schedule, and goals.
 - Trigger city events such as flu outbreak, traffic accident, food shortage, school exam, festival, bank policy change, and power outage.
 - Change mayor policies for tax, hospitals, school funding, roads, farming subsidies, and public health.
 - Observe WebSocket-streamed thoughts, conversations, memories, reflections, and city metrics.
+- Play from desktop or mobile; the UI stacks the city map, citizen panel, roster, and story feed on smaller screens.
 
 ## How To Play
 
 1. Open the city and let the clock run at `1x`, `2x`, or `4x`.
-2. Click a citizen on the map or in the roster to follow their life.
+2. Tap or click a citizen on the map or in the roster to follow their life.
 3. Read the right panel: `Life` explains needs and schedule, `Memory` shows what they remember, and `Social` shows relationships and conversations.
 4. Use `Make Something Happen` to trigger an event like a flu outbreak, festival, accident, or power outage.
 5. Watch `What Just Happened` at the bottom to understand the story, then use `Mayor Tools` to change policy and see who reacts.
