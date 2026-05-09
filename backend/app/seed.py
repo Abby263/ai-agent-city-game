@@ -124,6 +124,7 @@ def ensure_seeded(db: Session) -> None:
                 visitors=[],
             )
         )
+    db.flush()
 
     home_offsets = [(3, 3), (5, 3), (7, 4), (4, 6), (8, 7), (6, 5)]
     for index, (citizen_id, name, age, profession, work_location_id, skills) in enumerate(PEOPLE):
