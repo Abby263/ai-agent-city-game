@@ -246,7 +246,12 @@ export function AgentCityShell() {
   useEffect(() => {
     if (activePanel !== "story") return;
     void refreshCityConversations().catch(() => undefined);
-  }, [activePanel, refreshCityConversations]);
+  }, [activePanel, city?.clock.tick, refreshCityConversations]);
+
+  useEffect(() => {
+    if (!city || !selectedCitizenId) return;
+    void selectCitizen(selectedCitizenId).catch(() => undefined);
+  }, [city?.clock.tick, city?.events.length, city, selectedCitizenId, selectCitizen]);
 
   const handleSelectCitizen = useCallback(
     (citizenId: string) => {
@@ -389,7 +394,7 @@ export function AgentCityShell() {
           <MapPanelDock
             activePanel={activePanel}
             citizen={selectedCitizen ?? null}
-            timelineCount={timeline.length}
+            conversationCount={cityConversations.length}
             onOpen={setActivePanel}
           />
           {showGuide ? <HowToPlayOverlay onClose={closeGuide} /> : null}
@@ -743,12 +748,12 @@ function ClockBlock({
 function MapPanelDock({
   activePanel,
   citizen,
-  timelineCount,
+  conversationCount,
   onOpen,
 }: {
   activePanel: ActivePanel;
   citizen: CitizenAgent | null;
-  timelineCount: number;
+  conversationCount: number;
   onOpen: (panel: ActivePanel) => void;
 }) {
   const controls: Array<{
@@ -760,7 +765,7 @@ function MapPanelDock({
   }> = [
     { panel: "city", label: "City", detail: "events", icon: Gauge },
     { panel: "citizen", label: "Citizen", detail: citizen?.name ?? "select", icon: UserRound },
-    { panel: "story", label: "Talk", detail: "conversations", icon: MessageSquareText, count: String(timelineCount) },
+    { panel: "story", label: "Talk", detail: "conversations", icon: MessageSquareText, count: String(conversationCount) },
   ];
 
   return (
@@ -1576,15 +1581,15 @@ function AssignTaskPanel({
               : "Tasks become goals, memories, and conversation triggers while the city keeps living."}
           </p>
         </div>
-        <Badge tone={playerTask?.status === "active" ? "success" : "default"}>
-          {playerTask?.status === "active" ? "active" : "ready"}
+        <Badge tone={playerTask?.status === "active" ? "success" : playerTask ? "violet" : "default"}>
+          {playerTask?.status === "active" ? "active" : playerTask?.status === "completed" ? "completed" : "ready"}
         </Badge>
       </div>
 
       {playerTask ? (
         <div className="mb-2 rounded-lg border border-[rgba(var(--border),0.72)] bg-black/20 p-2 text-xs">
           <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            Current player task
+            {playerTask.status === "active" ? "Current player task" : "Last player task"}
           </div>
           <div className="leading-snug">{playerTask.task}</div>
           <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">

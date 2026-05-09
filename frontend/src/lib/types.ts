@@ -173,3 +173,21 @@ export type AssignTaskPayload = {
   target_citizen_id?: string | null;
   duration_ticks?: number;
 };
+
+export type SessionCognitionRequest = {
+  city: CityState;
+  actor_id: string;
+  target_id?: string | null;
+  task: string;
+  observations: string[];
+  memories: string[];
+};
+
+export type SessionCognitionResponse = {
+  thought: string;
+  mood: string;
+  memory: string;
+  reflection: string;
+  importance: number;
+  conversation: Conversation | null;
+};

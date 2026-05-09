@@ -5,9 +5,27 @@ import type {
   MayorPolicyPayload,
   Memory,
   Relationship,
+  SessionCognitionRequest,
+  SessionCognitionResponse,
   SimulationMode,
   TriggerEventPayload,
 } from "@/lib/types";
+import {
+  getSessionCity,
+  seedSession,
+  sessionApplyPolicy,
+  sessionAssignTask,
+  sessionCloseTask,
+  sessionConversations,
+  sessionMemoryEnabled,
+  sessionMemories,
+  sessionPause,
+  sessionRelationships,
+  sessionSetMode,
+  sessionStart,
+  sessionTick,
+  sessionTriggerEvent,
+} from "@/lib/session-simulation";
 
 const defaultApiUrl =
   typeof window !== "undefined" && !["localhost", "127.0.0.1"].includes(window.location.hostname)
@@ -31,38 +49,81 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  getState: () => request<CityState>("/city/state"),
-  getCityConversations: () => request<Conversation[]>("/city/conversations"),
-  start: () => request<CityState>("/simulation/start", { method: "POST" }),
-  pause: () => request<CityState>("/simulation/pause", { method: "POST" }),
-  setMode: (mode: SimulationMode) =>
-    request<CityState>("/simulation/mode", {
+  getState: async () => {
+    const sessionCity = getSessionCity();
+    if (sessionMemoryEnabled() && sessionCity) return sessionCity;
+    const city = await request<CityState>("/city/state");
+    return seedSession(city);
+  },
+  getCityConversations: async () => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionConversations();
+    return request<Conversation[]>("/city/conversations");
+  },
+  start: async () => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionStart();
+    return request<CityState>("/simulation/start", { method: "POST" });
+  },
+  pause: async () => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionPause();
+    return request<CityState>("/simulation/pause", { method: "POST" });
+  },
+  setMode: async (mode: SimulationMode) => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionSetMode(mode);
+    return request<CityState>("/simulation/mode", {
       method: "POST",
       body: JSON.stringify({ mode }),
-    }),
-  tick: () => request<CityState>("/simulation/tick", { method: "POST" }),
-  triggerEvent: (payload: TriggerEventPayload) =>
-    request<CityState>("/events/trigger", {
+    });
+  },
+  tick: async () => {
+    if (sessionMemoryEnabled() && getSessionCity()) {
+      return sessionTick(generateSessionCognition);
+    }
+    return request<CityState>("/simulation/tick", { method: "POST" });
+  },
+  triggerEvent: async (payload: TriggerEventPayload) => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionTriggerEvent(payload);
+    return request<CityState>("/events/trigger", {
       method: "POST",
       body: JSON.stringify(payload),
-    }),
-  applyPolicy: (payload: MayorPolicyPayload) =>
-    request<CityState>("/mayor/policy", {
+    });
+  },
+  applyPolicy: async (payload: MayorPolicyPayload) => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionApplyPolicy(payload);
+    return request<CityState>("/mayor/policy", {
       method: "POST",
       body: JSON.stringify(payload),
-    }),
-  getMemories: (citizenId: string) => request<Memory[]>(`/citizens/${citizenId}/memories`),
-  getRelationships: (citizenId: string) =>
-    request<Relationship[]>(`/citizens/${citizenId}/relationships`),
-  getConversations: (citizenId: string) =>
-    request<Conversation[]>(`/citizens/${citizenId}/conversations`),
-  assignTask: (citizenId: string, payload: AssignTaskPayload) =>
-    request<CityState>(`/citizens/${citizenId}/task`, {
+    });
+  },
+  getMemories: async (citizenId: string) => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionMemories(citizenId);
+    return request<Memory[]>(`/citizens/${citizenId}/memories`);
+  },
+  getRelationships: async (citizenId: string) => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionRelationships(citizenId);
+    return request<Relationship[]>(`/citizens/${citizenId}/relationships`);
+  },
+  getConversations: async (citizenId: string) => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionConversations(citizenId);
+    return request<Conversation[]>(`/citizens/${citizenId}/conversations`);
+  },
+  assignTask: async (citizenId: string, payload: AssignTaskPayload) => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionAssignTask(citizenId, payload);
+    return request<CityState>(`/citizens/${citizenId}/task`, {
       method: "POST",
       body: JSON.stringify(payload),
-    }),
-  closeTask: (citizenId: string) =>
-    request<CityState>(`/citizens/${citizenId}/task/close`, {
+    });
+  },
+  closeTask: async (citizenId: string) => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionCloseTask(citizenId);
+    return request<CityState>(`/citizens/${citizenId}/task/close`, {
       method: "POST",
-    }),
+    });
+  },
 };
+
+async function generateSessionCognition(requestBody: SessionCognitionRequest): Promise<SessionCognitionResponse> {
+  return request<SessionCognitionResponse>("/cognition/session", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+}

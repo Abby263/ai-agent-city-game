@@ -11,7 +11,7 @@ Play online: https://ai-agent-city-game.vercel.app
 - Frontend: Next.js, React, Phaser, Tailwind, shadcn-style primitives, Zustand
 - Backend: FastAPI, Pydantic, SQLAlchemy
 - Realtime: WebSocket
-- Memory store: short-term SQLite by default, optional cloud Postgres + pgvector for durable memory
+- Memory store: browser short-term session memory by default, optional cloud Postgres + pgvector for durable memory
 - LLM: OpenAI Responses API
 - Embeddings: OpenAI embeddings, default `text-embedding-3-small`
 
@@ -31,7 +31,7 @@ cp .env.example .env
 
 2. Optional: create a cloud Postgres database.
 
-The default `MEMORY_STORAGE=short_term` uses a temporary SQLite database so the game runs without Neon. For durable memory later, set `MEMORY_STORAGE=postgres` and provide `DATABASE_URL` or `NEON_DATABASE_URL`. See [docs/cloud-database.md](docs/cloud-database.md).
+The default `MEMORY_STORAGE=short_term` runs without Neon. On Vercel, the browser owns the active short-term play session in localStorage so task assignment, ticks, memories, and conversations stay consistent even when serverless functions cold start. For durable memory later, set `MEMORY_STORAGE=postgres` and provide `DATABASE_URL` or `NEON_DATABASE_URL`. See [docs/cloud-database.md](docs/cloud-database.md).
 
 3. Backend:
 
@@ -71,7 +71,7 @@ Set `ACTIVE_CITIZEN_IDS=all` to activate the full seeded city later, or provide 
 
 ## Database
 
-AgentCity does not require Neon for V1. By default it uses short-term SQLite memory in `/tmp`, which is enough for playable sessions and avoids hosted database quota failures.
+AgentCity does not require Neon for V1. By default the playable game uses browser short-term session memory and the backend only seeds the city plus handles optional cognition calls. This avoids hosted database quota failures and avoids relying on Vercel `/tmp` persistence across requests.
 
 For durable memory, set `MEMORY_STORAGE=postgres` and provide Supabase, Neon, or another hosted Postgres URL through `DATABASE_URL`. In Postgres mode, startup enables pgvector with `CREATE EXTENSION IF NOT EXISTS vector`, creates the SQLAlchemy tables, and seeds Navora if empty. Redis remains optional future infrastructure and is not required for V1 gameplay.
 

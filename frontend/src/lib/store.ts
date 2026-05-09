@@ -3,6 +3,7 @@
 import { create } from "zustand";
 
 import { API_URL, api } from "@/lib/api";
+import { saveSessionCity } from "@/lib/session-simulation";
 import type {
   CityEvent,
   CityState,
@@ -100,12 +101,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   cityConversations: [],
   connectionStatus: "idle",
   error: null,
-  setCity: (city) =>
+  setCity: (city) => {
+    saveSessionCity(city);
     set({
       city,
       timeline: dedupeTimeline(city.events.slice(-60).map(eventToTimeline).reverse(), 40),
       error: null,
-    }),
+    });
+  },
   appendTimeline: (item) =>
     set((state) => ({
       timeline: dedupeTimeline([item, ...state.timeline], 80),

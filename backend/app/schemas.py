@@ -186,6 +186,24 @@ class SimulationModeRequest(BaseModel):
     mode: Literal["manual", "autonomous"]
 
 
+class SessionCognitionRequest(BaseModel):
+    city: CityState
+    actor_id: str
+    target_id: str | None = None
+    task: str = Field(min_length=3, max_length=320)
+    observations: list[str] = Field(default_factory=list)
+    memories: list[str] = Field(default_factory=list)
+
+
+class SessionCognitionResponse(BaseModel):
+    thought: str
+    mood: str
+    memory: str
+    reflection: str
+    importance: float
+    conversation: Conversation | None = None
+
+
 class WebSocketEnvelope(BaseModel):
     type: str
     timestamp: datetime

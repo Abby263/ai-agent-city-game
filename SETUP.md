@@ -1,6 +1,6 @@
 # AgentCity Setup
 
-This guide sets up AgentCity with short-term memory by default, a FastAPI backend, and a Next.js + Phaser frontend.
+This guide sets up AgentCity with browser short-term session memory by default, a FastAPI backend, and a Next.js + Phaser frontend.
 
 ## Prerequisites
 
@@ -34,8 +34,8 @@ Set these in the root `.env`.
 
 | Variable | Required | Example | Notes |
 | --- | --- | --- | --- |
-| `MEMORY_STORAGE` | Optional | `short_term` | Default mode. Uses temporary SQLite memory and does not require Neon. Set `postgres` only when you want durable cloud memory. |
-| `DATABASE_FALLBACK_URL` | Optional | `sqlite+pysqlite:////tmp/agentcity-short-term.db` | Short-term memory database URL. This is not durable across cold starts. |
+| `MEMORY_STORAGE` | Optional | `short_term` | Default backend seed/cognition mode. Does not require Neon. Set `postgres` only when you want durable cloud memory. |
+| `DATABASE_FALLBACK_URL` | Optional | `sqlite+pysqlite:////tmp/agentcity-short-term.db` | Backend fallback seed database URL. Vercel gameplay state is browser-session based, not dependent on this for task progress. |
 | `DATABASE_URL` | Only for `MEMORY_STORAGE=postgres` | `postgresql+psycopg://...` | Preferred durable database URL. Neon or Supabase can be used later. |
 | `SUPABASE_DATABASE_URL` | Optional | `postgresql+psycopg://postgres.PROJECT_REF:...@aws-0-REGION.pooler.supabase.com:5432/postgres` | Used in Postgres mode if `DATABASE_URL` is empty. |
 | `NEON_DATABASE_URL` | Optional | `postgresql+psycopg://USER:PASSWORD@HOST.neon.tech/DB?sslmode=require` | Used in Postgres mode if `DATABASE_URL` and `SUPABASE_DATABASE_URL` are empty. |
@@ -52,6 +52,27 @@ Set these in the root `.env`.
 | `CORS_ORIGINS` | Yes | `http://localhost:3000` | Comma-separated frontend origins. |
 
 Redis is not required for V1 gameplay.
+
+## Short-Term Browser Memory
+
+In the default web game mode, the browser stores the active city session in `localStorage`.
+
+This means:
+
+- Vercel does not need Neon, Supabase, Redis, or a durable local database for the MVP.
+- Assign task, tick, conversation, relationship, and memory state stay consistent in one browser session.
+- Reloading the same browser keeps the current short-term city state.
+- Opening the game in a different browser/device starts a separate short-term session.
+- Redeploying or clearing browser storage starts a fresh city.
+
+The backend still provides the initial seeded city and optional OpenAI cognition through `/api/cognition/session`.
+
+Frontend env:
+
+| Variable | Value | Notes |
+| --- | --- | --- |
+| `NEXT_PUBLIC_MEMORY_MODE` | `browser` | Default. Uses browser session memory. |
+| `NEXT_PUBLIC_MEMORY_MODE` | `server` | Only use when a durable Postgres backend should own all game state. |
 
 ## Optional Supabase/Neon Setup
 
@@ -146,6 +167,7 @@ Set these Vercel environment variables for Production, Preview, and Development:
 | `ACTIVE_CITIZEN_IDS` | `cit_009,cit_010,cit_021,cit_022,cit_026` |
 | `CORS_ORIGINS` | `https://ai-agent-city-game.vercel.app` |
 | `NEXT_PUBLIC_API_URL` | `/api` |
+| `NEXT_PUBLIC_MEMORY_MODE` | `browser` |
 | `DATABASE_FALLBACK_URL` | `sqlite+pysqlite:////tmp/agentcity-short-term.db` |
 
 Optional only if you deploy the API separately:
@@ -171,6 +193,7 @@ npx vercel env add MAX_CONVERSATIONS_PER_TICK production
 npx vercel env add LLM_COGNITION_INTERVAL_TICKS production
 npx vercel env add ACTIVE_CITIZEN_IDS production
 npx vercel env add NEXT_PUBLIC_API_URL production
+npx vercel env add NEXT_PUBLIC_MEMORY_MODE production
 npx vercel --prod
 ```
 
@@ -258,7 +281,9 @@ npm run build
 
 ## Reset the City
 
-AgentCity seeds Navora only when the database is empty. To reset a cloud database during development, drop the app tables and restart the backend.
+For the default browser short-term mode, reset the city by clearing site data for `ai-agent-city-game.vercel.app` or localhost in your browser. That removes the localStorage play session and the next reload starts from the seeded city again.
+
+If you are using durable Postgres mode, AgentCity seeds Navora only when the database is empty. To reset a cloud database during development, drop the app tables and restart the backend.
 
 Use this only on a development database:
 
@@ -284,20 +309,20 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## Optional Temporary SQLite Demo
 
-The normal setup should use Neon or Supabase. For a quick offline smoke test only:
+For a backend-only offline smoke test:
 
 ```bash
 cd backend
 DATABASE_URL=sqlite:///./agentcity-dev.db LLM_MODE=mock uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-This is not the recommended memory setup because pgvector semantic retrieval requires Postgres.
+This is not durable and does not provide pgvector semantic retrieval. The playable Vercel MVP uses browser short-term session memory instead.
 
 ## Troubleshooting
 
 ### Backend says a database URL is required
 
-Set one of:
+This only applies when `MEMORY_STORAGE=postgres`. Either set `MEMORY_STORAGE=short_term`, or provide one of:
 
 - `DATABASE_URL`
 - `SUPABASE_DATABASE_URL`

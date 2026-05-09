@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -18,6 +20,8 @@ from app.schemas import (
     MayorPolicyRequest,
     Memory,
     Relationship,
+    SessionCognitionRequest,
+    SessionCognitionResponse,
     SimulationModeRequest,
     TriggerEventRequest,
 )
@@ -116,6 +120,79 @@ def get_citizen_conversations(citizen_id: str, db: Session = Depends(get_db)) ->
             if conversation.actor_ids and all(actor_id in active_ids for actor_id in conversation.actor_ids)
         ]
     return [Conversation.model_validate(conversation) for conversation in conversations]
+
+
+@router.post("/cognition/session", response_model=SessionCognitionResponse)
+async def session_cognition(request: SessionCognitionRequest) -> SessionCognitionResponse:
+    actor = next((citizen for citizen in request.city.citizens if citizen.citizen_id == request.actor_id), None)
+    if not actor:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Actor citizen not found in session state")
+
+    target = (
+        next((citizen for citizen in request.city.citizens if citizen.citizen_id == request.target_id), None)
+        if request.target_id
+        else None
+    )
+    nearby = []
+    if target:
+        nearby.append(
+            {
+                "citizen_id": target.citizen_id,
+                "name": target.name,
+                "profession": target.profession,
+            }
+        )
+    else:
+        nearby.extend(
+            {
+                "citizen_id": citizen.citizen_id,
+                "name": citizen.name,
+                "profession": citizen.profession,
+            }
+            for citizen in request.city.citizens
+            if citizen.citizen_id != actor.citizen_id
+            and (
+                citizen.current_location_id == actor.current_location_id
+                or abs(citizen.x - actor.x) + abs(citizen.y - actor.y) <= 3
+            )
+        )
+    city_time = f"Day {request.city.clock.day}, {request.city.clock.minute_of_day // 60:02d}:{request.city.clock.minute_of_day % 60:02d}"
+    event_context = " ".join(event.description for event in request.city.events[-6:] if event.priority >= 2)
+    result = cognition.client.generate(
+        citizen=actor.model_dump(mode="json"),
+        city_time=city_time,
+        observations=request.observations
+        or [f"{actor.name} is working on this player task: {request.task}"],
+        memories=request.memories,
+        nearby_citizens=nearby[:4],
+        event_context=event_context,
+    )
+
+    conversation = None
+    conversation_payload = result.conversation or {}
+    target_id = conversation_payload.get("target_citizen_id") or (target.citizen_id if target else None)
+    lines = conversation_payload.get("lines") if isinstance(conversation_payload.get("lines"), list) else []
+    if target_id and lines:
+        conversation = Conversation(
+            conversation_id=f"convo_{uuid4().hex[:16]}",
+            game_day=request.city.clock.day,
+            game_minute=request.city.clock.minute_of_day,
+            location_id=actor.current_location_id,
+            actor_ids=[actor.citizen_id, str(target_id)],
+            transcript=lines,
+            summary=str(conversation_payload.get("summary") or f"{actor.name} and {target_id} talked about the task."),
+        )
+
+    return SessionCognitionResponse(
+        thought=result.thought,
+        mood=result.mood,
+        memory=result.memory,
+        reflection=result.reflection,
+        importance=result.importance,
+        conversation=conversation,
+    )
 
 
 @router.post("/simulation/start", response_model=CityState)
