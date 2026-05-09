@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -14,7 +14,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
-  Cloud,
   Coffee,
   Eye,
   Factory,
@@ -54,6 +53,7 @@ import {
   Wifi,
   WifiOff,
   Wind,
+  X,
   Zap,
 } from "lucide-react";
 
@@ -78,6 +78,7 @@ import type {
 
 type Tone = "accent" | "warning" | "danger" | "success" | "violet";
 type InspectorTab = "life" | "memory" | "social";
+type ActivePanel = "city" | "citizen" | "story" | null;
 type SpeedKey = "paused" | "1x" | "2x" | "4x";
 type HoverInfo =
   | { kind: "location"; data: Location }
@@ -150,6 +151,7 @@ export function AgentCityShell() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>("life");
   const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
   const [showGuide, setShowGuide] = useState(false);
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const lastUserSelectRef = useRef<number>(0);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -158,13 +160,6 @@ export function AgentCityShell() {
     socketRef.current = connectWebSocket();
     return () => socketRef.current?.close();
   }, [connectWebSocket, loadInitialState]);
-
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      setShowGuide(window.localStorage.getItem("agentcity-guide-dismissed") !== "true");
-    }, 0);
-    return () => window.clearTimeout(id);
-  }, []);
 
   // Auto-start the simulation as soon as we have city state.
   useEffect(() => {
@@ -237,6 +232,7 @@ export function AgentCityShell() {
     (citizenId: string) => {
       lastUserSelectRef.current = Date.now();
       void selectCitizen(citizenId);
+      setActivePanel("citizen");
     },
     [selectCitizen],
   );
@@ -293,7 +289,7 @@ export function AgentCityShell() {
   const period = periodInfo(city?.clock.minute_of_day ?? 0);
 
   return (
-    <main className="agentcity-shell min-h-[100dvh] w-screen overflow-x-hidden overflow-y-auto pb-24 text-[rgb(var(--foreground))] lg:grid lg:h-[100dvh] lg:grid-rows-[68px_1fr_220px] lg:overflow-hidden lg:pb-0">
+    <main className="agentcity-shell min-h-[100dvh] w-screen overflow-x-hidden overflow-y-auto pb-24 text-[rgb(var(--foreground))] lg:grid lg:h-[100dvh] lg:grid-rows-[68px_minmax(0,1fr)] lg:overflow-hidden lg:pb-0">
       <TopHeader
         cityName={city?.city_name}
         connectionStatus={connectionStatus}
@@ -319,28 +315,8 @@ export function AgentCityShell() {
         onShowGuide={() => setShowGuide(true)}
       />
 
-      <section className="grid min-h-0 grid-cols-1 gap-3 px-2 pt-2 pb-3 sm:px-3 lg:grid-cols-[300px_minmax(420px,1fr)_380px] lg:pb-1">
-        <aside id="city-panel" className="glass-panel order-4 min-h-0 scroll-mt-24 rounded-xl p-3 scrollbar-thin lg:order-1 lg:overflow-y-auto">
-          <PlayerGuideCard
-            city={city}
-            selectedCitizen={selectedCitizen ?? null}
-            busy={busy}
-            onOpenGuide={() => setShowGuide(true)}
-            runAction={runAction}
-          />
-          <HeroStats city={city} />
-          <CitySystems city={city} />
-          <CitizenRoster
-            citizens={visibleCitizens}
-            totalCitizens={city?.citizens.length ?? 0}
-            selectedCitizenId={selectedCitizen?.citizen_id ?? null}
-            professionFilter={professionFilter}
-            onFilter={setProfessionFilter}
-            onSelect={handleSelectCitizen}
-          />
-        </aside>
-
-        <div id="city-map" className="glass-panel order-1 relative h-[62dvh] min-h-[360px] scroll-mt-24 overflow-hidden rounded-xl bg-[#0a1226] sm:h-[66dvh] lg:order-2 lg:h-auto lg:min-h-0">
+      <section className="relative min-h-0 px-2 pt-2 pb-3 sm:px-3 lg:h-full lg:pb-3">
+        <div id="city-map" className="glass-panel relative h-[68dvh] min-h-[430px] scroll-mt-24 overflow-hidden rounded-xl bg-[#0a1226] sm:h-[72dvh] lg:h-full lg:min-h-0">
           <GameCanvas
             city={city}
             selectedCitizenId={selectedCitizen?.citizen_id ?? null}
@@ -354,8 +330,14 @@ export function AgentCityShell() {
             period={period}
             hover={hoverInfo}
           />
+          <MapPanelDock
+            activePanel={activePanel}
+            citizen={selectedCitizen ?? null}
+            timelineCount={timeline.length}
+            onOpen={setActivePanel}
+          />
           {showGuide ? <HowToPlayOverlay onClose={closeGuide} /> : null}
-          <SceneLegend />
+          {activePanel === "city" ? <SceneLegend /> : null}
         </div>
 
         <MobileCitizenControls
@@ -364,33 +346,85 @@ export function AgentCityShell() {
           runAction={runAction}
           onPrevious={() => selectAdjacentCitizen(-1)}
           onNext={() => selectAdjacentCitizen(1)}
+          onOpenProfile={() => setActivePanel("citizen")}
         />
 
-        <aside id="citizen-panel" className="glass-panel order-3 min-h-0 scroll-mt-24 rounded-xl p-4 scrollbar-thin lg:order-3 lg:overflow-y-auto">
-          {error ? (
-            <div className="mb-3 rounded-lg border border-[rgba(244,89,89,0.4)] bg-[rgba(244,89,89,0.1)] p-3 text-sm text-[rgb(252,165,165)]">
-              {error}
-            </div>
-          ) : null}
-          {selectedCitizen ? (
-            <CitizenPanel
-              citizen={selectedCitizen}
-              memories={memories}
-              relationships={relationships}
-              conversations={conversations}
-              citizenNames={citizenNames}
-              locationById={locationById}
-              tab={inspectorTab}
-              onTab={setInspectorTab}
+        {activePanel === "city" ? (
+          <GameDrawer
+            id="city-panel"
+            title="City Controls"
+            subtitle="Events, policies, citizens"
+            icon={Gauge}
+            side="left"
+            onClose={() => setActivePanel(null)}
+          >
+            <PlayerGuideCard
+              city={city}
+              selectedCitizen={selectedCitizen ?? null}
+              busy={busy}
+              onOpenGuide={() => setShowGuide(true)}
+              runAction={runAction}
             />
-          ) : null}
+            <HeroStats city={city} />
+            <CitySystems city={city} />
+            <ActionPanel busy={busy} city={city} runAction={runAction} />
+            <CitizenRoster
+              citizens={visibleCitizens}
+              totalCitizens={city?.citizens.length ?? 0}
+              selectedCitizenId={selectedCitizen?.citizen_id ?? null}
+              professionFilter={professionFilter}
+              onFilter={setProfessionFilter}
+              onSelect={handleSelectCitizen}
+            />
+          </GameDrawer>
+        ) : null}
 
-          <ActionPanel busy={busy} city={city} runAction={runAction} />
-        </aside>
+        {activePanel === "citizen" ? (
+          <GameDrawer
+            id="citizen-panel"
+            title={selectedCitizen?.name ?? "Citizen"}
+            subtitle={selectedCitizen ? `${selectedCitizen.profession} profile` : "Select someone on the map"}
+            icon={UserRound}
+            side="right"
+            onClose={() => setActivePanel(null)}
+          >
+            {error ? (
+              <div className="mb-3 rounded-lg border border-[rgba(244,89,89,0.4)] bg-[rgba(244,89,89,0.1)] p-3 text-sm text-[rgb(252,165,165)]">
+                {error}
+              </div>
+            ) : null}
+            {selectedCitizen ? (
+              <CitizenPanel
+                citizen={selectedCitizen}
+                memories={memories}
+                relationships={relationships}
+                conversations={conversations}
+                citizenNames={citizenNames}
+                locationById={locationById}
+                tab={inspectorTab}
+                onTab={setInspectorTab}
+              />
+            ) : (
+              <EmptyLine text="Tap a citizen on the map to inspect them." />
+            )}
+          </GameDrawer>
+        ) : null}
+
+        {activePanel === "story" ? (
+          <GameDrawer
+            id="story-feed"
+            title="Story Feed"
+            subtitle="Recent city events and conversations"
+            icon={GalleryHorizontalEnd}
+            side="bottom"
+            onClose={() => setActivePanel(null)}
+          >
+            <StoryTimeline timeline={timeline} />
+          </GameDrawer>
+        ) : null}
       </section>
 
-      <StoryTimeline timeline={timeline} />
-      <MobilePlayDock />
+      <MobilePlayDock activePanel={activePanel} onOpen={setActivePanel} />
     </main>
   );
 }
@@ -466,7 +500,7 @@ function TopHeader({
       <div className="flex w-full min-w-0 items-center gap-2 overflow-x-auto pb-1 scrollbar-thin sm:w-auto sm:pb-0">
         <SpeedControl speed={speed} onSpeed={onSpeed} busy={busy} />
         <button
-          className={`btn-pill shrink-0 ${autoDirector ? "" : ""}`}
+          className={`btn-pill !hidden shrink-0 sm:!flex ${autoDirector ? "" : ""}`}
           data-active={autoDirector}
           onClick={() => onAutoDirector(!autoDirector)}
           title="Auto Events creates occasional city incidents and celebrations"
@@ -475,7 +509,7 @@ function TopHeader({
           Auto Events
         </button>
         <button
-          className="btn-pill shrink-0"
+          className="btn-pill !hidden shrink-0 sm:!flex"
           data-active={autoFollow}
           onClick={() => onAutoFollow(!autoFollow)}
           title="Follow interesting citizens automatically"
@@ -569,18 +603,125 @@ function ClockBlock({
   );
 }
 
+function MapPanelDock({
+  activePanel,
+  citizen,
+  timelineCount,
+  onOpen,
+}: {
+  activePanel: ActivePanel;
+  citizen: CitizenAgent | null;
+  timelineCount: number;
+  onOpen: (panel: ActivePanel) => void;
+}) {
+  const controls: Array<{
+    panel: Exclude<ActivePanel, null>;
+    label: string;
+    detail: string;
+    icon: ComponentType<{ className?: string }>;
+    count?: string;
+  }> = [
+    { panel: "city", label: "City", detail: "events", icon: Gauge },
+    { panel: "citizen", label: "Citizen", detail: citizen?.name ?? "select", icon: UserRound },
+    { panel: "story", label: "Story", detail: "feed", icon: GalleryHorizontalEnd, count: String(timelineCount) },
+  ];
+
+  return (
+    <div className="pointer-events-auto absolute right-2 top-2 z-20 hidden flex-col gap-2 sm:flex">
+      {controls.map((control) => {
+        const Icon = control.icon;
+        const active = activePanel === control.panel;
+        return (
+          <button
+            key={control.panel}
+            className={`flex min-w-[116px] items-center gap-2 rounded-xl border px-3 py-2 text-left shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur transition ${
+              active
+                ? "border-[rgba(56,189,248,0.7)] bg-[rgba(56,189,248,0.18)]"
+                : "border-[rgba(var(--border),0.65)] bg-[rgba(8,12,24,0.72)] hover:bg-[rgba(8,12,24,0.9)]"
+            }`}
+            onClick={() => onOpen(active ? null : control.panel)}
+          >
+            <Icon className="h-4 w-4 shrink-0 text-[rgb(var(--accent))]" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-semibold">{control.label}</span>
+              <span className="block truncate font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted))]">
+                {control.detail}
+              </span>
+            </span>
+            {control.count ? <Badge tone="accent">{control.count}</Badge> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function GameDrawer({
+  id,
+  title,
+  subtitle,
+  icon: Icon,
+  side,
+  onClose,
+  children,
+}: {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: ComponentType<{ className?: string }>;
+  side: "left" | "right" | "bottom";
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const sideClass =
+    side === "left"
+      ? "lg:left-3 lg:right-auto lg:top-3 lg:bottom-3 lg:w-[360px]"
+      : side === "right"
+        ? "lg:left-auto lg:right-3 lg:top-3 lg:bottom-3 lg:w-[420px]"
+        : "lg:left-3 lg:right-3 lg:top-auto lg:bottom-3 lg:max-h-[300px] lg:w-auto";
+
+  return (
+    <aside
+      id={id}
+      className={`fixed inset-x-2 bottom-20 z-50 max-h-[74dvh] overflow-hidden rounded-2xl border border-[rgba(var(--border),0.88)] bg-[rgba(8,12,24,0.95)] shadow-[0_28px_80px_rgba(0,0,0,0.62)] backdrop-blur-xl lg:absolute lg:inset-x-auto lg:bottom-auto lg:max-h-none ${sideClass}`}
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-[rgba(var(--border),0.7)] px-3 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgba(56,189,248,0.16)] text-[rgb(var(--accent))]">
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">{title}</div>
+            <div className="truncate font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
+              {subtitle}
+            </div>
+          </div>
+        </div>
+        <button className="btn-pill px-2 py-2" onClick={onClose} title="Close panel">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="scrollbar-thin max-h-[calc(74dvh-64px)] overflow-y-auto p-3 lg:h-[calc(100%-64px)] lg:max-h-none">
+        {children}
+      </div>
+    </aside>
+  );
+}
+
 function MobileCitizenControls({
   citizen,
   busy,
   runAction,
   onPrevious,
   onNext,
+  onOpenProfile,
 }: {
   citizen: CitizenAgent | null;
   busy: boolean;
   runAction: (action: () => Promise<unknown>) => Promise<void>;
   onPrevious: () => void;
   onNext: () => void;
+  onOpenProfile: () => void;
 }) {
   return (
     <div className="glass-panel order-2 scroll-mt-24 rounded-xl p-3 lg:hidden">
@@ -609,34 +750,43 @@ function MobileCitizenControls({
           <Radio className="h-4 w-4" />
           Step 15m
         </Button>
-        <a className="btn-pill justify-center py-2.5 text-center" href="#citizen-panel">
+        <button className="btn-pill justify-center py-2.5 text-center" onClick={onOpenProfile}>
           Open Profile
-        </a>
+        </button>
       </div>
     </div>
   );
 }
 
-function MobilePlayDock() {
-  const items: Array<{ href: string; label: string; icon: ComponentType<{ className?: string }> }> = [
-    { href: "#city-map", label: "Map", icon: MapPin },
-    { href: "#citizen-panel", label: "Agent", icon: UserRound },
-    { href: "#city-panel", label: "City", icon: Gauge },
-    { href: "#story-feed", label: "Story", icon: GalleryHorizontalEnd },
+function MobilePlayDock({
+  activePanel,
+  onOpen,
+}: {
+  activePanel: ActivePanel;
+  onOpen: (panel: ActivePanel) => void;
+}) {
+  const items: Array<{ panel: ActivePanel; label: string; icon: ComponentType<{ className?: string }> }> = [
+    { panel: null, label: "Map", icon: MapPin },
+    { panel: "citizen", label: "Agent", icon: UserRound },
+    { panel: "city", label: "City", icon: Gauge },
+    { panel: "story", label: "Story", icon: GalleryHorizontalEnd },
   ];
   return (
     <nav className="fixed inset-x-2 bottom-3 z-40 grid grid-cols-4 gap-1 rounded-2xl border border-[rgba(var(--border),0.9)] bg-[rgba(8,12,24,0.94)] p-1.5 shadow-[0_16px_42px_rgba(0,0,0,0.55)] backdrop-blur lg:hidden">
       {items.map((item) => {
         const Icon = item.icon;
+        const active = activePanel === item.panel;
         return (
-          <a
-            key={item.href}
-            href={item.href}
-            className="flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium text-[rgb(var(--muted-strong))] transition hover:bg-white/5"
+          <button
+            key={item.label}
+            className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition ${
+              active ? "bg-[rgba(56,189,248,0.16)] text-[rgb(var(--foreground))]" : "text-[rgb(var(--muted-strong))] hover:bg-white/5"
+            }`}
+            onClick={() => onOpen(item.panel)}
           >
             <Icon className="h-4 w-4 text-[rgb(var(--accent))]" />
             {item.label}
-          </a>
+          </button>
         );
       })}
     </nav>
@@ -740,8 +890,8 @@ function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
 
       <div className="grid gap-2 text-xs">
         <HowToRow icon={Play} title="Let the city run" body="Use 1x, 2x, or 4x in the top bar. Step 15m advances one simulation tick." />
-        <HowToRow icon={MousePointerClick} title="Tap a citizen" body="The right panel shows their thought, mood, money, needs, schedule, goals, memories, relationships, and conversations." />
-        <HowToRow icon={MessageSquareText} title="Read the story" body="The bottom feed explains what just happened. Conversations show what two agents discussed and how their relationship changed." />
+        <HowToRow icon={MousePointerClick} title="Tap a citizen" body="The citizen drawer shows their thought, mood, money, needs, schedule, goals, memories, relationships, and conversations." />
+        <HowToRow icon={MessageSquareText} title="Read the story" body="Open the Story drawer when you want the event feed. Conversations show what two agents discussed and how their relationship changed." />
         <HowToRow icon={Sparkles} title="Create a situation" body="Use the event cards for flu, traffic, festival, school exam, food shortage, policy changes, or power outage." />
         <HowToRow icon={Handshake} title="Watch relationships develop" body="Citizens who meet repeatedly become acquaintances, then friends, then trusted friends as memories accumulate." />
       </div>
@@ -963,49 +1113,26 @@ function SceneOverlay({
   period: ReturnType<typeof periodInfo>;
   hover: HoverInfo;
 }) {
-  const PeriodIcon = period.icon;
   return (
     <>
-      <div className="pointer-events-none absolute left-2 right-2 top-2 rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.86)] p-2 shadow-2xl backdrop-blur sm:left-3 sm:right-auto sm:top-3 sm:max-w-[380px] sm:p-3">
-        <div className="mb-2 flex items-center justify-between gap-3">
+      <div className="pointer-events-none absolute left-2 right-2 top-2 z-10 rounded-xl border border-[rgba(var(--border),0.62)] bg-[rgba(8,12,24,0.72)] p-2 shadow-2xl backdrop-blur sm:left-3 sm:right-auto sm:top-3 sm:max-w-[390px]">
+        <div className="mb-1 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
             <Route className="h-3.5 w-3.5" />
             Live focus
           </div>
           <Badge tone={city?.clock.running ? "success" : "default"}>
-            {city?.clock.running ? "running" : "paused"}
+            {period.label}
           </Badge>
         </div>
-        <div className="text-sm font-semibold leading-snug">
+        <div className="line-clamp-1 text-sm font-semibold leading-snug">
           {citizen ? `${citizen.name} is ${citizen.current_activity.toLowerCase()}` : "Navora is loading"}
         </div>
-        <p className="mt-1 line-clamp-3 text-xs leading-snug text-[rgb(var(--muted))]">
+        <p className="mt-1 line-clamp-1 text-xs leading-snug text-[rgb(var(--muted))] sm:line-clamp-2">
           {citizen?.current_thought ?? "Citizens move, work, react, remember, and form plans as the simulation runs."}
         </p>
-        <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-black/25 px-2 py-1.5 text-[11px] text-[rgb(var(--muted-strong))]">
-          <MousePointerClick className="h-3.5 w-3.5 text-[rgb(var(--accent))]" />
-          Tap a person on the map or roster to follow their life.
-        </div>
-      </div>
-
-      <div className="pointer-events-none absolute right-3 top-3 hidden w-[260px] rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.86)] p-3 shadow-2xl backdrop-blur md:block">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            <PeriodIcon className="h-3.5 w-3.5" />
-            {period.label}
-          </span>
-          <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted-strong))]">
-            <Cloud className="h-3 w-3" />
-            {weatherFor(city?.clock.day ?? 1, city?.clock.minute_of_day ?? 0)}
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <MiniNumber label="Happy" value={`${Math.round(city?.metrics.average_happiness ?? 0)}%`} />
-          <MiniNumber label="Sick" value={String(city?.metrics.sick_count ?? 0)} />
-          <MiniNumber label="Events" value={String(city?.metrics.active_events ?? 0)} />
-        </div>
         {event ? (
-          <div className="mt-2 flex items-start gap-2 rounded-lg bg-black/30 p-2">
+          <div className="mt-2 hidden items-start gap-2 rounded-lg bg-black/25 p-2 sm:flex">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[rgb(var(--warning))]" />
             <div className="line-clamp-2 text-[11px] leading-snug text-[rgb(var(--muted-strong))]">
               {event.description}
@@ -1413,7 +1540,7 @@ function SocialTab({
 
 function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
   return (
-    <footer id="story-feed" className="z-10 scroll-mt-24 border-t border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.85)] px-3 py-3 backdrop-blur sm:px-4">
+    <div className="z-10">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <GalleryHorizontalEnd className="h-4 w-4 text-[rgb(var(--accent))]" />
@@ -1425,7 +1552,7 @@ function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
           Newest first · tap citizens to see what they remember
         </div>
       </div>
-      <div className="grid max-h-[320px] grid-cols-1 gap-2 overflow-y-auto scrollbar-thin sm:grid-cols-2 lg:h-[148px] lg:grid-cols-5">
+      <div className="grid max-h-[320px] grid-cols-1 gap-2 overflow-y-auto scrollbar-thin sm:grid-cols-2 lg:max-h-[210px] lg:grid-cols-4">
         {timeline.map((item) => (
           <div key={item.id} className="story-card rounded-lg p-2">
             <div className="mb-1 flex items-center justify-between gap-2">
@@ -1439,12 +1566,12 @@ function StoryTimeline({ timeline }: { timeline: TimelineItem[] }) {
           </div>
         ))}
         {timeline.length === 0 ? (
-          <div className="flex items-center justify-center text-xs text-[rgb(var(--muted))] sm:col-span-2 lg:col-span-5">
+          <div className="flex items-center justify-center text-xs text-[rgb(var(--muted))] sm:col-span-2 lg:col-span-4">
             Waiting for the first story…
           </div>
         ) : null}
       </div>
-    </footer>
+    </div>
   );
 }
 
@@ -1487,15 +1614,6 @@ function InfoPill({
         {label}
       </div>
       <div className="truncate text-xs">{value}</div>
-    </div>
-  );
-}
-
-function MiniNumber({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="tile-card px-2 py-1.5">
-      <div className="font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">{label}</div>
-      <div className="font-mono text-sm font-semibold">{value}</div>
     </div>
   );
 }
@@ -1688,12 +1806,6 @@ function periodInfo(minute: number) {
   if (hour < 19) return { label: "Dusk", icon: Sunset, tint: "bg-[rgba(244,114,182,0.2)] text-[rgb(244,114,182)]" };
   if (hour < 22) return { label: "Evening", icon: Moon, tint: "bg-[rgba(167,139,250,0.18)] text-[rgb(196,181,253)]" };
   return { label: "Night", icon: Moon, tint: "bg-[rgba(56,72,104,0.5)] text-[rgb(165,180,252)]" };
-}
-
-function weatherFor(day: number, minute: number) {
-  // Deterministic faux-weather for ambient flavor.
-  const seed = (day * 37 + Math.floor(minute / 240)) % 5;
-  return ["clear", "breezy", "cloudy", "humid", "calm"][seed];
 }
 
 function citizenInterestScore(citizen: CitizenAgent) {

@@ -101,7 +101,7 @@ export function GameCanvas({
         private applyDayNight() {
           const minute = this.currentMinute;
           const intensity = nightIntensity(minute);
-          this.skyOverlay?.setFillStyle(skyColor(minute), intensity * 0.78);
+          this.skyOverlay?.setFillStyle(skyColor(minute), intensity * 0.48);
 
           const isNight = intensity > 0.35;
           for (const lamp of this.streetLights) {
