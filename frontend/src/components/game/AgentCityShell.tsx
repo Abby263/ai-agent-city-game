@@ -161,6 +161,7 @@ export function AgentCityShell() {
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const lastUserSelectRef = useRef<number>(0);
   const socketRef = useRef<WebSocket | null>(null);
+  const tickInFlightRef = useRef(false);
   const gameMode = city?.simulation_mode ?? "manual";
   const activeTasks = useMemo(
     () =>
@@ -186,6 +187,8 @@ export function AgentCityShell() {
     if (!interval || !city?.clock.running) return;
     if (city.simulation_mode === "manual" && activeTasks.length === 0) return;
     const id = window.setInterval(async () => {
+      if (tickInFlightRef.current) return;
+      tickInFlightRef.current = true;
       try {
         const next = await api.tick();
         setCity(next);
@@ -194,6 +197,8 @@ export function AgentCityShell() {
         }
       } catch {
         setSpeed("paused");
+      } finally {
+        tickInFlightRef.current = false;
       }
     }, interval);
     return () => window.clearInterval(id);
