@@ -17,7 +17,8 @@ import type {
 function resolveWebSocketUrl() {
   const configured = process.env.NEXT_PUBLIC_WS_URL;
   if (configured) return configured;
-  if (typeof window === "undefined") return "ws://localhost:8000/ws/city";
+  if (typeof window === "undefined") return null;
+  if (API_URL.startsWith("/")) return null;
   if (API_URL.startsWith("http://") || API_URL.startsWith("https://")) {
     const url = new URL(API_URL);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -40,7 +41,7 @@ type GameStore = {
   setCity: (city: CityState) => void;
   selectCitizen: (citizenId: string) => Promise<void>;
   loadInitialState: () => Promise<void>;
-  connectWebSocket: () => WebSocket;
+  connectWebSocket: () => WebSocket | null;
   appendTimeline: (item: TimelineItem) => void;
 };
 
@@ -128,8 +129,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
   },
   connectWebSocket: () => {
+    const wsUrl = resolveWebSocketUrl();
+    if (!wsUrl) {
+      set({ connectionStatus: "offline" });
+      return null;
+    }
     set({ connectionStatus: "connecting" });
-    const socket = new WebSocket(resolveWebSocketUrl());
+    const socket = new WebSocket(wsUrl);
     socket.onopen = () => set({ connectionStatus: "connected" });
     socket.onclose = () => set({ connectionStatus: "offline" });
     socket.onerror = () => set({ connectionStatus: "offline" });
