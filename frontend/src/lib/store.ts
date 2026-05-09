@@ -7,6 +7,7 @@ import type {
   CityEvent,
   CityState,
   CitizenAgent,
+  Conversation,
   Memory,
   Relationship,
   TimelineItem,
@@ -33,6 +34,7 @@ type GameStore = {
   timeline: TimelineItem[];
   memories: Memory[];
   relationships: Relationship[];
+  conversations: Conversation[];
   connectionStatus: "idle" | "connecting" | "connected" | "offline";
   error: string | null;
   setCity: (city: CityState) => void;
@@ -74,6 +76,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   timeline: [],
   memories: [],
   relationships: [],
+  conversations: [],
   connectionStatus: "idle",
   error: null,
   setCity: (city) =>
@@ -88,11 +91,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     })),
   selectCitizen: async (citizenId) => {
     set({ selectedCitizenId: citizenId });
-    const [memories, relationships] = await Promise.all([
+    const [memories, relationships, conversations] = await Promise.all([
       api.getMemories(citizenId),
       api.getRelationships(citizenId),
+      api.getConversations(citizenId),
     ]);
-    set({ memories, relationships });
+    set({ memories, relationships, conversations });
   },
   loadInitialState: async () => {
     try {
@@ -144,6 +148,51 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
       if (["thought", "memory", "reflection", "conversation"].includes(envelope.type)) {
         const payload = envelope.payload as Record<string, unknown>;
+        if (envelope.type === "conversation") {
+          const names = Object.fromEntries(
+            state.city?.citizens.map((citizen) => [citizen.citizen_id, citizen.name]) ?? [],
+          );
+          const actorIds = Array.isArray(payload.actor_ids) ? (payload.actor_ids as string[]) : [];
+          const speakers = actorIds.map((id) => names[id] ?? id).join(" and ");
+          const relationship =
+            typeof payload.relationship_before === "string" && typeof payload.relationship_after === "string"
+              ? ` (${payload.relationship_before} -> ${payload.relationship_after})`
+              : "";
+          const lines = Array.isArray(payload.transcript)
+            ? (payload.transcript as Array<{ speaker_id?: string; text?: string }>)
+                .slice(0, 2)
+                .map((line) => `${names[String(line.speaker_id)] ?? line.speaker_id}: ${line.text}`)
+                .join(" ")
+            : "";
+          const summary = typeof payload.summary === "string" ? payload.summary : "A conversation unfolded.";
+          state.appendTimeline({
+            id: `conversation-${String(payload.conversation_id ?? Date.now())}-${Math.random()}`,
+            type: "conversation",
+            time: gameTime(state.city),
+            text: `${speakers || "Citizens"} talked${relationship}: ${summary} ${lines}`.trim(),
+            priority: 2,
+          });
+          const selectedId = state.selectedCitizenId;
+          if (selectedId && actorIds.includes(selectedId) && typeof payload.conversation_id === "string") {
+            set((current) => ({
+              conversations: [
+                {
+                  conversation_id: payload.conversation_id as string,
+                  game_day: current.city?.clock.day ?? 1,
+                  game_minute: current.city?.clock.minute_of_day ?? 0,
+                  location_id: null,
+                  actor_ids: actorIds,
+                  transcript: Array.isArray(payload.transcript)
+                    ? (payload.transcript as Array<{ speaker_id: string; text: string }>)
+                    : [],
+                  summary,
+                },
+                ...current.conversations,
+              ].slice(0, 50),
+            }));
+          }
+          return;
+        }
         const text =
           (payload.thought as string) ??
           (payload.content as string) ??

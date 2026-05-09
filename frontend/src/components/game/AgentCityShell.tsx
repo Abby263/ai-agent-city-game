@@ -43,6 +43,7 @@ import type {
   CitizenAgent,
   CityEvent,
   CityState,
+  Conversation,
   Location,
   Memory,
   Relationship,
@@ -85,6 +86,7 @@ export function AgentCityShell() {
     selectedCitizenId,
     memories,
     relationships,
+    conversations,
     connectionStatus,
     error,
     loadInitialState,
@@ -195,6 +197,21 @@ export function AgentCityShell() {
               {city?.clock.running ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               {city?.clock.running ? "Pause" : "Start City"}
             </Button>
+            <Button
+              size="sm"
+              variant={autoTick ? "default" : "secondary"}
+              disabled={busy}
+              onClick={() => {
+                const next = !autoTick;
+                setAutoTick(next);
+                if (next && !city?.clock.running) {
+                  void runAction(api.start);
+                }
+              }}
+            >
+              <Sparkles className="h-4 w-4" />
+              Auto Mode
+            </Button>
             <Button size="sm" variant="secondary" disabled={busy} onClick={() => runAction(api.tick)}>
               <Radio className="h-4 w-4" />
               Tick
@@ -236,6 +253,7 @@ export function AgentCityShell() {
               citizen={selectedCitizen}
               memories={memories}
               relationships={relationships}
+              conversations={conversations}
               citizenNames={citizenNames}
               locationById={locationById}
               tab={inspectorTab}
@@ -536,6 +554,7 @@ function CitizenPanel({
   citizen,
   memories,
   relationships,
+  conversations,
   citizenNames,
   locationById,
   tab,
@@ -544,6 +563,7 @@ function CitizenPanel({
   citizen: CitizenAgent;
   memories: Memory[];
   relationships: Relationship[];
+  conversations: Conversation[];
   citizenNames: Record<string, string>;
   locationById: Record<string, Location>;
   tab: InspectorTab;
@@ -600,7 +620,7 @@ function CitizenPanel({
       ) : null}
       {tab === "memory" ? <MemoryTab citizen={citizen} memories={memories} /> : null}
       {tab === "social" ? (
-        <SocialTab relationships={relationships} citizenNames={citizenNames} />
+        <SocialTab relationships={relationships} conversations={conversations} citizenNames={citizenNames} />
       ) : null}
     </div>
   );
@@ -710,9 +730,11 @@ function MemoryTab({ citizen, memories }: { citizen: CitizenAgent; memories: Mem
 
 function SocialTab({
   relationships,
+  conversations,
   citizenNames,
 }: {
   relationships: Relationship[];
+  conversations: Conversation[];
   citizenNames: Record<string, string>;
 }) {
   return (
@@ -730,6 +752,31 @@ function SocialTab({
           </div>
         ))}
         {relationships.length === 0 ? <EmptyLine text="No social history loaded yet." /> : null}
+      </div>
+
+      <SectionTitle label="Recent conversations" count={conversations.length} />
+      <div className="space-y-2">
+        {conversations.slice(0, 5).map((conversation) => (
+          <div key={conversation.conversation_id} className="story-card rounded-md p-2 text-xs">
+            <div className="mb-1 font-mono text-[10px] uppercase text-[rgb(var(--muted))]">
+              Day {conversation.game_day} / {minutesLabel(conversation.game_minute)}
+            </div>
+            <p className="mb-1 leading-snug">{conversation.summary}</p>
+            <div className="space-y-1 text-[11px] text-[rgb(var(--muted))]">
+              {conversation.transcript.slice(0, 3).map((line, index) => (
+                <div key={`${conversation.conversation_id}-${index}`}>
+                  <span className="text-[rgb(var(--foreground))]">
+                    {citizenNames[line.speaker_id] ?? line.speaker_id}:
+                  </span>{" "}
+                  {line.text}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        {conversations.length === 0 ? (
+          <EmptyLine text="No conversations yet. Auto mode will create them as citizens cross paths." />
+        ) : null}
       </div>
     </div>
   );
@@ -757,7 +804,7 @@ function StoryTimeline({
             checked={autoTick}
             onChange={(event) => onAutoTick(event.currentTarget.checked)}
           />
-          Auto tick
+          Auto mode
         </label>
       </div>
       <div className="grid h-[146px] grid-cols-5 gap-2 overflow-y-auto scrollbar-thin">

@@ -4,6 +4,8 @@ AgentCity is a playable 2D AI city simulation where every citizen is an autonomo
 
 This repo is `ai-agent-city-game`. The visible product name is `AgentCity`.
 
+Play online: https://ai-agent-city-game.vercel.app
+
 ## Stack
 
 - Frontend: Next.js, React, Phaser, Tailwind, shadcn-style primitives, Zustand
@@ -12,6 +14,12 @@ This repo is `ai-agent-city-game`. The visible product name is `AgentCity`.
 - Database: cloud Postgres with pgvector, Neon recommended
 - LLM: OpenAI Responses API
 - Embeddings: OpenAI embeddings, default `text-embedding-3-small`
+
+## Autonomy Direction
+
+AgentCity uses a Hermes-inspired loop: citizens collect observations, retrieve memories, reason selectively, form plans, talk to nearby citizens, and write new memories back into the city. The linked Hermes Agent project is a useful reference for self-improving agents with persistent memory, skill learning, cross-session recall, scheduled automations, and subagents. AgentCity applies those ideas inside a game simulation rather than embedding Hermes as a runtime dependency.
+
+Auto Mode in the UI starts the city and keeps ticks flowing from the browser. As citizens cross paths, the backend creates social opportunities, LLM cognition can generate conversations, and relationships shift from strangers to acquaintances to friends over time.
 
 ## Local Setup
 

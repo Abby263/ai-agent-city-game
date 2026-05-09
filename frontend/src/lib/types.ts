@@ -115,6 +115,19 @@ export type Relationship = {
   notes: string;
 };
 
+export type Conversation = {
+  conversation_id: string;
+  game_day: number;
+  game_minute: number;
+  location_id: string | null;
+  actor_ids: string[];
+  transcript: Array<{
+    speaker_id: string;
+    text: string;
+  }>;
+  summary: string;
+};
+
 export type TimelineItem = {
   id: string;
   type: string;

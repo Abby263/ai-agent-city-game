@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 from app.cognition.pipeline import CognitionPipeline
 from app.config import get_settings
 from app.database import get_db
-from app.models import CitizenORM, CityEventORM, MemoryORM, RelationshipORM
+from app.models import CitizenORM, CityEventORM, ConversationORM, MemoryORM, RelationshipORM
 from app.realtime import manager
 from app.schemas import (
     CitizenAgent,
     CityEvent,
     CityState,
+    Conversation,
     MayorPolicyRequest,
     Memory,
     Relationship,
@@ -72,6 +73,15 @@ def get_citizen_relationships(citizen_id: str, db: Session = Depends(get_db)) ->
         db.scalars(select(RelationshipORM).where(RelationshipORM.citizen_id == citizen_id))
     )
     return [Relationship.model_validate(relationship) for relationship in relationships]
+
+
+@router.get("/citizens/{citizen_id}/conversations", response_model=list[Conversation])
+def get_citizen_conversations(citizen_id: str, db: Session = Depends(get_db)) -> list[Conversation]:
+    recent = list(
+        db.scalars(select(ConversationORM).order_by(desc(ConversationORM.created_at)).limit(120))
+    )
+    conversations = [conversation for conversation in recent if citizen_id in conversation.actor_ids][:50]
+    return [Conversation.model_validate(conversation) for conversation in conversations]
 
 
 @router.post("/simulation/start", response_model=CityState)

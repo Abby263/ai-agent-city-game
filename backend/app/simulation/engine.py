@@ -119,6 +119,7 @@ class SimulationEngine:
             )
 
         events.extend(self._run_profession_systems(db, state, citizens, locations))
+        events.extend(self._run_social_systems(db, state, citizens, locations))
         db.flush()
 
         cognition_results: list[dict] = []
@@ -315,6 +316,62 @@ class SimulationEngine:
 
         citizen.updated_at = utcnow()
         return events
+
+    def _run_social_systems(
+        self,
+        db: Session,
+        state: SimulationStateORM,
+        citizens: list[CitizenORM],
+        locations: dict[str, LocationORM],
+    ) -> list[CityEventORM]:
+        if state.tick % 3 != 0:
+            return []
+
+        events: list[CityEventORM] = []
+        by_location: dict[str, list[CitizenORM]] = {}
+        for citizen in citizens:
+            if citizen.energy < 18 or citizen.stress > 88:
+                continue
+            by_location.setdefault(citizen.current_location_id, []).append(citizen)
+
+        for location_id, people in by_location.items():
+            if len(people) < 2 or len(events) >= 2:
+                continue
+            people = sorted(people, key=lambda item: item.citizen_id)
+            first = people[state.tick % len(people)]
+            second = people[(state.tick + 1) % len(people)]
+            if first.citizen_id == second.citizen_id:
+                continue
+            relationship = self._relationship_status(db, first.citizen_id, second.citizen_id)
+            location_name = locations.get(location_id).name if location_id in locations else "the city"
+            events.append(
+                self._event(
+                    db,
+                    state=state,
+                    event_type="social_opportunity",
+                    location_id=location_id,
+                    actors=[first.citizen_id, second.citizen_id],
+                    description=(
+                        f"{first.name} and {second.name} have a natural chance to talk at "
+                        f"{location_name}. They are currently {relationship.lower()}."
+                    ),
+                    payload={"relationship": relationship},
+                    priority=2,
+                )
+            )
+        return events
+
+    def _relationship_status(self, db: Session, citizen_id: str, other_citizen_id: str) -> str:
+        relationship = db.get(RelationshipORM, f"rel_{citizen_id}_{other_citizen_id}")
+        if not relationship:
+            return "Strangers"
+        if relationship.trust >= 72 and relationship.warmth >= 70 and relationship.familiarity >= 65:
+            return "trusted friends"
+        if relationship.trust >= 58 and relationship.warmth >= 56 and relationship.familiarity >= 45:
+            return "friends"
+        if relationship.familiarity >= 24 or relationship.trust >= 45:
+            return "acquaintances"
+        return "strangers"
 
     def _run_profession_systems(
         self,

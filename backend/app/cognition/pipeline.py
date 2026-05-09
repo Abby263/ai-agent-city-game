@@ -17,6 +17,7 @@ from app.models import (
     LocationORM,
     MemoryORM,
     ReflectionORM,
+    RelationshipORM,
     utcnow,
 )
 
@@ -212,7 +213,29 @@ class CognitionPipeline:
         minute_of_day: int,
     ) -> dict:
         target = conversation["target_citizen_id"]
+        target_citizen = db.get(CitizenORM, target)
         actor_ids = [citizen.citizen_id, target]
+        before = self._relationship_label(
+            self._get_or_create_relationship(db, citizen.citizen_id, target)
+        )
+        after_record = self._strengthen_relationship(
+            db,
+            citizen_id=citizen.citizen_id,
+            other_citizen_id=target,
+            summary=conversation.get("summary", ""),
+        )
+        self._strengthen_relationship(
+            db,
+            citizen_id=target,
+            other_citizen_id=citizen.citizen_id,
+            summary=conversation.get("summary", ""),
+        )
+        after = self._relationship_label(after_record)
+        if after in {"Friend", "Trusted friend"}:
+            self._mark_friend(citizen, target)
+            if target_citizen:
+                self._mark_friend(target_citizen, citizen.citizen_id)
+
         record = ConversationORM(
             conversation_id=f"convo_{uuid4().hex[:16]}",
             game_day=day,
@@ -220,26 +243,93 @@ class CognitionPipeline:
             location_id=citizen.current_location_id,
             actor_ids=actor_ids,
             transcript=conversation.get("lines", []),
-            summary=conversation.get("summary", ""),
+            summary=f"{conversation.get('summary', '')} Relationship: {before} -> {after}.",
         )
         db.add(record)
         for actor_id in actor_ids:
+            other_id = target if actor_id == citizen.citizen_id else citizen.citizen_id
             self.memory_store.add_memory(
                 db,
                 citizen_id=actor_id,
                 kind="relationship",
-                content=conversation.get("summary", ""),
-                importance=0.5,
+                content=f"{conversation.get('summary', '')} This changed the relationship from {before} to {after}.",
+                importance=0.58 if after in {"Friend", "Trusted friend"} else 0.5,
                 salience=0.6,
-                related_citizen_id=target if actor_id == citizen.citizen_id else citizen.citizen_id,
+                related_citizen_id=other_id,
                 extra={"conversation_id": record.conversation_id},
             )
         return {
             "conversation_id": record.conversation_id,
             "actor_ids": actor_ids,
+            "relationship_before": before,
+            "relationship_after": after,
             "summary": record.summary,
             "transcript": record.transcript,
         }
+
+    def _get_or_create_relationship(
+        self,
+        db: Session,
+        citizen_id: str,
+        other_citizen_id: str,
+    ) -> RelationshipORM:
+        relationship_id = f"rel_{citizen_id}_{other_citizen_id}"
+        for pending in db.new:
+            if isinstance(pending, RelationshipORM) and pending.relationship_id == relationship_id:
+                return pending
+        relationship = db.get(RelationshipORM, relationship_id)
+        if relationship:
+            return relationship
+        relationship = RelationshipORM(
+            relationship_id=relationship_id,
+            citizen_id=citizen_id,
+            other_citizen_id=other_citizen_id,
+            trust=38,
+            warmth=38,
+            familiarity=12,
+            notes="They are new to each other and only know each other from life in Navora.",
+        )
+        db.add(relationship)
+        return relationship
+
+    def _strengthen_relationship(
+        self,
+        db: Session,
+        *,
+        citizen_id: str,
+        other_citizen_id: str,
+        summary: str,
+    ) -> RelationshipORM:
+        relationship = self._get_or_create_relationship(db, citizen_id, other_citizen_id)
+        relationship.familiarity = min(100, relationship.familiarity + 7)
+        relationship.warmth = min(100, relationship.warmth + 4)
+        relationship.trust = min(100, relationship.trust + 3)
+        relationship.notes = (
+            f"Recent interaction: {summary} "
+            f"Current bond: {self._relationship_label(relationship)}."
+        )
+        relationship.updated_at = utcnow()
+        return relationship
+
+    @staticmethod
+    def _relationship_label(relationship: RelationshipORM) -> str:
+        if relationship.trust >= 72 and relationship.warmth >= 70 and relationship.familiarity >= 65:
+            return "Trusted friend"
+        if relationship.trust >= 58 and relationship.warmth >= 56 and relationship.familiarity >= 45:
+            return "Friend"
+        if relationship.familiarity >= 24 or relationship.trust >= 45:
+            return "Acquaintance"
+        return "Stranger"
+
+    @staticmethod
+    def _mark_friend(citizen: CitizenORM, other_citizen_id: str) -> None:
+        friends = list(citizen.friend_ids or [])
+        if other_citizen_id not in friends:
+            friends.append(other_citizen_id)
+        citizen.friend_ids = friends
+        scores = dict(citizen.relationship_scores or {})
+        scores[other_citizen_id] = max(float(scores.get(other_citizen_id, 0)), 62.0)
+        citizen.relationship_scores = scores
 
     @staticmethod
     def _compact_summary(existing: str, new_memory: str) -> str:

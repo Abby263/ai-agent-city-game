@@ -1,5 +1,6 @@
 import type {
   CityState,
+  Conversation,
   MayorPolicyPayload,
   Memory,
   Relationship,
@@ -45,4 +46,6 @@ export const api = {
   getMemories: (citizenId: string) => request<Memory[]>(`/citizens/${citizenId}/memories`),
   getRelationships: (citizenId: string) =>
     request<Relationship[]>(`/citizens/${citizenId}/relationships`),
+  getConversations: (citizenId: string) =>
+    request<Conversation[]>(`/citizens/${citizenId}/conversations`),
 };

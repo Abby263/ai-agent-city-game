@@ -103,6 +103,61 @@ OPENAI_API_KEY=
 
 Mock mode keeps the game playable but uses deterministic template thoughts instead of real LLM cognition.
 
+## Vercel Setup
+
+The production app is intended to run at:
+
+```text
+https://ai-agent-city-game.vercel.app
+```
+
+The repo uses Vercel Services in `vercel.json`:
+
+- `frontend/` is mounted at `/`.
+- `backend/main.py` is mounted at `/api`.
+
+Connect the Vercel project to the GitHub repo. With Vercel Git integration enabled, every merge to `main` creates a new production deployment and every pull request gets a preview deployment.
+
+Set these Vercel environment variables for Production, Preview, and Development:
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | Neon Postgres URL, preferably with `sslmode=require`. |
+| `LLM_MODE` | `real` for production, or `mock` if no OpenAI key is available. |
+| `OPENAI_API_KEY` | Your OpenAI API key. Required for real intelligent mode. |
+| `OPENAI_MODEL` | `gpt-4.1-nano` |
+| `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` |
+| `MAX_LLM_CALLS_PER_TICK` | `4` |
+| `MAX_CONVERSATIONS_PER_TICK` | `2` |
+| `TICK_MINUTES` | `15` |
+| `CORS_ORIGINS` | `https://ai-agent-city-game.vercel.app` |
+| `NEXT_PUBLIC_API_URL` | `/api` |
+
+Optional only if you deploy the API separately:
+
+| Variable | Value |
+| --- | --- |
+| `NEXT_PUBLIC_WS_URL` | `wss://YOUR_API_DOMAIN/ws/city` |
+
+When frontend and backend are deployed together through Vercel Services, leave `NEXT_PUBLIC_WS_URL` unset. The frontend derives the WebSocket URL from `NEXT_PUBLIC_API_URL`.
+
+Using the Vercel CLI:
+
+```bash
+npx vercel link --yes --project ai-agent-city-game
+npx vercel env add DATABASE_URL production
+npx vercel env add OPENAI_API_KEY production
+npx vercel env add LLM_MODE production
+npx vercel env add OPENAI_MODEL production
+npx vercel env add OPENAI_EMBEDDING_MODEL production
+npx vercel env add NEXT_PUBLIC_API_URL production
+npx vercel --prod
+```
+
+Repeat env additions for `preview` and `development`, or set them in the Vercel dashboard for all environments.
+
+Important: if `LLM_MODE=real` but `OPENAI_API_KEY` is missing, the backend falls back to non-intelligent template cognition.
+
 ## Install Dependencies
 
 Backend:
