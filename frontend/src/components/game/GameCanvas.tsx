@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { CityState, Location } from "@/lib/types";
 
 type SyncableScene = {
   syncCity: (city: CityState, selectedCitizenId: string | null) => void;
+  setMapZoom: (zoom: number) => void;
 };
 
 const TILE = 22;
 const MAP_TILES = 40;
 const MAP_PX = MAP_TILES * TILE;
 
+type WeatherKind = "clear" | "fog" | "rain";
 type HoverInfo = { kind: "location"; data: Location } | { kind: "citizen"; data: { name: string; subtitle: string } } | null;
 
 export function GameCanvas({
@@ -32,6 +34,11 @@ export function GameCanvas({
   const selectedRef = useRef<string | null>(selectedCitizenId);
   const onSelectRef = useRef(onSelectCitizen);
   const onHoverRef = useRef(onHoverChange);
+  const [zoom, setZoom] = useState(1);
+  const weather = useMemo(
+    () => weatherFor(city?.clock.minute_of_day ?? 8 * 60, city?.clock.day ?? 1, city?.events ?? []),
+    [city?.clock.day, city?.clock.minute_of_day, city?.events],
+  );
 
   useEffect(() => {
     latestCityRef.current = city;
@@ -48,6 +55,10 @@ export function GameCanvas({
   }, [onHoverChange]);
 
   useEffect(() => {
+    sceneRef.current?.setMapZoom(zoom);
+  }, [zoom]);
+
+  useEffect(() => {
     let mounted = true;
 
     async function boot() {
@@ -58,6 +69,9 @@ export function GameCanvas({
         private buildings = new Map<string, Phaser.GameObjects.Container>();
         private citizens = new Map<string, Phaser.GameObjects.Container>();
         private fireflies: Phaser.GameObjects.Arc[] = [];
+        private fogBanks: Phaser.GameObjects.Ellipse[] = [];
+        private rainDrops: Phaser.GameObjects.Rectangle[] = [];
+        private vehicles: Phaser.GameObjects.Container[] = [];
         private skyOverlay?: Phaser.GameObjects.Rectangle;
         private streetLights: Phaser.GameObjects.Arc[] = [];
         private buildingWindows: Map<string, Phaser.GameObjects.Rectangle[]> = new Map();
@@ -66,6 +80,9 @@ export function GameCanvas({
         private selectedRing?: Phaser.GameObjects.Arc;
         private thoughtBubble?: Phaser.GameObjects.Container;
         private currentMinute = 8 * 60;
+        private currentWeather: WeatherKind = "clear";
+        private mapZoom = 1;
+        private dragStart: { x: number; y: number; scrollX: number; scrollY: number } | null = null;
 
         constructor() {
           super("city");
@@ -73,13 +90,18 @@ export function GameCanvas({
 
         create() {
           this.cameras.main.setBackgroundColor("#0a1226");
+          this.cameras.main.setBounds(0, 0, MAP_PX, MAP_PX);
+          this.createTileTextures();
           this.drawGround();
           this.drawDecor();
+          this.spawnVehicles();
           this.skyOverlay = this.add
             .rectangle(0, 0, MAP_PX, MAP_PX, 0x050912, 0)
             .setOrigin(0)
             .setDepth(80);
+          this.spawnWeather();
           this.spawnFireflies();
+          this.registerCameraDrag();
           if (latestCityRef.current) {
             this.syncCity(latestCityRef.current, selectedRef.current);
           }
@@ -87,15 +109,133 @@ export function GameCanvas({
 
         update(_: number, delta: number) {
           this.driftFireflies(delta);
+          this.animateRain(delta);
+          this.animateVehicles(delta);
         }
 
         syncCity(city: CityState, selectedCitizenId: string | null) {
           if (!city) return;
+          const previousSelected = this.selected;
           this.selected = selectedCitizenId;
           this.currentMinute = city.clock.minute_of_day;
+          this.currentWeather = weatherFor(city.clock.minute_of_day, city.clock.day, city.events);
           this.applyDayNight();
+          this.applyWeather();
           this.drawLocations(city);
           this.drawCitizens(city);
+          if (previousSelected !== selectedCitizenId && selectedCitizenId && this.mapZoom > 1) {
+            const citizen = city.citizens.find((item) => item.citizen_id === selectedCitizenId);
+            if (citizen) this.focusPoint(citizen.x * TILE + TILE / 2, citizen.y * TILE + TILE / 2);
+          }
+        }
+
+        setMapZoom(zoom: number) {
+          this.mapZoom = zoom;
+          this.cameras.main.zoomTo(zoom, 180, "Sine.easeOut");
+          if (this.selected && latestCityRef.current) {
+            const citizen = latestCityRef.current.citizens.find((item) => item.citizen_id === this.selected);
+            if (citizen) {
+              this.focusPoint(citizen.x * TILE + TILE / 2, citizen.y * TILE + TILE / 2);
+              return;
+            }
+          }
+          this.focusPoint(MAP_PX / 2, MAP_PX / 2);
+        }
+
+        private focusPoint(x: number, y: number) {
+          const camera = this.cameras.main;
+          camera.pan(x, y, 220, "Sine.easeOut");
+        }
+
+        private registerCameraDrag() {
+          this.input.on("pointerdown", (pointer: Phaser.Input.Pointer, gameObjects: Phaser.GameObjects.GameObject[]) => {
+            if (gameObjects.length > 0 || this.mapZoom <= 1) return;
+            this.dragStart = {
+              x: pointer.x,
+              y: pointer.y,
+              scrollX: this.cameras.main.scrollX,
+              scrollY: this.cameras.main.scrollY,
+            };
+          });
+          this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+            if (!this.dragStart || !pointer.isDown || this.mapZoom <= 1) return;
+            const camera = this.cameras.main;
+            camera.scrollX = Phaser.Math.Clamp(
+              this.dragStart.scrollX - (pointer.x - this.dragStart.x) / camera.zoom,
+              0,
+              MAP_PX - camera.width / camera.zoom,
+            );
+            camera.scrollY = Phaser.Math.Clamp(
+              this.dragStart.scrollY - (pointer.y - this.dragStart.y) / camera.zoom,
+              0,
+              MAP_PX - camera.height / camera.zoom,
+            );
+          });
+          this.input.on("pointerup", () => {
+            this.dragStart = null;
+          });
+        }
+
+        private createTileTextures() {
+          if (this.textures.exists("agentcity-grass")) return;
+
+          const makeTile = (
+            key: string,
+            base: number,
+            pixels: Array<{ x: number; y: number; w: number; h: number; color: number; alpha?: number }>,
+          ) => {
+            const graphics = this.add.graphics().setVisible(false);
+            graphics.fillStyle(base, 1);
+            graphics.fillRect(0, 0, TILE, TILE);
+            for (const pixel of pixels) {
+              graphics.fillStyle(pixel.color, pixel.alpha ?? 1);
+              graphics.fillRect(pixel.x, pixel.y, pixel.w, pixel.h);
+            }
+            graphics.generateTexture(key, TILE, TILE);
+            graphics.destroy();
+          };
+
+          makeTile("agentcity-grass", 0x244d35, [
+            { x: 3, y: 5, w: 3, h: 1, color: 0x3f7d4f, alpha: 0.8 },
+            { x: 14, y: 4, w: 2, h: 2, color: 0x1c3f2d, alpha: 0.75 },
+            { x: 8, y: 15, w: 4, h: 1, color: 0x65a35b, alpha: 0.6 },
+            { x: 18, y: 16, w: 1, h: 3, color: 0x173724, alpha: 0.7 },
+          ]);
+          makeTile("agentcity-garden", 0x2e5b3d, [
+            { x: 4, y: 3, w: 2, h: 2, color: 0x86efac, alpha: 0.65 },
+            { x: 12, y: 7, w: 3, h: 1, color: 0x1f452d, alpha: 0.75 },
+            { x: 17, y: 15, w: 2, h: 2, color: 0xf9a8d4, alpha: 0.35 },
+            { x: 7, y: 18, w: 4, h: 1, color: 0xbbf7d0, alpha: 0.35 },
+          ]);
+          makeTile("agentcity-paver", 0x34475d, [
+            { x: 0, y: 10, w: 22, h: 1, color: 0x26374b, alpha: 0.8 },
+            { x: 10, y: 0, w: 1, h: 10, color: 0x26374b, alpha: 0.8 },
+            { x: 4, y: 15, w: 8, h: 1, color: 0x4c637f, alpha: 0.65 },
+            { x: 16, y: 5, w: 5, h: 1, color: 0x4c637f, alpha: 0.45 },
+          ]);
+          makeTile("agentcity-road", 0x202633, [
+            { x: 0, y: 0, w: 22, h: 1, color: 0x101827, alpha: 0.9 },
+            { x: 4, y: 7, w: 2, h: 1, color: 0x3b4353, alpha: 0.75 },
+            { x: 14, y: 14, w: 3, h: 1, color: 0x3b4353, alpha: 0.75 },
+            { x: 19, y: 4, w: 1, h: 1, color: 0x566174, alpha: 0.5 },
+          ]);
+          makeTile("agentcity-sidewalk", 0x536179, [
+            { x: 0, y: 11, w: 22, h: 1, color: 0x394760, alpha: 0.9 },
+            { x: 10, y: 0, w: 1, h: 22, color: 0x394760, alpha: 0.65 },
+            { x: 3, y: 4, w: 2, h: 1, color: 0x75839a, alpha: 0.5 },
+            { x: 16, y: 17, w: 2, h: 1, color: 0x75839a, alpha: 0.45 },
+          ]);
+          makeTile("agentcity-field", 0x536f34, [
+            { x: 0, y: 4, w: 22, h: 3, color: 0x7c9446, alpha: 0.85 },
+            { x: 0, y: 12, w: 22, h: 3, color: 0x334d27, alpha: 0.55 },
+            { x: 6, y: 1, w: 2, h: 2, color: 0xfacc15, alpha: 0.35 },
+            { x: 16, y: 18, w: 2, h: 2, color: 0xfacc15, alpha: 0.25 },
+          ]);
+          makeTile("agentcity-water", 0x21465c, [
+            { x: 2, y: 6, w: 8, h: 1, color: 0x6db4d4, alpha: 0.55 },
+            { x: 12, y: 15, w: 7, h: 1, color: 0x6db4d4, alpha: 0.42 },
+            { x: 8, y: 3, w: 2, h: 1, color: 0xb7e4f7, alpha: 0.35 },
+          ]);
         }
 
         private applyDayNight() {
@@ -119,27 +259,22 @@ export function GameCanvas({
         }
 
         private drawGround() {
+          this.add.tileSprite(0, 0, MAP_PX, MAP_PX, "agentcity-grass").setOrigin(0).setDepth(0);
+
           const graphics = this.add.graphics();
           graphics.setName("ground");
-          graphics.setDepth(0);
-
-          // Grass / land base with subtle gradient stripes
-          for (let row = 0; row < MAP_TILES; row += 1) {
-            const tone = row % 2 === 0 ? 0x183024 : 0x1a3527;
-            graphics.fillStyle(tone, 1);
-            graphics.fillRect(0, row * TILE, MAP_PX, TILE);
-          }
+          graphics.setDepth(5);
 
           // Soft inner light wash
           graphics.fillStyle(0x214936, 0.25);
           graphics.fillCircle(MAP_PX * 0.45, MAP_PX * 0.45, MAP_PX * 0.55);
 
           // Districts (residential west, commercial center, civic east, agri south)
-          this.drawDistrict(graphics, 1, 1, 11, 12, 0x274c39, "Residential");
-          this.drawDistrict(graphics, 14, 1, 11, 12, 0x2d4a55, "Commercial");
-          this.drawDistrict(graphics, 27, 1, 12, 12, 0x3a3554, "Civic");
-          this.drawDistrict(graphics, 1, 27, 11, 12, 0x39482a, "Agri");
-          this.drawDistrict(graphics, 14, 27, 25, 12, 0x244a4d, "Riverside");
+          this.drawDistrict(graphics, 1, 1, 11, 12, 0x274c39, "agentcity-garden");
+          this.drawDistrict(graphics, 14, 1, 11, 12, 0x2d4a55, "agentcity-paver");
+          this.drawDistrict(graphics, 27, 1, 12, 12, 0x3a3554, "agentcity-paver");
+          this.drawDistrict(graphics, 1, 27, 11, 12, 0x39482a, "agentcity-field");
+          this.drawDistrict(graphics, 14, 27, 25, 12, 0x244a4d, "agentcity-garden");
 
           // Roads
           this.drawRoad(graphics, 12, 0, 3, MAP_TILES, "vertical");
@@ -150,7 +285,7 @@ export function GameCanvas({
           this.drawSidewalks(graphics);
 
           // Lake (riverside accent)
-          graphics.fillStyle(0x21465c, 1);
+          graphics.fillStyle(0x21465c, 0.92);
           graphics.fillRoundedRect(33 * TILE, 30 * TILE, 6 * TILE, 7.5 * TILE, 14);
           graphics.lineStyle(1, 0x4d8db0, 0.6);
           graphics.strokeRoundedRect(33 * TILE, 30 * TILE, 6 * TILE, 7.5 * TILE, 14);
@@ -165,7 +300,12 @@ export function GameCanvas({
           graphics.fillCircle(37.1 * TILE, 32.5 * TILE, 1.6);
 
           // Park grass patch
-          graphics.fillStyle(0x244d2c, 0.85);
+          this.add
+            .tileSprite(15 * TILE, 27 * TILE, 9 * TILE, 7 * TILE, "agentcity-garden")
+            .setOrigin(0)
+            .setDepth(1)
+            .setAlpha(0.9);
+          graphics.fillStyle(0x244d2c, 0.25);
           graphics.fillRoundedRect(15 * TILE, 27 * TILE, 9 * TILE, 7 * TILE, 16);
           // Path through park
           graphics.lineStyle(3, 0x90a96b, 0.5);
@@ -182,9 +322,14 @@ export function GameCanvas({
           w: number,
           h: number,
           color: number,
-          _label: string,
+          textureKey: string,
         ) {
-          graphics.fillStyle(color, 0.55);
+          this.add
+            .tileSprite(x * TILE, y * TILE, w * TILE, h * TILE, textureKey)
+            .setOrigin(0)
+            .setDepth(1)
+            .setAlpha(0.88);
+          graphics.fillStyle(color, 0.22);
           graphics.fillRoundedRect(x * TILE, y * TILE, w * TILE, h * TILE, 12);
           graphics.lineStyle(1, color, 0.85);
           graphics.strokeRoundedRect(x * TILE, y * TILE, w * TILE, h * TILE, 12);
@@ -198,9 +343,10 @@ export function GameCanvas({
           height: number,
           direction: "horizontal" | "vertical",
         ) {
-          // Asphalt
-          graphics.fillStyle(0x1c2230, 1);
-          graphics.fillRect(tileX * TILE, tileY * TILE, width * TILE, height * TILE);
+          this.add
+            .tileSprite(tileX * TILE, tileY * TILE, width * TILE, height * TILE, "agentcity-road")
+            .setOrigin(0)
+            .setDepth(2);
           // Edges
           graphics.lineStyle(2, 0x3a4356, 0.9);
           graphics.strokeRect(tileX * TILE, tileY * TILE, width * TILE, height * TILE);
@@ -244,13 +390,12 @@ export function GameCanvas({
         }
 
         private drawSidewalks(graphics: Phaser.GameObjects.Graphics) {
-          graphics.fillStyle(0x394760, 0.7);
           // Borders along roads
           for (const x of [11.4, 15.2, 24.4, 28.2]) {
-            graphics.fillRect(x * TILE, 0, 4, MAP_PX);
+            this.add.tileSprite(x * TILE, 0, 4, MAP_PX, "agentcity-sidewalk").setOrigin(0).setDepth(3).setAlpha(0.85);
           }
           for (const y of [12.4, 16.2, 24.4, 28.2]) {
-            graphics.fillRect(0, y * TILE, MAP_PX, 4);
+            this.add.tileSprite(0, y * TILE, MAP_PX, 4, "agentcity-sidewalk").setOrigin(0).setDepth(3).setAlpha(0.85);
           }
         }
 
@@ -261,7 +406,12 @@ export function GameCanvas({
           w: number,
           h: number,
         ) {
-          graphics.fillStyle(0x2f5a32, 0.65);
+          this.add
+            .tileSprite(x * TILE, y * TILE, w * TILE, h * TILE, "agentcity-field")
+            .setOrigin(0)
+            .setDepth(1)
+            .setAlpha(0.92);
+          graphics.fillStyle(0x2f5a32, 0.22);
           graphics.fillRoundedRect(x * TILE, y * TILE, w * TILE, h * TILE, 10);
           for (let row = 0; row < 6; row += 1) {
             graphics.fillStyle(row % 2 === 0 ? 0x6f8b3f : 0x517336, 0.9);
@@ -298,6 +448,27 @@ export function GameCanvas({
           for (const [lx, ly] of lamps) {
             this.drawLampPost(lx as number, ly as number);
           }
+
+          const benches = [
+            [17.2, 29.6], [20.8, 31.1], [22.6, 29.2], [4.2, 15.1], [19.4, 18.2],
+            [31.2, 18.1], [30.5, 27.1], [7.8, 27.1],
+          ];
+          for (const [bx, by] of benches) this.drawBench(bx as number, by as number);
+
+          const bikes = [
+            [14.8, 12.2], [24.3, 15.8], [28.8, 12.4], [15.5, 24.2], [25.4, 28.6],
+          ];
+          for (const [bx, by] of bikes) this.drawBikeRack(bx as number, by as number);
+
+          const flowerbeds = [
+            [3.2, 9.5], [8.6, 9.2], [18.6, 10.4], [22.8, 8.7], [29.5, 8.4], [33.4, 23.8],
+          ];
+          for (const [fx, fy] of flowerbeds) this.drawFlowerBed(fx as number, fy as number);
+
+          const signs = [
+            [11.6, 12.2], [15.5, 12.2], [24.6, 24.1], [28.3, 24.1],
+          ];
+          for (const [sx, sy] of signs) this.drawStreetSign(sx as number, sy as number);
         }
 
         private drawTree(tx: number, ty: number) {
@@ -323,6 +494,43 @@ export function GameCanvas({
           this.streetLights.push(glow);
         }
 
+        private drawBench(tx: number, ty: number) {
+          const cx = tx * TILE;
+          const cy = ty * TILE;
+          this.add.rectangle(cx, cy, 18, 4, 0x8b5a2b, 1).setDepth(7);
+          this.add.rectangle(cx, cy + 5, 18, 3, 0x6b4226, 1).setDepth(7);
+          this.add.rectangle(cx - 7, cy + 8, 2, 6, 0x1f2937, 1).setDepth(6);
+          this.add.rectangle(cx + 7, cy + 8, 2, 6, 0x1f2937, 1).setDepth(6);
+        }
+
+        private drawBikeRack(tx: number, ty: number) {
+          const cx = tx * TILE;
+          const cy = ty * TILE;
+          this.add.circle(cx - 5, cy + 3, 4, 0x000000, 0).setStrokeStyle(1.5, 0x94a3b8, 0.95).setDepth(8);
+          this.add.circle(cx + 6, cy + 3, 4, 0x000000, 0).setStrokeStyle(1.5, 0x94a3b8, 0.95).setDepth(8);
+          this.add.line(cx, cy, -5, 3, 0, -4, 0x60a5fa, 0.9).setLineWidth(1.5).setDepth(8);
+          this.add.line(cx, cy, 0, -4, 6, 3, 0x60a5fa, 0.9).setLineWidth(1.5).setDepth(8);
+          this.add.rectangle(cx + 2, cy - 5, 7, 1.5, 0xfacc15, 1).setDepth(8);
+        }
+
+        private drawFlowerBed(tx: number, ty: number) {
+          const cx = tx * TILE;
+          const cy = ty * TILE;
+          this.add.rectangle(cx, cy, 23, 9, 0x1f452d, 0.9).setDepth(6).setStrokeStyle(1, 0x547c45, 0.9);
+          for (let i = 0; i < 6; i += 1) {
+            const x = cx - 9 + i * 4;
+            const color = i % 3 === 0 ? 0xf9a8d4 : i % 3 === 1 ? 0xfde68a : 0x93c5fd;
+            this.add.circle(x, cy - 1 + (i % 2) * 3, 1.5, color, 0.95).setDepth(7);
+          }
+        }
+
+        private drawStreetSign(tx: number, ty: number) {
+          const cx = tx * TILE;
+          const cy = ty * TILE;
+          this.add.rectangle(cx, cy + 7, 1.5, 13, 0x111827, 1).setDepth(8);
+          this.add.rectangle(cx + 4, cy, 12, 5, 0x38bdf8, 0.95).setDepth(8).setStrokeStyle(1, 0x0f172a, 1);
+        }
+
         private spawnFireflies() {
           for (let i = 0; i < 26; i += 1) {
             const x = Phaser.Math.Between(0, MAP_PX);
@@ -342,8 +550,127 @@ export function GameCanvas({
           }
         }
 
+        private spawnVehicles() {
+          const routes = [
+            { x1: -28, y1: 14.5 * TILE, x2: MAP_PX + 28, y2: 14.5 * TILE, angle: 0, color: 0x38bdf8, duration: 14500, delay: 0, kind: "car" },
+            { x1: MAP_PX + 30, y1: 26.5 * TILE, x2: -30, y2: 26.5 * TILE, angle: 180, color: 0xf97316, duration: 17000, delay: 2400, kind: "bus" },
+            { x1: 13.5 * TILE, y1: MAP_PX + 26, x2: 13.5 * TILE, y2: -26, angle: -90, color: 0xa78bfa, duration: 15500, delay: 1200, kind: "bike" },
+            { x1: 26.5 * TILE, y1: -26, x2: 26.5 * TILE, y2: MAP_PX + 26, angle: 90, color: 0x4ade80, duration: 18000, delay: 3600, kind: "car" },
+          ];
+
+          for (const route of routes) {
+            const vehicle = this.createVehicle(route.color, route.kind as "car" | "bus" | "bike");
+            vehicle.setPosition(route.x1, route.y1);
+            vehicle.setAngle(route.angle);
+            vehicle.setDepth(route.kind === "bike" ? 17 : 18);
+            this.vehicles.push(vehicle);
+            this.tweens.add({
+              targets: vehicle,
+              x: route.x2,
+              y: route.y2,
+              duration: route.duration,
+              delay: route.delay,
+              repeat: -1,
+              ease: "Linear",
+            });
+          }
+        }
+
+        private createVehicle(color: number, kind: "car" | "bus" | "bike") {
+          const vehicle = this.add.container(0, 0);
+          const shadow = this.add.ellipse(0, 6, kind === "bus" ? 28 : 18, 6, 0x000000, 0.35);
+          if (kind === "bike") {
+            const back = this.add.circle(-6, 2, 4, 0x000000, 0).setStrokeStyle(1.4, 0xe2e8f0, 0.9);
+            const front = this.add.circle(6, 2, 4, 0x000000, 0).setStrokeStyle(1.4, 0xe2e8f0, 0.9);
+            const frame = this.add.triangle(0, 0, -6, 2, 1, -6, 6, 2, color, 0.95).setOrigin(0.5);
+            const rider = this.add.circle(0, -8, 3, 0xfcd9b8, 1);
+            vehicle.add([shadow, back, front, frame, rider]);
+            return vehicle;
+          }
+
+          const width = kind === "bus" ? 28 : 20;
+          const body = this.add.rectangle(0, 0, width, 11, color, 1).setStrokeStyle(1, 0x0b1220, 1);
+          const roof = this.add.rectangle(1, -1, width - 8, 6, 0xe0f2fe, 0.78);
+          const frontLight = this.add.circle(width / 2 - 2, -3, 1.6, 0xfef3c7, 1);
+          const tailLight = this.add.circle(-width / 2 + 2, 3, 1.4, 0xf87171, 1);
+          const wheelA = this.add.circle(-width / 3, 6, 2.2, 0x0b1220, 1);
+          const wheelB = this.add.circle(width / 3, 6, 2.2, 0x0b1220, 1);
+          vehicle.add([shadow, body, roof, frontLight, tailLight, wheelA, wheelB]);
+          return vehicle;
+        }
+
         private driftFireflies(_delta: number) {
           // tweens handle motion; this hook intentionally empty
+        }
+
+        private animateVehicles(_delta: number) {
+          for (const vehicle of this.vehicles) {
+            const light = vehicle.list.find((item) => item instanceof Phaser.GameObjects.Arc) as Phaser.GameObjects.Arc | undefined;
+            if (light) light.rotation += 0.02;
+          }
+        }
+
+        private spawnWeather() {
+          for (let i = 0; i < 80; i += 1) {
+            const drop = this.add
+              .rectangle(
+                Phaser.Math.Between(-40, MAP_PX + 40),
+                Phaser.Math.Between(-80, MAP_PX),
+                1.5,
+                13,
+                0x93c5fd,
+                0.55,
+              )
+              .setAngle(-18)
+              .setDepth(90)
+              .setVisible(false);
+            this.rainDrops.push(drop);
+          }
+
+          const banks = [
+            { x: 120, y: 140, w: 250, h: 80 },
+            { x: 520, y: 220, w: 280, h: 90 },
+            { x: 250, y: 620, w: 330, h: 96 },
+          ];
+          for (const bank of banks) {
+            const fog = this.add
+              .ellipse(bank.x, bank.y, bank.w, bank.h, 0xdbeafe, 0.1)
+              .setDepth(86)
+              .setVisible(false);
+            this.fogBanks.push(fog);
+            this.tweens.add({
+              targets: fog,
+              x: bank.x + 60,
+              alpha: 0.18,
+              duration: 5000 + bank.x,
+              yoyo: true,
+              repeat: -1,
+              ease: "Sine.easeInOut",
+            });
+          }
+        }
+
+        private applyWeather() {
+          const isRain = this.currentWeather === "rain";
+          const isFog = this.currentWeather === "fog";
+          for (const drop of this.rainDrops) drop.setVisible(isRain);
+          for (const fog of this.fogBanks) fog.setVisible(isFog);
+          if (isRain) {
+            this.skyOverlay?.setFillStyle(0x0c1425, Math.max(nightIntensity(this.currentMinute) * 0.48, 0.24));
+          }
+        }
+
+        private animateRain(delta: number) {
+          if (this.currentWeather !== "rain") return;
+          for (const drop of this.rainDrops) {
+            drop.y += delta * 0.42;
+            drop.x -= delta * 0.12;
+            if (drop.y > MAP_PX + 40) {
+              drop.y = -40;
+              drop.x = Phaser.Math.Between(-30, MAP_PX + 80);
+            }
+            if (drop.x < -50) drop.x = MAP_PX + 50;
+          }
         }
 
         private drawLocations(city: CityState) {
@@ -532,11 +859,13 @@ export function GameCanvas({
               container.setDepth(20);
               const shadow = this.add.ellipse(0, 9, 14, 5, 0x000000, 0.45);
               const inner = this.add.container(0, 0);
-              const legs = this.add.rectangle(0, 5, 7, 7, 0x1f2937, 1).setOrigin(0.5);
+              const leftLeg = this.add.rectangle(-2.8, 5, 3.2, 8, 0x1f2937, 1).setOrigin(0.5, 0);
+              const rightLeg = this.add.rectangle(2.8, 5, 3.2, 8, 0x1f2937, 1).setOrigin(0.5, 0);
               const body = this.add.rectangle(0, -1, 11, 11, professionColor(citizen.profession), 1).setOrigin(0.5);
               body.setStrokeStyle(1, 0x0b1220, 1);
               const skin = skinTone(citizen.citizen_id);
-              const arms = this.add.rectangle(0, -1, 14, 2.5, skin, 1).setOrigin(0.5);
+              const leftArm = this.add.rectangle(-7.2, -3, 2.8, 10, skin, 1).setOrigin(0.5, 0);
+              const rightArm = this.add.rectangle(7.2, -3, 2.8, 10, skin, 1).setOrigin(0.5, 0);
               const head = this.add.circle(0, -10, 4.5, skin, 1);
               head.setStrokeStyle(1, 0x0b1220, 0.8);
               const hat = this.add.rectangle(0, -14, 9, 3, professionAccent(citizen.profession), 1).setOrigin(0.5);
@@ -555,7 +884,7 @@ export function GameCanvas({
                 })
                 .setOrigin(0.5, 0);
               const tapHalo = this.add
-                .circle(0, -1, 17, 0xffffff, 0)
+                .circle(0, -1, 22, 0xffffff, 0)
                 .setStrokeStyle(1, 0xe2e8f0, 0.18);
               const nameLabel = this.add
                 .text(0, -28, citizen.name.split(" ")[0], {
@@ -567,19 +896,24 @@ export function GameCanvas({
                 })
                 .setOrigin(0.5)
                 .setVisible(false);
-              inner.add([legs, body, arms, head, hat, hatBrim, leftEye, rightEye, mood, glyph]);
+              inner.add([leftLeg, rightLeg, leftArm, rightArm, body, head, hat, hatBrim, leftEye, rightEye, mood, glyph]);
               container.add([shadow, tapHalo, inner, nameLabel]);
               container.setData("body", body);
               container.setData("badge", mood);
               container.setData("hat", hat);
               container.setData("hatBrim", hatBrim);
+              container.setData("leftLeg", leftLeg);
+              container.setData("rightLeg", rightLeg);
+              container.setData("leftArm", leftArm);
+              container.setData("rightArm", rightArm);
+              container.setData("glyph", glyph);
               container.setData("tapHalo", tapHalo);
               container.setData("label", nameLabel);
               container.setData("inner", inner);
               container.setData("bobOffset", Math.random() * Math.PI * 2);
-              container.setSize(56, 56);
+              container.setSize(70, 70);
               container.setInteractive(
-                new Phaser.Geom.Circle(0, 0, 28),
+                new Phaser.Geom.Circle(0, 0, 35),
                 Phaser.Geom.Circle.Contains,
               );
               container.on("pointerdown", () => onSelectRef.current(citizen.citizen_id));
@@ -611,9 +945,17 @@ export function GameCanvas({
 
             const inner = container.getData("inner") as Phaser.GameObjects.Container;
             const bobOffset = container.getData("bobOffset") as number;
-            // bobbing animation
-            this.tweens.killTweensOf(inner);
+            const leftLeg = container.getData("leftLeg") as Phaser.GameObjects.Rectangle;
+            const rightLeg = container.getData("rightLeg") as Phaser.GameObjects.Rectangle;
+            const leftArm = container.getData("leftArm") as Phaser.GameObjects.Rectangle;
+            const rightArm = container.getData("rightArm") as Phaser.GameObjects.Rectangle;
+            const glyph = container.getData("glyph") as Phaser.GameObjects.Text;
+            const limbs = [leftLeg, rightLeg, leftArm, rightArm];
+            this.tweens.killTweensOf([inner, ...limbs]);
             if (moving) {
+              const direction = citizen.target_x < citizen.x ? -1 : 1;
+              inner.scaleX = direction;
+              glyph.scaleX = direction;
               this.tweens.add({
                 targets: inner,
                 y: { from: 0, to: -1.6 },
@@ -622,8 +964,41 @@ export function GameCanvas({
                 repeat: -1,
                 ease: "Sine.easeInOut",
               });
+              this.tweens.add({
+                targets: leftLeg,
+                angle: { from: -18, to: 18 },
+                duration: 260,
+                yoyo: true,
+                repeat: -1,
+                ease: "Sine.easeInOut",
+              });
+              this.tweens.add({
+                targets: rightLeg,
+                angle: { from: 18, to: -18 },
+                duration: 260,
+                yoyo: true,
+                repeat: -1,
+                ease: "Sine.easeInOut",
+              });
+              this.tweens.add({
+                targets: leftArm,
+                angle: { from: 16, to: -16 },
+                duration: 280,
+                yoyo: true,
+                repeat: -1,
+                ease: "Sine.easeInOut",
+              });
+              this.tweens.add({
+                targets: rightArm,
+                angle: { from: -16, to: 16 },
+                duration: 280,
+                yoyo: true,
+                repeat: -1,
+                ease: "Sine.easeInOut",
+              });
             } else {
               inner.y = 0;
+              for (const limb of limbs) limb.setAngle(0);
             }
 
             const body = container.getData("body") as Phaser.GameObjects.Rectangle;
@@ -638,7 +1013,7 @@ export function GameCanvas({
             hatBrim.setFillStyle(professionAccent(citizen.profession), 1);
             label.setVisible(isSelected);
             tapHalo.setStrokeStyle(isSelected ? 2 : 1, isSelected ? 0xfacc15 : 0xe2e8f0, isSelected ? 0.7 : 0.2);
-            container.setScale(isSelected ? 1.45 : 1.25);
+            container.setScale(isSelected ? 1.6 : 1.35);
 
             if (isSelected) {
               this.drawSelectionRing(x, y);
@@ -731,7 +1106,107 @@ export function GameCanvas({
     };
   }, []);
 
-  return <div ref={containerRef} className="h-full min-h-0 w-full overflow-hidden [touch-action:manipulation]" />;
+  return (
+    <div className="relative h-full min-h-0 w-full overflow-hidden">
+      <div ref={containerRef} className="h-full min-h-0 w-full overflow-hidden [touch-action:pan-x_pan-y]" />
+      <MapZoomControls
+        zoom={zoom}
+        onZoomIn={() => setZoom((value) => Math.min(1.9, Number((value + 0.25).toFixed(2))))}
+        onZoomOut={() => setZoom((value) => Math.max(0.8, Number((value - 0.25).toFixed(2))))}
+        onReset={() => setZoom(1)}
+      />
+      <MiniMap city={city} selectedCitizenId={selectedCitizenId} weather={weather} />
+    </div>
+  );
+}
+
+function MapZoomControls({
+  zoom,
+  onZoomIn,
+  onZoomOut,
+  onReset,
+}: {
+  zoom: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="pointer-events-auto absolute bottom-3 right-3 z-30 flex items-center overflow-hidden rounded-xl border border-[rgba(var(--border),0.72)] bg-[rgba(8,12,24,0.78)] shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur sm:bottom-auto sm:right-24 sm:top-3">
+      <button className="px-3 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-white/10" onClick={onZoomOut} title="Zoom out">
+        -
+      </button>
+      <button
+        className="border-x border-[rgba(var(--border),0.55)] px-2.5 py-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted-strong))] hover:bg-white/10"
+        onClick={onReset}
+        title="Reset zoom"
+      >
+        {Math.round(zoom * 100)}%
+      </button>
+      <button className="px-3 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-white/10" onClick={onZoomIn} title="Zoom in">
+        +
+      </button>
+    </div>
+  );
+}
+
+function MiniMap({
+  city,
+  selectedCitizenId,
+  weather,
+}: {
+  city: CityState | null;
+  selectedCitizenId: string | null;
+  weather: WeatherKind;
+}) {
+  if (!city) return null;
+  return (
+    <div className="pointer-events-none absolute bottom-3 left-3 z-30 w-[126px] rounded-xl border border-[rgba(var(--border),0.72)] bg-[rgba(8,12,24,0.76)] p-2 shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur sm:w-[164px]">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted-strong))]">Mini-map</span>
+        <span className="rounded-full bg-white/10 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wide text-[rgb(var(--muted))]">
+          {weather}
+        </span>
+      </div>
+      <div className="relative aspect-square overflow-hidden rounded-lg border border-[rgba(var(--border-soft),0.75)] bg-[#204b35]">
+        <div className="absolute left-[30%] top-0 h-full w-[7.5%] bg-[#1f2937]" />
+        <div className="absolute left-[62.5%] top-0 h-full w-[7.5%] bg-[#1f2937]" />
+        <div className="absolute left-0 top-[32.5%] h-[7.5%] w-full bg-[#1f2937]" />
+        <div className="absolute left-0 top-[62.5%] h-[7.5%] w-full bg-[#1f2937]" />
+        {city.locations.map((location) => (
+          <div
+            key={location.location_id}
+            className="absolute rounded-[2px] opacity-90 ring-1 ring-black/40"
+            style={{
+              left: pct(location.x),
+              top: pct(location.y),
+              width: pct(location.width),
+              height: pct(location.height),
+              backgroundColor: minimapLocationColor(location.type),
+            }}
+            title={location.name}
+          />
+        ))}
+        {city.citizens.map((citizen) => {
+          const selected = citizen.citizen_id === selectedCitizenId;
+          return (
+            <div
+              key={citizen.citizen_id}
+              className={`absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border ${
+                selected ? "border-[#facc15] bg-[#facc15] shadow-[0_0_12px_rgba(250,204,21,0.9)]" : "border-white/80 bg-[#86efac]"
+              }`}
+              style={{ left: pct(citizen.x + 0.5), top: pct(citizen.y + 0.5) }}
+              title={citizen.name}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function pct(value: number) {
+  return `${(value / MAP_TILES) * 100}%`;
 }
 
 function labelFor(name: string) {
@@ -762,6 +1237,27 @@ function locationColor(type: string) {
     bus_stop: 0x4b5563,
   };
   return colors[type] ?? 0x475569;
+}
+
+function minimapLocationColor(type: string) {
+  const colors: Record<string, string> = {
+    home: "#a78b5f",
+    hospital: "#ef4444",
+    school: "#3b82f6",
+    bank: "#8b5cf6",
+    market: "#f97316",
+    restaurant: "#fb7185",
+    pharmacy: "#22d3ee",
+    farm: "#84cc16",
+    police: "#2563eb",
+    city_hall: "#f59e0b",
+    lab: "#10b981",
+    library: "#a855f7",
+    power: "#f97316",
+    park: "#22c55e",
+    bus_stop: "#94a3b8",
+  };
+  return colors[type] ?? "#64748b";
 }
 
 function darken(hex: number, factor: number) {
@@ -862,4 +1358,13 @@ function skyColor(minute: number) {
   if (hour <= 17) return 0x102040;
   if (hour <= 19) return 0x6b3a1f; // dusk orange
   return 0x050912;
+}
+
+function weatherFor(minute: number, day: number, events: Array<{ event_type: string; priority: number }>): WeatherKind {
+  const hour = minute / 60;
+  if (events.some((event) => event.event_type === "power_outage" && event.priority >= 2)) return "fog";
+  if (hour >= 5.2 && hour <= 7.4) return "fog";
+  const rainWindow = (day * 17 + Math.floor(hour / 3)) % 9;
+  if ((hour >= 15 && hour <= 18 && rainWindow === 4) || rainWindow === 7) return "rain";
+  return "clear";
 }
