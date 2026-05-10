@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypedDict
 
+from app.cognition.deep_agents import DeepAgentRuntime
 from app.config import Settings
 
 try:
@@ -39,7 +40,7 @@ COGNITION_SCHEMA: dict[str, Any] = {
                         },
                         "required": ["speaker_id", "text"],
                     },
-                    "maxItems": 4,
+                    "maxItems": 8,
                 },
             },
             "required": ["target_citizen_id", "summary", "lines"],
@@ -78,6 +79,10 @@ TASK_PLAN_SCHEMA: dict[str, Any] = {
     "required": ["task_kind", "target_citizen_ids", "location_id", "reasoning_summary", "player_visible_plan"],
 }
 
+class PrivateExchangeState(TypedDict):
+    lines: list[dict[str, str]]
+    turn_results: dict[str, list[dict[str, Any]]]
+
 
 @dataclass
 class CognitionResult:
@@ -89,6 +94,8 @@ class CognitionResult:
     reflection: str = ""
     conversation: dict[str, Any] = field(default_factory=dict)
     importance: float = 0.5
+    participant_memories: dict[str, str] = field(default_factory=dict)
+    participant_reflections: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -111,6 +118,7 @@ class CognitionValidationError(RuntimeError):
 class CitizenCognitionClient:
     def __init__(self, settings: Settings):
         self.settings = settings
+        self.deep_agents = DeepAgentRuntime(settings)
         self.client = None
         if settings.real_llm_enabled and OpenAI is not None:
             self.client = OpenAI(api_key=settings.openai_api_key)
@@ -159,6 +167,7 @@ class CitizenCognitionClient:
                     "If required is true, conversation.target_citizen_id must equal required_target_citizen_id.",
                     "If required is true, conversation.lines must include at least one line from the actor and at least one line from the target.",
                     "If the player asked the actor to tell, ask, invite, warn, explain, or report something to the target, the target must acknowledge or answer in their own voice.",
+                    "When a question asks about a prior social fact, the target may only claim it happened if it appears in their own memory or the supplied prior transcript facts.",
                 ],
             },
             "rules": [
@@ -167,6 +176,9 @@ class CitizenCognitionClient:
                 "If the player asked someone to greet or say hi, make the transcript a natural greeting and response.",
                 "If the player asked a question, have the target answer it concretely from their own mood, activity, memory, and perspective.",
                 "If the player asked the actor to tell someone something, include the actor delivering that message and the target responding to it.",
+                "Never leak knowledge from one citizen into another. If the target lacks a direct memory or transcript fact, have them say they are not sure or have not heard yet.",
+                "Use three to six short spoken lines when it would feel human: greeting, answer, emotional reaction, and a small follow-up question are allowed.",
+                "Give each speaker a distinct emotional tone based on their mood and relationship instead of flat task-report language.",
                 "Make memory specific enough to affect future behavior.",
                 "Only omit conversation lines when conversation_contract.required is false and no nearby citizen is a natural target.",
                 "Keep the result game-readable and concise.",
@@ -226,6 +238,214 @@ class CitizenCognitionClient:
         if errors:
             raise CognitionValidationError("; ".join(errors))
         return CognitionResult(**parsed)
+
+    def generate_private_exchange(
+        self,
+        *,
+        actor: dict[str, Any],
+        target: dict[str, Any],
+        city_time: str,
+        task: str,
+        observations: list[str],
+        actor_memories: list[str],
+        target_memories: list[str],
+        event_context: str,
+    ) -> CognitionResult:
+        if not self.client:
+            raise CognitionUnavailableError("OpenAI cognition is unavailable. Set LLM_MODE=real and OPENAI_API_KEY.")
+
+        self.deep_agents.prepare_citizen_agent(actor)
+        self.deep_agents.prepare_citizen_agent(target)
+
+        try:
+            from langgraph.graph import END, START, StateGraph
+        except Exception as error:  # pragma: no cover - dependency is required in production
+            raise CognitionUnavailableError("LangGraph is unavailable for private agent exchange.") from error
+
+        def actor_open(state: PrivateExchangeState) -> PrivateExchangeState:
+            return self._append_private_turn(
+                state,
+                speaker=actor,
+                listener=target,
+                city_time=city_time,
+                task=task,
+                observations=observations,
+                private_memories=actor_memories,
+                event_context=event_context,
+                turn_goal="Open the conversation naturally and make progress on the player's task.",
+            )
+
+        def target_reply(state: PrivateExchangeState) -> PrivateExchangeState:
+            return self._append_private_turn(
+                state,
+                speaker=target,
+                listener=actor,
+                city_time=city_time,
+                task=task,
+                observations=observations,
+                private_memories=target_memories,
+                event_context=event_context,
+                turn_goal="Reply honestly from your own private memory. If you do not know a fact, say so.",
+            )
+
+        def actor_follow_up(state: PrivateExchangeState) -> PrivateExchangeState:
+            return self._append_private_turn(
+                state,
+                speaker=actor,
+                listener=target,
+                city_time=city_time,
+                task=task,
+                observations=observations,
+                private_memories=actor_memories,
+                event_context=event_context,
+                turn_goal="React to the reply with a short human follow-up, clarification, or thanks.",
+            )
+
+        def target_close(state: PrivateExchangeState) -> PrivateExchangeState:
+            return self._append_private_turn(
+                state,
+                speaker=target,
+                listener=actor,
+                city_time=city_time,
+                task=task,
+                observations=observations,
+                private_memories=target_memories,
+                event_context=event_context,
+                turn_goal="Close the exchange naturally in your own voice without repeating your earlier line.",
+            )
+
+        graph_builder = StateGraph(PrivateExchangeState)
+        graph_builder.add_node("actor_open", actor_open)
+        graph_builder.add_node("target_reply", target_reply)
+        graph_builder.add_node("actor_follow_up", actor_follow_up)
+        graph_builder.add_node("target_close", target_close)
+        graph_builder.add_edge(START, "actor_open")
+        graph_builder.add_edge("actor_open", "target_reply")
+        graph_builder.add_edge("target_reply", "actor_follow_up")
+        graph_builder.add_edge("actor_follow_up", "target_close")
+        graph_builder.add_edge("target_close", END)
+        final_state = graph_builder.compile().invoke({"lines": [], "turn_results": {}})
+
+        lines = final_state["lines"]
+        actor_id = str(actor["citizen_id"])
+        target_id = str(target["citizen_id"])
+        errors = self._conversation_errors(
+            {"conversation": {"target_citizen_id": target_id, "summary": task, "lines": lines}},
+            actor_id=actor_id,
+            required_target_id=target_id,
+            require_conversation=True,
+        )
+        if errors:
+            raise CognitionValidationError("; ".join(errors))
+
+        turn_results = final_state["turn_results"]
+        actor_result = turn_results[actor_id][-1]
+        target_result = turn_results[target_id][-1]
+        participant_memories = {
+            actor_id: str(actor_result["memory"]),
+            target_id: str(target_result["memory"]),
+        }
+        participant_reflections = {
+            actor_id: str(actor_result["reflection"]),
+            target_id: str(target_result["reflection"]),
+        }
+        summary = self._public_summary(actor, target, task, lines)
+        importance = max(float(actor_result["importance"]), float(target_result["importance"]))
+        return CognitionResult(
+            thought=str(actor_result["thought"]),
+            mood=str(actor_result["mood"]),
+            activity_adjustment=f"Talked with {target['name']}",
+            short_term_goals=[f"Remember what {target['name']} said"],
+            memory=participant_memories[actor_id],
+            reflection=participant_reflections[actor_id],
+            conversation={"target_citizen_id": target_id, "summary": summary, "lines": lines},
+            importance=importance,
+            participant_memories=participant_memories,
+            participant_reflections=participant_reflections,
+        )
+
+    def _append_private_turn(
+        self,
+        state: PrivateExchangeState,
+        *,
+        speaker: dict[str, Any],
+        listener: dict[str, Any],
+        city_time: str,
+        task: str,
+        observations: list[str],
+        private_memories: list[str],
+        event_context: str,
+        turn_goal: str,
+    ) -> PrivateExchangeState:
+        result = self._generate_private_turn(
+            speaker=speaker,
+            listener=listener,
+            city_time=city_time,
+            task=task,
+            observations=observations,
+            private_memories=private_memories,
+            public_transcript=state["lines"],
+            event_context=event_context,
+            turn_goal=turn_goal,
+        )
+        speaker_id = str(speaker["citizen_id"])
+        return {
+            "lines": [*state["lines"], {"speaker_id": speaker_id, "text": str(result["spoken_line"])}],
+            "turn_results": {
+                **state["turn_results"],
+                speaker_id: [*state["turn_results"].get(speaker_id, []), result],
+            },
+        }
+
+    def _generate_private_turn(
+        self,
+        *,
+        speaker: dict[str, Any],
+        listener: dict[str, Any],
+        city_time: str,
+        task: str,
+        observations: list[str],
+        private_memories: list[str],
+        public_transcript: list[dict[str, str]],
+        event_context: str,
+        turn_goal: str,
+    ) -> dict[str, Any]:
+        prompt = {
+            "city_time": city_time,
+            "speaker": speaker,
+            "listener": {
+                "citizen_id": listener["citizen_id"],
+                "name": listener["name"],
+                "mood": listener.get("mood"),
+                "current_activity": listener.get("current_activity"),
+            },
+            "player_task": task,
+            "turn_goal": turn_goal,
+            "observations": observations,
+            "private_memories_for_speaker_only": private_memories,
+            "public_transcript_so_far": public_transcript,
+            "event_context": event_context,
+            "rules": [
+                "Write exactly one spoken line for the speaker.",
+                "Use a human tone with emotion, uncertainty, or a small follow-up when natural.",
+                "If asked whether something happened and it is not in your private memory or public transcript, say you are not sure or have not heard.",
+                "Do not answer using another citizen's private memory.",
+                "Do not repeat a line already present in public_transcript_so_far.",
+                "Memory must be written from the speaker's first-person perspective.",
+            ],
+        }
+        return self.deep_agents.generate_private_turn(citizen=speaker, prompt=prompt)
+
+    @staticmethod
+    def _public_summary(
+        actor: dict[str, Any],
+        target: dict[str, Any],
+        task: str,
+        lines: list[dict[str, str]],
+    ) -> str:
+        first = next((line["text"] for line in lines if line["speaker_id"] == actor["citizen_id"]), "")
+        task_label = task.strip().rstrip(".!?")
+        return f"{actor['name']} and {target['name']} discussed: {task_label}. First line: {first}"
 
     def plan_task(
         self,

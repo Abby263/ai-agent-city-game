@@ -180,6 +180,7 @@ export type SessionCognitionRequest = {
   task: string;
   observations: string[];
   memories: string[];
+  private_memories?: Record<string, string[]>;
 };
 
 export type SessionCognitionResponse = {
@@ -189,6 +190,8 @@ export type SessionCognitionResponse = {
   reflection: string;
   importance: number;
   conversation: Conversation | null;
+  participant_memories?: Record<string, string>;
+  participant_reflections?: Record<string, string>;
 };
 
 export type SessionTaskPlanRequest = {

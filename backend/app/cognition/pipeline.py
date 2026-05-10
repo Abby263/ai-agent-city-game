@@ -56,16 +56,41 @@ class CognitionPipeline:
             )
             nearby = self._nearby_citizens(citizen, citizens)
             required_target_id = self._required_task_target_id(citizen)
-            result = self.client.generate(
-                citizen=self._citizen_prompt(citizen),
-                city_time=city_time,
-                observations=observations.get(citizen.citizen_id, []),
-                memories=[memory.content for memory in memories],
-                nearby_citizens=nearby,
-                event_context=event_context,
-                required_target_id=required_target_id,
-                require_conversation=bool(required_target_id),
+            target_citizen = next(
+                (item for item in citizens if item.citizen_id == required_target_id),
+                None,
             )
+            if target_citizen:
+                target_query = f"{citizen.name} is talking to {target_citizen.name}: {query}"
+                target_embedding = self.client.embed(target_query) if self.settings.real_llm_enabled else None
+                target_memories = self.memory_store.retrieve(
+                    db,
+                    citizen_id=target_citizen.citizen_id,
+                    query=target_query,
+                    query_embedding=target_embedding,
+                    limit=5,
+                )
+                result = self.client.generate_private_exchange(
+                    actor=self._citizen_prompt(citizen),
+                    target=self._citizen_prompt(target_citizen),
+                    city_time=city_time,
+                    task=query,
+                    observations=observations.get(citizen.citizen_id, []),
+                    actor_memories=[memory.content for memory in memories],
+                    target_memories=[memory.content for memory in target_memories],
+                    event_context=event_context,
+                )
+            else:
+                result = self.client.generate(
+                    citizen=self._citizen_prompt(citizen),
+                    city_time=city_time,
+                    observations=observations.get(citizen.citizen_id, []),
+                    memories=[memory.content for memory in memories],
+                    nearby_citizens=nearby,
+                    event_context=event_context,
+                    required_target_id=required_target_id,
+                    require_conversation=bool(required_target_id),
+                )
 
             citizen.current_thought = result.thought
             citizen.mood = result.mood
@@ -108,6 +133,24 @@ class CognitionPipeline:
                 ],
             )
             db.add(plan)
+
+            for participant_id, participant_memory in result.participant_memories.items():
+                if participant_id == citizen.citizen_id or not participant_memory:
+                    continue
+                self.memory_store.add_memory(
+                    db,
+                    citizen_id=participant_id,
+                    kind="episodic",
+                    content=participant_memory,
+                    importance=result.importance,
+                    salience=result.importance,
+                    embedding=self.client.embed(participant_memory) if self.settings.real_llm_enabled else None,
+                    extra={
+                        "source": "private_exchange",
+                        "city_time": city_time,
+                        "reflection": result.participant_reflections.get(participant_id, ""),
+                    },
+                )
 
             conversation_payload = None
             conversation = result.conversation or {}

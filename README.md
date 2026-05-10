@@ -10,14 +10,17 @@ Play online: https://ai-agent-city-game.vercel.app
 
 - Frontend: Next.js, React, Phaser, Tailwind, shadcn-style primitives, Zustand
 - Backend: FastAPI, Pydantic, SQLAlchemy
+- Agent runtime: LangGraph + Deep Agents for private citizen exchange orchestration
 - Realtime: WebSocket
 - Memory store: browser short-term session memory by default, optional cloud Postgres + pgvector for durable memory
-- LLM: OpenAI Responses API
+- LLM: OpenAI Responses API for strict structured turn generation
 - Embeddings: OpenAI embeddings, default `text-embedding-3-small`
 
 ## Autonomy Direction
 
-AgentCity uses a Hermes-inspired loop: citizens collect observations, retrieve memories, reason selectively, form plans, talk to nearby citizens, and write new memories back into the city. The linked Hermes Agent project is a useful reference for self-improving agents with persistent memory, skill learning, cross-session recall, scheduled automations, and subagents. AgentCity applies those ideas inside a game simulation rather than embedding Hermes as a runtime dependency.
+AgentCity uses a Hermes-inspired loop: citizens collect observations, retrieve memories, reason selectively, form plans, talk to nearby citizens, and write new memories back into the city. The linked Hermes Agent project is a useful reference for self-improving agents with persistent memory, skill learning, cross-session recall, scheduled automations, and subagents.
+
+The live task/conversation path now uses LangGraph to run private exchange nodes and invokes a cached Deep Agent graph for each citizen turn. Each citizen turn receives only that citizen's private memory plus the public transcript so far. This prevents Ava from reading Mateo's memory, and it prevents Mateo from claiming he was invited to dinner unless Mateo actually remembers that or hears it in conversation.
 
 Manual Mode is the easiest way to follow the game: the city waits, the player assigns one student task, the task runs, conversations/memories are written, and the city pauses when the task completes. Autonomous Mode starts the living-city loop: students follow routines, meet naturally, LLM cognition can generate conversations, and relationships shift from strangers to acquaintances to friends over time.
 
@@ -71,7 +74,7 @@ Set `ACTIVE_CITIZEN_IDS=all` to activate the full seeded city later, or provide 
 
 ## Adding Citizens
 
-Each citizen has a dedicated YAML persona file in `backend/app/citizens/profiles/`. Add a new citizen by creating one file with the citizen id, persona, schedule, skills, seed memories, and relationships. Runtime memories and relationships are stored in app state/database so they can grow over time without rewriting deployment files. See [docs/citizens.md](docs/citizens.md).
+Each citizen has a dedicated YAML persona file in `backend/app/citizens/profiles/`. Add a new citizen by creating one file with the citizen id, persona, schedule, skills, seed memories, and relationships. Runtime memories are stored per citizen in browser short-term memory or the configured database so they grow independently without rewriting deployment files. See [docs/citizens.md](docs/citizens.md).
 
 ## Database
 

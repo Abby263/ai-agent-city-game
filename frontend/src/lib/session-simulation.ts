@@ -16,9 +16,8 @@ import type {
   TriggerEventPayload,
 } from "@/lib/types";
 
-const SESSION_VERSION = "v8";
+const SESSION_VERSION = "v9";
 const CITY_KEY = `agentcity.${SESSION_VERSION}.city`;
-const MEMORIES_KEY = `agentcity.${SESSION_VERSION}.memories`;
 const RELATIONSHIPS_KEY = `agentcity.${SESSION_VERSION}.relationships`;
 const CONVERSATIONS_KEY = `agentcity.${SESSION_VERSION}.conversations`;
 
@@ -62,7 +61,7 @@ export function seedSession(city: CityState) {
 
   const normalized = normalizeCity(city);
   writeJson(CITY_KEY, normalized);
-  writeJson(MEMORIES_KEY, buildInitialMemories(normalized));
+  seedCitizenMemoryFiles(normalized);
   writeJson(RELATIONSHIPS_KEY, buildInitialRelationships(normalized));
   writeJson(CONVERSATIONS_KEY, [] satisfies Conversation[]);
   return normalized;
@@ -70,9 +69,8 @@ export function seedSession(city: CityState) {
 
 export function sessionMemories(citizenId: string) {
   const city = getSessionCity();
-  const memories = ensureMemories(city);
+  const memories = ensureCitizenMemories(city, citizenId);
   return memories
-    .filter((memory) => memory.citizen_id === citizenId)
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
     .slice(0, 80);
 }
@@ -91,6 +89,25 @@ export function sessionConversations(citizenId?: string) {
   return filtered
     .sort((a, b) => b.game_day - a.game_day || b.game_minute - a.game_minute)
     .slice(0, citizenId ? 50 : 80);
+}
+
+function recentConversationFacts(citizenId?: string) {
+  const conversations = sessionConversations(citizenId)
+    .slice(0, 8)
+    .sort((a, b) => a.game_day - b.game_day || a.game_minute - b.game_minute);
+  return conversations.map((conversation) => {
+    const turns = conversation.transcript
+      .slice(0, 8)
+      .map((line) => `${line.speaker_id}: ${line.text}`)
+      .join(" | ");
+    return `Day ${conversation.game_day} ${clockLabel(conversation.game_minute)}: ${conversation.summary} Transcript: ${turns}`;
+  });
+}
+
+function clockLabel(minuteOfDay: number) {
+  const hour = Math.floor(minuteOfDay / 60);
+  const minute = minuteOfDay % 60;
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
 
 export async function sessionStart() {
@@ -611,7 +628,10 @@ async function runTaskCognition(city: CityState, citizen: CitizenAgent, generate
       target_id: null,
       task: task.task,
       observations: buildSoloTaskObservations(city, citizen, task),
-      memories: sessionMemories(citizen.citizen_id).slice(0, 8).map((memory) => memory.content),
+      memories: privateMemoryContext(citizen),
+      private_memories: {
+        [citizen.citizen_id]: privateMemoryContext(citizen),
+      },
     });
     applySoloCognition(city, citizen, task, response);
     return;
@@ -630,7 +650,11 @@ async function runTaskCognition(city: CityState, citizen: CitizenAgent, generate
     require_conversation: true,
     task: task.task,
     observations: buildTaskObservations(city, citizen, target, task),
-    memories: sessionMemories(citizen.citizen_id).slice(0, 5).map((memory) => memory.content),
+    memories: privateMemoryContext(citizen),
+    private_memories: {
+      [citizen.citizen_id]: privateMemoryContext(citizen),
+      [target.citizen_id]: privateMemoryContext(target),
+    },
   });
   applyCognition(city, citizen, target, task, response);
 }
@@ -661,7 +685,19 @@ function buildTaskObservations(city: CityState, citizen: CitizenAgent, target: C
     `Player task: "${task.task}". ${taskIntent}`,
     `${citizen.name} is physically near ${target.name} at ${locationName(city, citizen.current_location_id)}. ${routeProgress}`,
     `${citizen.name} and ${target.name} are ${relationshipLabelFromScore(relationshipScore)}. ${target.name} is ${target.mood.toLowerCase()} and currently ${target.current_activity.toLowerCase()}.`,
+    "Memory boundary: the actor only knows their own memories and what other citizens say out loud in this conversation. Do not invent private facts for the target.",
+    ...recentConversationFacts(citizen.citizen_id).map((fact) => `Private memory evidence for ${citizen.name}: ${fact}`),
   ].filter(Boolean);
+}
+
+function privateMemoryContext(citizen: CitizenAgent) {
+  const memories = sessionMemories(citizen.citizen_id)
+    .slice(0, 6)
+    .map((memory) => `${citizen.name} private memory: ${memory.content}`);
+  const conversations = recentConversationFacts(citizen.citizen_id)
+    .slice(-6)
+    .map((fact) => `${citizen.name} private conversation memory: ${fact}`);
+  return [...memories, ...conversations];
 }
 
 function locationName(city: CityState, locationId: string) {
@@ -688,8 +724,13 @@ async function runAutonomousCognition(city: CityState, event: CityEvent, generat
       `${actor.name} and ${target.name} are ${relationshipLabelFromScore(relationshipScore)} at ${locationName(city, actor.current_location_id)}.`,
       `${actor.name} is ${actor.mood.toLowerCase()} and ${target.name} is ${target.mood.toLowerCase()}.`,
       "Let them talk like real students. The conversation should reveal whether they are strangers, acquaintances, or becoming friends.",
+      ...recentConversationFacts(actor.citizen_id).map((fact) => `Recent actor conversation: ${fact}`),
     ],
-    memories: sessionMemories(actor.citizen_id).slice(0, 6).map((memory) => memory.content),
+    memories: privateMemoryContext(actor),
+    private_memories: {
+      [actor.citizen_id]: privateMemoryContext(actor),
+      [target.citizen_id]: privateMemoryContext(target),
+    },
   });
   applyAutonomousCognition(city, actor, target, event, response);
 }
@@ -703,17 +744,39 @@ function applyAutonomousCognition(
 ) {
   actor.current_thought = response.thought;
   actor.mood = response.mood || actor.mood;
-  actor.memory_summary = compactSummary(actor.memory_summary, response.memory);
+  const actorMemory = response.participant_memories?.[actor.citizen_id] ?? response.memory;
+  const targetMemory = response.participant_memories?.[target.citizen_id] ?? "";
+  actor.memory_summary = compactSummary(actor.memory_summary, actorMemory);
 
   addMemory({
     citizen_id: actor.citizen_id,
     kind: "episodic",
-    content: response.memory,
+    content: actorMemory,
     importance: response.importance || 0.58,
     salience: response.importance || 0.58,
     related_citizen_id: target.citizen_id,
-    extra: { source: "autonomous_cognition", reflection: response.reflection, source_event_id: sourceEvent.event_id },
+    extra: {
+      source: "autonomous_cognition",
+      reflection: response.participant_reflections?.[actor.citizen_id] ?? response.reflection,
+      source_event_id: sourceEvent.event_id,
+    },
   });
+  if (targetMemory) {
+    target.memory_summary = compactSummary(target.memory_summary, targetMemory);
+    addMemory({
+      citizen_id: target.citizen_id,
+      kind: "episodic",
+      content: targetMemory,
+      importance: response.importance || 0.58,
+      salience: response.importance || 0.58,
+      related_citizen_id: actor.citizen_id,
+      extra: {
+        source: "autonomous_cognition",
+        reflection: response.participant_reflections?.[target.citizen_id] ?? "",
+        source_event_id: sourceEvent.event_id,
+      },
+    });
+  }
 
   const conversation = validTaskConversation(response.conversation, actor, target);
   if (!conversation) {
@@ -754,20 +817,25 @@ function applyAutonomousCognition(
 
 function applySoloCognition(city: CityState, citizen: CitizenAgent, task: PlayerTaskData, response: SessionCognitionResponse) {
   const answer = response.thought || response.memory || response.reflection;
+  const citizenMemory = response.participant_memories?.[citizen.citizen_id] ?? response.memory;
   citizen.current_activity = "Answered the player";
   citizen.current_thought = answer;
   citizen.mood = response.mood || citizen.mood;
-  citizen.memory_summary = compactSummary(citizen.memory_summary, response.memory);
+  citizen.memory_summary = compactSummary(citizen.memory_summary, citizenMemory);
   citizen.personality = { ...citizen.personality, player_task: { ...task, last_cognition_tick: city.clock.tick } };
 
   addMemory({
     citizen_id: citizen.citizen_id,
     kind: "episodic",
-    content: response.memory || `${citizen.name} handled the player task: ${task.task}`,
+    content: citizenMemory || `${citizen.name} handled the player task: ${task.task}`,
     importance: response.importance || 0.64,
     salience: response.importance || 0.64,
     related_citizen_id: null,
-    extra: { source: "session_cognition", reflection: response.reflection, task_kind: task.task_kind },
+    extra: {
+      source: "session_cognition",
+      reflection: response.participant_reflections?.[citizen.citizen_id] ?? response.reflection,
+      task_kind: task.task_kind,
+    },
   });
 
   const responseConversation = response.conversation;
@@ -813,7 +881,12 @@ function applyCognition(
 ) {
   citizen.current_thought = response.thought;
   citizen.mood = response.mood || citizen.mood;
-  citizen.memory_summary = compactSummary(citizen.memory_summary, response.memory);
+  const actorMemory = response.participant_memories?.[citizen.citizen_id] ?? response.memory;
+  const targetMemory =
+    response.participant_memories?.[target.citizen_id] ??
+    `${target.name} remembers that ${citizen.name} spoke with them about: ${task.task}.`;
+  citizen.memory_summary = compactSummary(citizen.memory_summary, actorMemory);
+  target.memory_summary = compactSummary(target.memory_summary, targetMemory);
   const previousCompleted = task.completed_target_ids ?? [];
   const completedTargetIds = Array.from(new Set([...previousCompleted, target.citizen_id]));
   const updatedTask = {
@@ -828,20 +901,26 @@ function applyCognition(
   addMemory({
     citizen_id: citizen.citizen_id,
     kind: "episodic",
-    content: response.memory,
+    content: actorMemory,
     importance: response.importance || 0.65,
     salience: response.importance || 0.65,
     related_citizen_id: target.citizen_id,
-    extra: { source: "session_cognition", reflection: response.reflection },
+    extra: {
+      source: "session_cognition",
+      reflection: response.participant_reflections?.[citizen.citizen_id] ?? response.reflection,
+    },
   });
   addMemory({
     citizen_id: target.citizen_id,
     kind: "relationship",
-    content: `${citizen.name} checked in with me: ${response.memory}`,
+    content: targetMemory,
     importance: 0.58,
     salience: 0.62,
     related_citizen_id: citizen.citizen_id,
-    extra: { source: "session_cognition" },
+    extra: {
+      source: "session_cognition",
+      reflection: response.participant_reflections?.[target.citizen_id] ?? "",
+    },
   });
 
   const conversation = validTaskConversation(response.conversation, citizen, target);
@@ -1087,18 +1166,31 @@ function addEvent(
 
 function addMemory(input: Omit<Memory, "memory_id" | "created_at" | "source_event_id"> & { source_event_id?: string | null }) {
   if (!sessionMemoryEnabled()) return;
-  const memories = readJson<Memory[]>(MEMORIES_KEY) ?? [];
+  const memories = readJson<Memory[]>(citizenMemoryKey(input.citizen_id)) ?? [];
   const memory: Memory = {
     memory_id: newId("mem"),
     source_event_id: input.source_event_id ?? null,
     created_at: new Date().toISOString(),
     ...input,
   };
-  writeJson(MEMORIES_KEY, [memory, ...memories].slice(0, 250));
+  writeJson(citizenMemoryKey(input.citizen_id), [memory, ...memories].slice(0, 120));
 }
 
-function buildInitialMemories(city: CityState): Memory[] {
-  return city.citizens.map((citizen) => ({
+function citizenMemoryKey(citizenId: string) {
+  return `agentcity.${SESSION_VERSION}.memory.${citizenId}`;
+}
+
+function seedCitizenMemoryFiles(city: CityState) {
+  for (const citizen of city.citizens) {
+    const key = citizenMemoryKey(citizen.citizen_id);
+    if (!readJson<Memory[]>(key)) {
+      writeJson(key, [buildInitialMemory(citizen)]);
+    }
+  }
+}
+
+function buildInitialMemory(citizen: CitizenAgent): Memory {
+  return {
     memory_id: `mem_seed_${citizen.citizen_id}`,
     citizen_id: citizen.citizen_id,
     kind: "semantic",
@@ -1109,7 +1201,7 @@ function buildInitialMemories(city: CityState): Memory[] {
     source_event_id: null,
     extra: { source: "seed" },
     created_at: new Date().toISOString(),
-  }));
+  };
 }
 
 function buildInitialRelationships(city: CityState): Relationship[] {
@@ -1131,11 +1223,13 @@ function buildInitialRelationships(city: CityState): Relationship[] {
   );
 }
 
-function ensureMemories(city: CityState | null) {
-  const memories = readJson<Memory[]>(MEMORIES_KEY);
+function ensureCitizenMemories(city: CityState | null, citizenId: string) {
+  const key = citizenMemoryKey(citizenId);
+  const memories = readJson<Memory[]>(key);
   if (memories) return memories;
-  const seeded = city ? buildInitialMemories(city) : [];
-  writeJson(MEMORIES_KEY, seeded);
+  const citizen = city?.citizens.find((item) => item.citizen_id === citizenId);
+  const seeded = citizen ? [buildInitialMemory(citizen)] : [];
+  writeJson(key, seeded);
   return seeded;
 }
 

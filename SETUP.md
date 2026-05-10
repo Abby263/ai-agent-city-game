@@ -6,7 +6,7 @@ This guide sets up AgentCity with browser short-term session memory by default, 
 
 - Node.js 20+; Node 24 works.
 - npm 10+.
-- Python 3.10+.
+- Python 3.11+.
 - `uv` for Python dependency management.
 - Optional: a hosted Postgres database if you want durable memory. Short-term memory works without Neon or Supabase.
 - An OpenAI API key for real citizen cognition.
@@ -66,6 +66,11 @@ This means:
 - Redeploying or clearing browser storage starts a fresh city.
 
 The backend still provides the initial seeded city and optional OpenAI cognition through `/api/cognition/session`.
+
+Memory is isolated per citizen in browser mode. The browser stores each citizen's
+short-term memories under `agentcity.v9.memory.<citizen_id>`, and the backend
+conversation workflow only passes a citizen the memories for the current speaking
+agent. Spoken transcript lines are public; private memory is not.
 
 Frontend env:
 

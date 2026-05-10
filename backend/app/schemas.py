@@ -192,6 +192,7 @@ class SessionCognitionRequest(BaseModel):
     task: str = Field(min_length=3, max_length=320)
     observations: list[str] = Field(default_factory=list)
     memories: list[str] = Field(default_factory=list)
+    private_memories: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class SessionCognitionResponse(BaseModel):
@@ -201,6 +202,8 @@ class SessionCognitionResponse(BaseModel):
     reflection: str
     importance: float
     conversation: Conversation | None = None
+    participant_memories: dict[str, str] = Field(default_factory=dict)
+    participant_reflections: dict[str, str] = Field(default_factory=dict)
 
 
 class SessionTaskPlanRequest(BaseModel):

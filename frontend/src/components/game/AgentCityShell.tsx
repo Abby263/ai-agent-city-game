@@ -17,7 +17,6 @@ import {
   Coffee,
   Factory,
   FlaskConical,
-  GalleryHorizontalEnd,
   Gauge,
   Handshake,
   HeartPulse,
@@ -44,7 +43,6 @@ import {
   Sunset,
   Target,
   TreePine,
-  TrendingUp,
   UserRound,
   Users,
   Wheat,
@@ -71,7 +69,6 @@ import type {
   Memory,
   Relationship,
   SimulationMode,
-  TimelineItem,
   TriggerEventPayload,
 } from "@/lib/types";
 
@@ -86,6 +83,18 @@ type PlayerTask = {
   target_citizen_id: string | null;
   plan_summary?: string;
 };
+type ConversationFlowItem =
+  | { kind: "task"; id: string; day: number; minute: number; event: CityEvent }
+  | {
+      kind: "line";
+      id: string;
+      day: number;
+      minute: number;
+      conversation: Conversation;
+      line: Conversation["transcript"][number];
+      lineIndex: number;
+    }
+  | { kind: "done"; id: string; day: number; minute: number; event: CityEvent };
 type HoverInfo =
   | { kind: "location"; data: Location }
   | { kind: "citizen"; data: { name: string; subtitle: string } }
@@ -137,7 +146,6 @@ const AUTO_EVENT_TYPES: TriggerEventPayload["event_type"][] = [
 export function AgentCityShell() {
   const {
     city,
-    timeline,
     selectedCitizenId,
     memories,
     relationships,
@@ -496,7 +504,6 @@ export function AgentCityShell() {
             <ConversationFeed
               conversations={cityConversations}
               city={city}
-              timeline={timeline}
               gameMode={gameMode}
               activeTasks={activeTasks}
               onSelectCitizen={handleSelectCitizen}
@@ -1873,14 +1880,12 @@ function SocialTab({
 function ConversationFeed({
   conversations,
   city,
-  timeline,
   gameMode,
   activeTasks,
   onSelectCitizen,
 }: {
   conversations: Conversation[];
   city: CityState | null;
-  timeline: TimelineItem[];
   gameMode: SimulationMode;
   activeTasks: Array<{ citizen: CitizenAgent; task: PlayerTask }>;
   onSelectCitizen: (citizenId: string) => void;
@@ -1893,6 +1898,11 @@ function ConversationFeed({
     () => Object.fromEntries(city?.locations.map((location) => [location.location_id, location]) ?? []),
     [city?.locations],
   );
+  const flowItems = useMemo(
+    () => buildConversationFlow(conversations, city?.events ?? []),
+    [city?.events, conversations],
+  );
+  const lineCount = flowItems.filter((item) => item.kind === "line").length;
 
   return (
     <div className="space-y-4">
@@ -1927,218 +1937,172 @@ function ConversationFeed({
         ) : null}
       </div>
 
-      {conversations[0] ? (
-        <FeaturedConversation
-          conversation={conversations[0]}
-          citizenById={citizenById}
-          locationById={locationById}
-          onSelectCitizen={onSelectCitizen}
-        />
-      ) : null}
-
       <div>
         <div className="mb-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <MessageSquareText className="h-4 w-4 text-[rgb(var(--accent))]" />
             <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">
-              Conversations
+              Conversation Flow
             </h2>
-            <Badge tone="accent">{conversations.length}</Badge>
+            <Badge tone="accent">{lineCount}</Badge>
           </div>
           <div className="hidden text-[10px] uppercase tracking-wide text-[rgb(var(--muted))] sm:block">
-            newest first
+            oldest at top · newest at bottom
           </div>
         </div>
 
-        <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-3">
-          {conversations.slice(conversations[0] ? 1 : 0, 10).map((conversation) => {
-            const speakers = conversation.actor_ids.map((actorId) => citizenById[actorId]).filter(Boolean);
-            const locationName = conversation.location_id
-              ? locationById[conversation.location_id]?.name ?? conversation.location_id
-              : "City";
-            const stage = conversationRelationshipStage(conversation, citizenById);
+        <div className="relative space-y-2 rounded-xl border border-[rgba(var(--border),0.8)] bg-black/20 p-3">
+          <div className="absolute bottom-4 left-[1.55rem] top-4 w-px bg-[rgba(var(--accent),0.28)]" />
+          {flowItems.map((item, index) => (
+            <ConversationFlowRow
+              key={item.id}
+              item={item}
+              index={index}
+              citizenById={citizenById}
+              locationById={locationById}
+              onSelectCitizen={onSelectCitizen}
+            />
+          ))}
 
-            return (
-              <article key={conversation.conversation_id} className="story-card rounded-xl p-3">
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                      {speakers.map((speaker) => (
-                        <button
-                          key={speaker.citizen_id}
-                          className="inline-flex max-w-[9rem] items-center gap-1 rounded-full border border-[rgba(var(--border),0.8)] bg-black/20 px-2 py-1 text-left text-[11px] font-semibold hover:border-[rgba(var(--accent),0.75)]"
-                          onClick={() => onSelectCitizen(speaker.citizen_id)}
-                          title={`Open ${speaker.name}`}
-                        >
-                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: moodHex(speaker) }} />
-                          <span className="truncate">{speaker.name.split(" ")[0]}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-                      <span>Day {conversation.game_day}</span>
-                      <span>{minutesLabel(conversation.game_minute)}</span>
-                      <span className="inline-flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {locationName}
-                      </span>
-                    </div>
-                  </div>
-                  <Badge tone={stage === "friend" || stage === "trusted friend" ? "success" : "default"}>
-                    {stage}
-                  </Badge>
-                </div>
-
-                <p className="mb-2 text-xs leading-relaxed text-[rgb(var(--muted-strong))]">
-                  {conversation.summary}
-                </p>
-
-                <div className="space-y-1.5">
-                  {conversation.transcript.slice(0, 8).map((line, index) => {
-                    const speaker = citizenById[line.speaker_id];
-                    return (
-                      <div
-                        key={`${conversation.conversation_id}-${index}`}
-                        className="rounded-lg border border-[rgba(var(--border-soft),0.75)] bg-black/20 p-2"
-                      >
-                        <div className="mb-0.5 text-[10px] font-semibold text-[rgb(var(--accent))]">
-                          {speaker?.name ?? line.speaker_id}
-                        </div>
-                        <div className="text-xs leading-snug">{line.text}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </article>
-            );
-          })}
-
-          {conversations.length === 0 ? (
-            <div className="rounded-xl border border-[rgba(var(--border),0.85)] bg-black/20 p-4 text-sm leading-relaxed text-[rgb(var(--muted-strong))] lg:col-span-2 xl:col-span-3">
+          {flowItems.length === 0 ? (
+            <div className="relative rounded-xl border border-[rgba(var(--border),0.85)] bg-black/20 p-4 text-sm leading-relaxed text-[rgb(var(--muted-strong))]">
               No conversations yet. Assign a task like “Talk to Iris about today” or trigger a school exam,
               then step time forward.
             </div>
           ) : null}
         </div>
       </div>
-
-      <StoryTimeline timeline={timeline} compact />
     </div>
   );
 }
 
-function FeaturedConversation({
-  conversation,
+function ConversationFlowRow({
+  item,
+  index,
   citizenById,
   locationById,
   onSelectCitizen,
 }: {
-  conversation: Conversation;
+  item: ConversationFlowItem;
+  index: number;
   citizenById: Record<string, CitizenAgent | undefined>;
   locationById: Record<string, Location | undefined>;
   onSelectCitizen: (citizenId: string) => void;
 }) {
-  const speakers = conversation.actor_ids
+  if (item.kind !== "line") {
+    const event = item.event;
+    const primary = event.actors[0] ? citizenById[event.actors[0]] : null;
+    return (
+      <div className="relative flex gap-3">
+        <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(var(--accent),0.5)] bg-[#071222] text-[rgb(var(--accent))]">
+          {item.kind === "task" ? <Target className="h-4 w-4" /> : <Handshake className="h-4 w-4" />}
+        </div>
+        <div className="min-w-0 flex-1 rounded-xl border border-[rgba(var(--accent),0.28)] bg-[rgba(56,189,248,0.08)] p-3">
+          <div className="mb-1 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
+            <span>{item.kind === "task" ? "Task assigned" : "Task completed"}</span>
+            <span>Day {item.day}</span>
+            <span>{minutesLabel(item.minute)}</span>
+            {primary ? (
+              <button className="text-[rgb(var(--accent))] hover:underline" onClick={() => onSelectCitizen(primary.citizen_id)}>
+                {primary.name}
+              </button>
+            ) : null}
+          </div>
+          <p className="text-sm leading-relaxed">{event.description}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const speaker = citizenById[item.line.speaker_id];
+  const listeners = item.conversation.actor_ids
+    .filter((actorId) => actorId !== item.line.speaker_id)
     .map((actorId) => citizenById[actorId])
-    .filter((speaker): speaker is CitizenAgent => Boolean(speaker));
-  const locationName = conversation.location_id
-    ? locationById[conversation.location_id]?.name ?? conversation.location_id
+    .filter((citizen): citizen is CitizenAgent => Boolean(citizen));
+  const locationName = item.conversation.location_id
+    ? locationById[item.conversation.location_id]?.name ?? item.conversation.location_id
     : "City";
-  const stage = conversationRelationshipStage(conversation, citizenById);
+  const stage = conversationRelationshipStage(item.conversation, citizenById);
 
   return (
-    <article className="rounded-xl border border-[rgba(var(--accent),0.5)] bg-[rgba(56,189,248,0.1)] p-3 shadow-[0_12px_36px_rgba(56,189,248,0.12)]">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="mb-1 flex items-center gap-2 text-sm font-semibold">
-            <MessageSquareText className="h-4 w-4 text-[rgb(var(--accent))]" />
-            Latest Conversation
-          </div>
-          <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            <span>Day {conversation.game_day}</span>
-            <span>{minutesLabel(conversation.game_minute)}</span>
-            <span className="inline-flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {locationName}
-            </span>
-            <span>{stage}</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {speakers.map((speaker) => (
-            <button
-              key={speaker.citizen_id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(var(--border),0.8)] bg-black/25 px-2 py-1 text-xs font-semibold hover:border-[rgba(var(--accent),0.75)]"
-              onClick={() => onSelectCitizen(speaker.citizen_id)}
-            >
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: moodHex(speaker) }} />
-              {speaker.name.split(" ")[0]}
-            </button>
-          ))}
-        </div>
+    <div className="relative flex gap-3">
+      <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(var(--border),0.9)] bg-[#071222] font-mono text-[10px] text-[rgb(var(--accent))]">
+        {index + 1}
       </div>
-      <p className="mb-3 text-sm leading-relaxed text-[rgb(var(--muted-strong))]">
-        {conversation.summary}
-      </p>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {conversation.transcript.slice(0, 8).map((line, index) => {
-          const speaker = citizenById[line.speaker_id];
-          return (
-            <div
-              key={`${conversation.conversation_id}-featured-${index}`}
-              className="rounded-lg border border-[rgba(var(--border-soft),0.78)] bg-black/20 p-2"
-            >
-              <div className="mb-1 text-[11px] font-semibold text-[rgb(var(--accent))]">
-                {speaker?.name ?? line.speaker_id}
-              </div>
-              <div className="text-xs leading-relaxed">{line.text}</div>
-            </div>
-          );
-        })}
-      </div>
-    </article>
+      <article className="min-w-0 flex-1 rounded-xl border border-[rgba(var(--border-soft),0.78)] bg-[rgba(6,11,22,0.72)] p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {speaker ? (
+              <button
+                className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border border-[rgba(var(--border),0.8)] bg-black/25 px-2 py-1 text-xs font-semibold hover:border-[rgba(var(--accent),0.75)]"
+                onClick={() => onSelectCitizen(speaker.citizen_id)}
+              >
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: moodHex(speaker) }} />
+                <span className="truncate">{speaker.name}</span>
+              </button>
+            ) : (
+              <span className="text-xs font-semibold">{item.line.speaker_id}</span>
+            )}
+            <span className="text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">to</span>
+            {listeners.map((listener) => (
+              <button
+                key={listener.citizen_id}
+                className="max-w-[9rem] truncate rounded-full border border-[rgba(var(--border),0.7)] bg-black/20 px-2 py-1 text-xs hover:border-[rgba(var(--accent),0.75)]"
+                onClick={() => onSelectCitizen(listener.citizen_id)}
+              >
+                {listener.name}
+              </button>
+            ))}
+          </div>
+          <Badge tone={stage === "friend" || stage === "trusted friend" ? "success" : "default"}>
+            {stage}
+          </Badge>
+        </div>
+        <div className="mb-2 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
+          <span>Line {item.lineIndex + 1}</span>
+          <span>Day {item.day}</span>
+          <span>{minutesLabel(item.minute)}</span>
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="h-3 w-3" />
+            {locationName}
+          </span>
+        </div>
+        {item.lineIndex === 0 ? (
+          <p className="mb-2 text-xs leading-relaxed text-[rgb(var(--muted))]">{item.conversation.summary}</p>
+        ) : null}
+        <p className="text-sm leading-relaxed">{item.line.text}</p>
+      </article>
+    </div>
   );
 }
 
-function StoryTimeline({ timeline, compact = false }: { timeline: TimelineItem[]; compact?: boolean }) {
-  return (
-    <div className="z-10">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <GalleryHorizontalEnd className="h-4 w-4 text-[rgb(var(--accent))]" />
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">What Just Happened</h2>
-          <Badge tone="accent">{timeline.length}</Badge>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-          <TrendingUp className="h-3.5 w-3.5" />
-          Newest first · tap citizens to see what they remember
-        </div>
-      </div>
-      <div
-        className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${
-          compact ? "lg:grid-cols-3 xl:grid-cols-4" : "max-h-[320px] overflow-y-auto scrollbar-thin lg:max-h-[210px] lg:grid-cols-4"
-        }`}
-      >
-        {timeline.map((item) => (
-          <div key={item.id} className="story-card rounded-lg p-2">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className={`flex h-5 items-center gap-1 rounded-full border px-1.5 text-[9px] uppercase tracking-wide ${storyTone(item.type)}`}>
-                {storyIcon(item.type)}
-                <span className="truncate">{storyTypeLabel(item.type)}</span>
-              </span>
-              <span className="font-mono text-[10px] text-[rgb(var(--muted))]">{item.time}</span>
-            </div>
-            <p className="line-clamp-4 text-[11px] leading-snug">{item.text}</p>
-          </div>
-        ))}
-        {timeline.length === 0 ? (
-          <div className="flex items-center justify-center text-xs text-[rgb(var(--muted))] sm:col-span-2 lg:col-span-4">
-            Waiting for the first story…
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
+function buildConversationFlow(conversations: Conversation[], events: CityEvent[]) {
+  const items: ConversationFlowItem[] = [];
+  for (const event of events) {
+    if (event.event_type === "player_task") {
+      items.push({ kind: "task", id: event.event_id, day: event.game_day, minute: event.game_minute, event });
+    }
+    if (event.event_type === "player_task_completed") {
+      items.push({ kind: "done", id: event.event_id, day: event.game_day, minute: event.game_minute, event });
+    }
+  }
+  for (const conversation of conversations) {
+    conversation.transcript.slice(0, 10).forEach((line, lineIndex) => {
+      items.push({
+        kind: "line",
+        id: `${conversation.conversation_id}-${lineIndex}`,
+        day: conversation.game_day,
+        minute: conversation.game_minute,
+        conversation,
+        line,
+        lineIndex,
+      });
+    });
+  }
+  const order = { task: 0, line: 1, done: 2 };
+  return items
+    .sort((a, b) => a.day - b.day || a.minute - b.minute || order[a.kind] - order[b.kind])
+    .slice(-120);
 }
 
 function CitizenAvatar({ citizen, small = false }: { citizen: CitizenAgent; small?: boolean }) {
@@ -2342,60 +2306,6 @@ function professionGlyph(profession: string) {
     "Restaurant Cook": "C",
   };
   return glyphs[profession] ?? "·";
-}
-
-function storyTone(type: string) {
-  if (type.includes("flu") || type.includes("outage") || type.includes("accident")) {
-    return "border-[rgba(244,89,89,0.5)] bg-[rgba(244,89,89,0.12)] text-[rgb(252,165,165)]";
-  }
-  if (type === "city_festival" || type === "memory" || type === "reflection") {
-    return "border-[rgba(167,139,250,0.5)] bg-[rgba(167,139,250,0.12)] text-[rgb(196,181,253)]";
-  }
-  if (type === "conversation" || type === "thought") {
-    return "border-[rgba(56,189,248,0.5)] bg-[rgba(56,189,248,0.12)] text-[rgb(125,211,252)]";
-  }
-  if (type === "mayor_policy" || type === "bank_policy_change") {
-    return "border-[rgba(251,191,36,0.5)] bg-[rgba(251,191,36,0.14)] text-[rgb(252,211,77)]";
-  }
-  return "border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel-strong),0.85)] text-[rgb(var(--muted-strong))]";
-}
-
-function storyIcon(type: string) {
-  const className = "h-3 w-3";
-  if (type.includes("flu") || type === "doctor_treatment") return <HeartPulse className={className} />;
-  if (type === "traffic_accident" || type === "citizen_arrived") return <Bus className={className} />;
-  if (type === "food_shortage" || type === "farm_harvest" || type === "market_sale")
-    return <ShoppingBag className={className} />;
-  if (type === "school_exam" || type === "workday_started") return <BookOpen className={className} />;
-  if (type === "city_festival") return <Sparkles className={className} />;
-  if (type === "bank_policy_change") return <PiggyBank className={className} />;
-  if (type === "power_outage") return <Zap className={className} />;
-  if (type === "conversation") return <MessageCircle className={className} />;
-  if (type === "thought") return <Brain className={className} />;
-  if (type === "memory") return <Brain className={className} />;
-  if (type === "mayor_policy") return <Banknote className={className} />;
-  if (type === "new_day") return <Sunrise className={className} />;
-  if (type === "social_opportunity") return <Users className={className} />;
-  return <Activity className={className} />;
-}
-
-function storyTypeLabel(type: string) {
-  const labels: Record<string, string> = {
-    social_opportunity: "chance to talk",
-    conversation: "conversation",
-    thought: "thought",
-    memory: "memory",
-    reflection: "reflection",
-    citizen_arrived: "arrived",
-    workday_started: "workday",
-    mayor_policy: "mayor decision",
-    simulation_started: "city started",
-    simulation_paused: "city paused",
-    farm_harvest: "farm harvest",
-    market_sale: "market sale",
-    doctor_treatment: "doctor helped",
-  };
-  return labels[type] ?? type.replaceAll("_", " ");
 }
 
 function minutesLabel(value: number) {

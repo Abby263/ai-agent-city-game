@@ -166,17 +166,30 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
     city_time = f"Day {request.city.clock.day}, {request.city.clock.minute_of_day // 60:02d}:{request.city.clock.minute_of_day % 60:02d}"
     event_context = " ".join(event.description for event in request.city.events[-6:] if event.priority >= 2)
     try:
-        result = cognition.client.generate(
-            citizen=actor.model_dump(mode="json"),
-            city_time=city_time,
-            observations=request.observations
-            or [f"{actor.name} is working on this player task: {request.task}"],
-            memories=request.memories,
-            nearby_citizens=nearby[:4],
-            event_context=event_context,
-            required_target_id=request.required_target_id or request.target_id,
-            require_conversation=request.require_conversation or bool(request.target_id),
-        )
+        if target and (request.require_conversation or request.target_id):
+            result = cognition.client.generate_private_exchange(
+                actor=actor.model_dump(mode="json"),
+                target=target.model_dump(mode="json"),
+                city_time=city_time,
+                task=request.task,
+                observations=request.observations
+                or [f"{actor.name} is working on this player task: {request.task}"],
+                actor_memories=request.private_memories.get(actor.citizen_id, request.memories),
+                target_memories=request.private_memories.get(target.citizen_id, []),
+                event_context=event_context,
+            )
+        else:
+            result = cognition.client.generate(
+                citizen=actor.model_dump(mode="json"),
+                city_time=city_time,
+                observations=request.observations
+                or [f"{actor.name} is working on this player task: {request.task}"],
+                memories=request.private_memories.get(actor.citizen_id, request.memories),
+                nearby_citizens=nearby[:4],
+                event_context=event_context,
+                required_target_id=request.required_target_id or request.target_id,
+                require_conversation=request.require_conversation or bool(request.target_id),
+            )
     except CognitionUnavailableError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except CognitionValidationError as error:
@@ -204,6 +217,8 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
         reflection=result.reflection,
         importance=result.importance,
         conversation=conversation,
+        participant_memories=result.participant_memories,
+        participant_reflections=result.participant_reflections,
     )
 
 

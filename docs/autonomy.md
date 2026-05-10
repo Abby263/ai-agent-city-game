@@ -2,14 +2,14 @@
 
 AgentCity should feel like a city of people, not a dashboard of bots.
 
-The current implementation uses OpenAI as the cognition layer for citizen planning,
-conversation, reflection, and memory writing. The local game engine does not decide
-what a person should say or who they should talk to for a player task; it advances
-city time, moves sprites, records memory, and validates that the AI produced a real
-exchange before the task is marked complete.
+The current implementation uses LangGraph + Deep Agents as the agent workflow
+layer and OpenAI as the strict structured cognition layer for citizen planning,
+conversation, reflection, and memory writing. The local game engine does not
+decide what a person should say or who they should talk to for a player task; it
+advances city time, moves sprites, records memory, and validates that the AI
+produced a real exchange before the task is marked complete.
 
-The design borrows the useful ideas from Hermes Agent, LangGraph, and Deep Agents
-without coupling the MVP to one runtime-specific workflow:
+The design borrows the useful ideas from Hermes Agent, LangGraph, and Deep Agents:
 
 - persistent memory that compounds over time
 - recall of past conversations and social history
@@ -28,12 +28,28 @@ Every playable tick:
 1. The engine advances city time, sprite movement, location state, and visible events.
 2. The orchestrator creates observations for any active task or autonomous social moment.
 3. The LLM task planner decides the citizen's target citizens, location, and visible plan.
-4. The citizen LLM receives the task, current city state, nearby citizens, and memories.
-5. The citizen LLM writes thoughts, spoken lines, memories, reflections, and relationship context.
-6. The engine validates required conversations before closing the task.
-7. Conversations write relationship memories for both citizens.
-8. Relationship scores evolve from stranger to acquaintance to friend to trusted friend.
-9. The UI streams visible thoughts, conversations, memory updates, and relationship context.
+4. LangGraph runs private exchange nodes: actor turn, target reply, actor follow-up, target close.
+5. Each node invokes the current citizen's cached Deep Agent graph with a structured private-turn response contract.
+6. Each private turn receives only that citizen's private memory plus the public transcript so far.
+7. OpenAI Responses API returns strict JSON for the turn, spoken line, memory, reflection, and mood.
+8. The engine validates required conversations before closing the task.
+9. Conversations write separate memories for each participant.
+10. Relationship scores evolve from stranger to acquaintance to friend to trusted friend.
+11. The UI streams visible thoughts, conversations, memory updates, and relationship context.
+
+## Memory Boundary
+
+Each citizen has private runtime memory. A citizen can learn a fact only from:
+
+- their own seed/persona memory
+- memories written after their own actions
+- words spoken to them in a conversation
+- public city events visible to everyone
+
+The orchestrator can route a task, but it must not leak one citizen's private
+memory into another citizen's prompt. If Ava asks Mateo whether he was invited to
+dinner, Mateo answers from Mateo's memory only. If Mateo has not heard about an
+invitation, the correct human answer is uncertainty, not a hallucinated yes.
 
 ## Auto Mode
 
@@ -63,7 +79,6 @@ The conversation is saved to durable memory for both citizens so future conversa
 
 Good next steps:
 
-- LangGraph graph nodes for orchestrator, citizen planning, memory recall, action, and report-back
 - Deep Agents subagents for school, hospital, bank, mayor office, and emergency response
 - citizen self-improvement journals that become retrievable memories
 - profession-specific learned skills and tools

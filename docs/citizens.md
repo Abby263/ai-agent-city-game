@@ -37,6 +37,25 @@ seed_memories:
 
 `active: true` means the citizen appears in the default playable cast when `ACTIVE_CITIZEN_IDS=profile`.
 
-Runtime memory is not written back to YAML. The YAML is the immutable persona and seed memory. During play, memories, reflections, conversations, and relationship changes are written to browser session memory or the configured database. That keeps production deployments safe and lets the same persona develop differently for each player session.
+Runtime memory is not written back to YAML. The YAML is the immutable persona and seed memory.
+
+During browser play, each active citizen gets an isolated short-term memory store:
+
+```text
+agentcity.v9.memory.<citizen_id>
+```
+
+The cognition endpoint receives a map of private memories by citizen id. The
+LangGraph exchange only passes each node the memory for the citizen currently
+speaking. Public transcript lines can cross the boundary; private memories cannot.
+
+In durable server mode, the same rule is enforced by retrieving memories by
+`citizen_id` before each private turn. This keeps the mental model simple:
+every citizen develops their own memory over time, and conversations are how
+facts move between people.
+
+Relationship changes are still stored separately because relationships are shared
+game state, not a private diary. That keeps production deployments safe and lets
+the same persona develop differently for each player session.
 
 Use `ACTIVE_CITIZEN_IDS=all` to activate every profile, or provide a comma-separated list for a custom cast.
