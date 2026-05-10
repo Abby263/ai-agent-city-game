@@ -228,13 +228,14 @@ export async function sessionAssignTask(citizenId: string, payload: AssignTaskPa
     event_type: "player_task",
     location_id: locationId,
     actors: [citizen.citizen_id, ...taskPlan.target_citizen_ids].filter(Boolean),
-    description: taskPlan.player_visible_plan,
+    description: task,
     payload: {
       task,
       target_citizen_id: taskPlan.target_citizen_id,
       target_citizen_ids: taskPlan.target_citizen_ids,
       task_kind: taskPlan.task_kind,
       reasoning_summary: taskPlan.reasoning_summary,
+      plan_summary: taskPlan.player_visible_plan,
     },
     priority: 3,
   });
@@ -445,8 +446,14 @@ async function planManualTask(
   const validCitizenIds = new Set(city.citizens.filter((item) => item.citizen_id !== citizen.citizen_id).map((item) => item.citizen_id));
   const validLocationIds = new Set(city.locations.map((location) => location.location_id));
   const inferredTargetIds = inferMentionedCitizenIds(task, city, citizen.citizen_id);
+  const unavailableMentionedNames = inferUnavailableMentionedPersonNames(task, city);
   const targetIds = Array.from(
-    new Set([...plan.target_citizen_ids, ...inferredTargetIds].filter((targetId) => validCitizenIds.has(targetId))),
+    new Set(
+      [
+        ...(unavailableMentionedNames.length > 0 && inferredTargetIds.length === 0 ? [] : plan.target_citizen_ids),
+        ...inferredTargetIds,
+      ].filter((targetId) => validCitizenIds.has(targetId)),
+    ),
   );
   const firstTarget = targetIds[0] ? city.citizens.find((item) => item.citizen_id === targetIds[0]) : null;
   const inferredLocationId = inferMentionedLocationId(task, city);
@@ -455,7 +462,12 @@ async function planManualTask(
     inferredLocationId ??
     firstTarget?.current_location_id ??
     citizen.current_location_id;
-  const taskKind = normalizePlannedTaskKind(task, plan.task_kind, Boolean(firstTarget), Boolean(inferredLocationId));
+  const taskKind = unavailableMentionedNames.length > 0 && inferredTargetIds.length === 0
+    ? "open_task"
+    : normalizePlannedTaskKind(task, plan.task_kind, Boolean(firstTarget), Boolean(inferredLocationId));
+  const visiblePlan = unavailableMentionedNames.length > 0 && inferredTargetIds.length === 0
+    ? `${citizen.name} needs to clarify the task because ${unavailableMentionedNames.join(", ")} is not currently in Navora.`
+    : plan.player_visible_plan || `${citizen.name} is deciding how to handle: ${task}`;
 
   return {
     task_kind: taskKind,
@@ -463,7 +475,7 @@ async function planManualTask(
     target_citizen_ids: targetIds,
     location_id: locationId,
     reasoning_summary: plan.reasoning_summary,
-    player_visible_plan: plan.player_visible_plan || `${citizen.name} is deciding how to handle: ${task}`,
+    player_visible_plan: visiblePlan,
   };
 }
 
@@ -1524,6 +1536,38 @@ function inferMentionedCitizenIds(task: string, city: CityState, actorId: string
       return names.some((name) => lower.includes(name));
     })
     .map((citizen) => citizen.citizen_id);
+}
+
+function inferUnavailableMentionedPersonNames(task: string, city: CityState) {
+  const availableNames = new Set(
+    city.citizens.flatMap((citizen) => {
+      const parts = citizen.name.toLowerCase().split(/\s+/).filter(Boolean);
+      return [citizen.name.toLowerCase(), ...parts];
+    }),
+  );
+  const locationWords = new Set(
+    city.locations.flatMap((location) => [
+      location.name.toLowerCase(),
+      location.type.toLowerCase().replaceAll("_", " "),
+      ...location.name.toLowerCase().split(/\s+/),
+    ]),
+  );
+  const matches = Array.from(
+    task.matchAll(
+      /\b(?:[Aa]sk|[Tt]ell|[Ii]nvite|[Mm]eet|[Vv]isit|[Cc]all|[Mm]essage|[Rr]each out to|[Tt]alk to|[Ss]peak to|[Cc]heck on|[Ff]ind)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g,
+    ),
+  );
+  return Array.from(
+    new Set(
+      matches
+        .map((match) => match[1].trim())
+        .filter((name) => {
+          const lower = name.toLowerCase();
+          const first = lower.split(/\s+/)[0];
+          return !availableNames.has(lower) && !availableNames.has(first) && !locationWords.has(lower) && !locationWords.has(first);
+        }),
+    ),
+  );
 }
 
 function inferMentionedLocationId(task: string, city: CityState) {

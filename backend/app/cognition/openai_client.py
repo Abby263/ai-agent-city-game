@@ -422,6 +422,16 @@ class CitizenCognitionClient:
                 "current_activity": listener.get("current_activity"),
             },
             "player_task": task,
+            "target_identity_contract": {
+                "current_listener_is_the_person_being_addressed": True,
+                "listener_name": listener["name"],
+                "listener_id": listener["citizen_id"],
+                "instruction": (
+                    "Address the listener as 'you' or by their exact name. Do not use he/she/him/her for the listener, "
+                    "and do not say the speaker still needs to go talk to another person unless the public transcript "
+                    "already established another remaining target."
+                ),
+            },
             "current_task_contract": {
                 "exact_task": task,
                 "mandatory_terms": self._task_terms(task, speaker, listener),
@@ -439,6 +449,9 @@ class CitizenCognitionClient:
                 "Write exactly one spoken line for the speaker.",
                 f"You are {speaker['name']}; every use of 'I' must refer to {speaker['name']}, not {listener['name']}.",
                 "The spoken line must serve the current player_task, not a prior memory.",
+                f"The current listener is {listener['name']}; do not replace them with another named person.",
+                "Use 'you' for the listener. Avoid gendered third-person pronouns for the listener.",
+                "Do not announce that you are about to go ask or talk to someone else when you are already speaking with the current listener.",
                 "Use a human tone with emotion, uncertainty, or a small follow-up when natural.",
                 "If asked whether something happened and it is not in your private memory or public transcript, say you are not sure or have not heard.",
                 "Do not answer using another citizen's private memory.",
@@ -571,6 +584,8 @@ class CitizenCognitionClient:
                 "If the task says everyone, everybody, all classmates, or all students, choose all relevant non-actor citizens.",
                 "If the task asks the actor to go, walk, travel, visit, head, move, or meet at a location, choose go_to_location.",
                 "If that location task also names another citizen to go with, choose go_with_citizen and include that citizen as target.",
+                "Never substitute an unavailable person with a different citizen. If the named person is not in available_citizens, choose open_task with no targets and explain that the person is not currently in the city.",
+                "Do not invent names. player_visible_plan must preserve the player task's named person or explicitly say that named person is unavailable.",
                 "If the task asks the actor about their own friends, goals, mood, schedule, health, or money, choose self_answer and no targets.",
                 "If the task is ambiguous, choose the most socially natural target from relationships, goals, and current activity.",
                 "Use only citizen_id values and location_id values from the supplied lists.",
@@ -598,7 +613,75 @@ class CitizenCognitionClient:
 
         response = self.client.responses.create(**request)
         parsed = json.loads(response.output_text)
-        return TaskPlanResult(**parsed)
+        result = TaskPlanResult(**parsed)
+        unavailable_names = self._unavailable_named_people(task, citizens, locations)
+        known_targets_mentioned = self._known_people_mentioned(task, citizens)
+        if unavailable_names and not known_targets_mentioned:
+            result.task_kind = "open_task"
+            result.target_citizen_ids = []
+            result.location_id = None
+            result.player_visible_plan = (
+                f"{citizen['name']} needs to clarify the task because "
+                f"{', '.join(unavailable_names)} is not currently in the city."
+            )
+        return result
+
+    @staticmethod
+    def _known_people_mentioned(task: str, citizens: list[dict[str, Any]]) -> bool:
+        normalized = task.lower()
+        for citizen in citizens:
+            if citizen.get("is_actor"):
+                continue
+            name = str(citizen.get("name") or "").lower()
+            parts = [part for part in name.split() if part]
+            if name and name in normalized:
+                return True
+            if any(part in normalized for part in parts):
+                return True
+        return False
+
+    @staticmethod
+    def _unavailable_named_people(
+        task: str,
+        citizens: list[dict[str, Any]],
+        locations: list[dict[str, Any]],
+    ) -> list[str]:
+        import re
+
+        available_names = {
+            name
+            for citizen in citizens
+            for name in [
+                str(citizen.get("name") or "").lower(),
+                *str(citizen.get("name") or "").lower().split(),
+            ]
+            if name
+        }
+        location_words = {
+            word
+            for location in locations
+            for word in [
+                str(location.get("name") or "").lower(),
+                str(location.get("type") or "").lower().replace("_", " "),
+                *str(location.get("name") or "").lower().split(),
+            ]
+            if word
+        }
+        pattern = re.compile(
+            r"\b(?i:ask|tell|invite|meet|visit|call|message|reach out to|talk to|speak to|check on|find)\s+"
+            r"([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)"
+        )
+        unavailable: list[str] = []
+        for match in pattern.finditer(task):
+            name = match.group(1).strip()
+            lower = name.lower()
+            first = lower.split()[0]
+            if lower in available_names or first in available_names:
+                continue
+            if lower in location_words or first in location_words:
+                continue
+            unavailable.append(name)
+        return list(dict.fromkeys(unavailable))
 
     @staticmethod
     def _supports_reasoning(model: str) -> bool:

@@ -420,13 +420,14 @@ class SimulationEngine:
             event_type="player_task",
             location_id=location_id,
             actors=[citizen.citizen_id, *target_ids],
-            description=plan.player_visible_plan or f"{citizen.name} is planning the player task: {task}",
+            description=task,
             payload={
                 "task": task,
                 "target_citizen_id": target_ids[0] if target_ids else None,
                 "target_citizen_ids": target_ids,
                 "task_kind": plan.task_kind,
                 "reasoning_summary": plan.reasoning_summary,
+                "plan_summary": plan.player_visible_plan,
             },
             priority=3,
         )

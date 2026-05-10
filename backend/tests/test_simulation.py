@@ -334,3 +334,15 @@ def test_task_alignment_flags_stale_topic_leakage():
         speaker,
         listener,
     )
+
+
+def test_unknown_named_person_is_not_substituted_with_available_citizen():
+    client = CitizenCognitionClient(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    citizens = [
+        {"citizen_id": "cit_009", "name": "Ava Singh", "is_actor": True},
+        {"citizen_id": "cit_021", "name": "Noah Mensah", "is_actor": False},
+    ]
+    locations = [{"location_id": "loc_bank", "name": "Bank", "type": "bank"}]
+
+    assert client._unavailable_named_people("Reach out to Sophie and ask how was her day", citizens, locations) == ["Sophie"]
+    assert client._known_people_mentioned("Talk to Noah at home to ask how the day was", citizens)

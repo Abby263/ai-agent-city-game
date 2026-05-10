@@ -1992,6 +1992,8 @@ function ConversationFlowRow({
   if (item.kind !== "line") {
     const event = item.event;
     const primary = event.actors[0] ? citizenById[event.actors[0]] : null;
+    const taskText = eventTaskText(event);
+    const planSummary = item.kind === "task" ? eventPlanSummary(event) : null;
     return (
       <div className="relative flex gap-3">
         <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(var(--accent),0.5)] bg-[#071222] text-[rgb(var(--accent))]">
@@ -2008,7 +2010,12 @@ function ConversationFlowRow({
               </button>
             ) : null}
           </div>
-          <p className="text-sm leading-relaxed">{event.description}</p>
+          <p className="text-sm leading-relaxed">{taskText}</p>
+          {planSummary && planSummary !== taskText ? (
+            <p className="mt-1 rounded-md bg-[rgba(56,189,248,0.08)] px-2 py-1 text-[11px] leading-snug text-[rgb(var(--muted-strong))]">
+              Plan: {planSummary}
+            </p>
+          ) : null}
         </div>
       </div>
     );
@@ -2074,6 +2081,18 @@ function ConversationFlowRow({
       </article>
     </div>
   );
+}
+
+function eventTaskText(event: CityEvent) {
+  return typeof event.payload?.task === "string" && event.payload.task.trim()
+    ? event.payload.task
+    : event.description;
+}
+
+function eventPlanSummary(event: CityEvent) {
+  return typeof event.payload?.plan_summary === "string" && event.payload.plan_summary.trim()
+    ? event.payload.plan_summary
+    : null;
 }
 
 function buildConversationFlow(conversations: Conversation[], events: CityEvent[]) {
