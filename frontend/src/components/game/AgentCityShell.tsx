@@ -84,6 +84,7 @@ type PlayerTask = {
   status: string;
   location_id: string | null;
   target_citizen_id: string | null;
+  plan_summary?: string;
 };
 type HoverInfo =
   | { kind: "location"; data: Location }
@@ -473,7 +474,6 @@ export function AgentCityShell() {
                   busy={busy}
                   runAction={runAction}
                   onRefreshCitizen={() => selectCitizen(selectedCitizen.citizen_id)}
-                  citizens={city?.citizens ?? []}
                   gameMode={gameMode}
                   onTaskAssigned={handleTaskAssigned}
                 />
@@ -1457,7 +1457,6 @@ function CitizenPanel({
   busy,
   runAction,
   onRefreshCitizen,
-  citizens,
   gameMode,
   onTaskAssigned,
 }: {
@@ -1472,7 +1471,6 @@ function CitizenPanel({
   busy: boolean;
   runAction: (action: () => Promise<unknown>) => Promise<unknown>;
   onRefreshCitizen: () => Promise<void>;
-  citizens: CitizenAgent[];
   gameMode: SimulationMode;
   onTaskAssigned: (state: CityState) => void;
 }) {
@@ -1523,7 +1521,6 @@ function CitizenPanel({
         busy={busy}
         runAction={runAction}
         onRefreshCitizen={onRefreshCitizen}
-        citizens={citizens}
         gameMode={gameMode}
         onTaskAssigned={onTaskAssigned}
       />
@@ -1551,7 +1548,6 @@ function AssignTaskPanel({
   busy,
   runAction,
   onRefreshCitizen,
-  citizens,
   gameMode,
   onTaskAssigned,
 }: {
@@ -1560,40 +1556,20 @@ function AssignTaskPanel({
   busy: boolean;
   runAction: (action: () => Promise<unknown>) => Promise<unknown>;
   onRefreshCitizen: () => Promise<void>;
-  citizens: CitizenAgent[];
   gameMode: SimulationMode;
   onTaskAssigned: (state: CityState) => void;
 }) {
   const [task, setTask] = useState("");
-  const [locationId, setLocationId] = useState(citizen.current_location_id);
-  const [targetCitizenId, setTargetCitizenId] = useState<string | null>(null);
   const playerTask = playerTaskFor(citizen);
-  const targetCitizen = citizens.find((item) => item.citizen_id === targetCitizenId) ?? null;
   const locationsById = useMemo(
     () => Object.fromEntries(locations.map((location) => [location.location_id, location])),
     [locations],
   );
-  const otherCitizens = useMemo(
-    () => citizens.filter((item) => item.citizen_id !== citizen.citizen_id),
-    [citizen.citizen_id, citizens],
-  );
-  const locationChoices = useMemo(() => {
-    const preferred = ["loc_school", "loc_library", "loc_park", "loc_market", "loc_homes"];
-    const picked = preferred
-      .map((id) => locationsById[id])
-      .filter((location): location is Location => Boolean(location));
-    const current = locationsById[citizen.current_location_id];
-    if (current && !picked.some((location) => location.location_id === current.location_id)) {
-      picked.unshift(current);
-    }
-    return picked;
-  }, [citizen.current_location_id, locationsById]);
-  const targetName = targetCitizen?.name.split(" ")[0] ?? "a classmate";
   const quickTasks = [
-    `Talk with ${targetName} about today`,
-    `Study with ${targetName} at the library`,
-    `Ask ${targetName} how they are feeling`,
-    `Invite ${targetName} to the park`,
+    "Ask Iris how she is doing",
+    "Say hi to everyone",
+    "Find someone who wants to study",
+    "Check if anyone needs help today",
   ];
 
   async function submitTask(event: FormEvent<HTMLFormElement>) {
@@ -1603,9 +1579,6 @@ function AssignTaskPanel({
     const result = await runAction(() =>
       api.assignTask(citizen.citizen_id, {
         task: trimmed,
-        location_id: locationId,
-        target_citizen_id: targetCitizenId,
-        duration_ticks: 6,
       }),
     );
     if (result && typeof result === "object" && "city_id" in result) {
@@ -1636,8 +1609,8 @@ function AssignTaskPanel({
           </div>
           <p className="mt-0.5 text-[11px] leading-snug text-[rgb(var(--muted))]">
             {gameMode === "manual"
-              ? "Manual mode runs only this kind of player task, then pauses when it is complete."
-              : "Tasks become goals, memories, and conversation triggers while the city keeps living."}
+              ? "Tell the citizen what you want. Their AI brain chooses who to talk to, where to go, and how to answer."
+              : "Tasks become AI-chosen goals, memories, and conversation triggers while the city keeps living."}
           </p>
         </div>
         <Badge tone={playerTask?.status === "active" ? "success" : playerTask ? "violet" : "default"}>
@@ -1651,6 +1624,11 @@ function AssignTaskPanel({
             {playerTask.status === "active" ? "Current player task" : "Last player task"}
           </div>
           <div className="leading-snug">{playerTask.task}</div>
+          {playerTask.plan_summary ? (
+            <div className="mt-1 rounded-md bg-[rgba(56,189,248,0.08)] px-2 py-1 text-[11px] leading-snug text-[rgb(var(--muted-strong))]">
+              {playerTask.plan_summary}
+            </div>
+          ) : null}
           <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
             <MapPin className="h-3 w-3" />
             {locationsById[playerTask.location_id ?? ""]?.name ?? "Current location"}
@@ -1670,37 +1648,6 @@ function AssignTaskPanel({
           ) : null}
         </div>
       ) : null}
-
-      <div className="mb-2">
-        <div className="mb-1 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted))]">
-          Conversation target
-        </div>
-        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
-          <button
-            type="button"
-            className="btn-pill shrink-0"
-            data-active={!targetCitizenId}
-            onClick={() => setTargetCitizenId(null)}
-          >
-            Anyone nearby
-          </button>
-          {otherCitizens.map((other) => (
-            <button
-              key={other.citizen_id}
-              type="button"
-              className="btn-pill shrink-0"
-              data-active={targetCitizenId === other.citizen_id}
-              onClick={() => {
-                setTargetCitizenId(other.citizen_id);
-                setLocationId(other.current_location_id);
-              }}
-            >
-              <span className="h-2 w-2 rounded-full" style={{ background: moodHex(other) }} />
-              {other.name.split(" ")[0]}
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div className="mb-2 flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
         {quickTasks.map((quickTask) => (
@@ -1723,21 +1670,6 @@ function AssignTaskPanel({
         className="min-h-[76px] w-full resize-none rounded-lg border border-[rgba(var(--border),0.85)] bg-[rgba(8,12,24,0.72)] px-3 py-2 text-sm leading-snug outline-none transition focus:border-[rgba(var(--accent),0.8)]"
         placeholder="Example: Ask Iris if she wants to study together, then remember how she responds."
       />
-
-      <div className="mt-2 flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
-        {locationChoices.map((location) => (
-          <button
-            key={location.location_id}
-            type="button"
-            className="btn-pill shrink-0"
-            data-active={locationId === location.location_id}
-            onClick={() => setLocationId(location.location_id)}
-          >
-            {locationIcon(location.type)}
-            {location.name}
-          </button>
-        ))}
-      </div>
 
       <Button
         className="mt-2 w-full"
@@ -2305,6 +2237,7 @@ function playerTaskFor(citizen: CitizenAgent): PlayerTask | null {
     status: typeof taskData.status === "string" ? taskData.status : "active",
     location_id: typeof taskData.location_id === "string" ? taskData.location_id : null,
     target_citizen_id: typeof taskData.target_citizen_id === "string" ? taskData.target_citizen_id : null,
+    plan_summary: typeof taskData.plan_summary === "string" ? taskData.plan_summary : undefined,
   };
 }
 

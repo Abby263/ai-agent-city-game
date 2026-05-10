@@ -10,11 +10,13 @@ import type {
   Relationship,
   SessionCognitionRequest,
   SessionCognitionResponse,
+  SessionTaskPlanRequest,
+  SessionTaskPlanResponse,
   SimulationMode,
   TriggerEventPayload,
 } from "@/lib/types";
 
-const SESSION_VERSION = "v5";
+const SESSION_VERSION = "v6";
 const CITY_KEY = `agentcity.${SESSION_VERSION}.city`;
 const MEMORIES_KEY = `agentcity.${SESSION_VERSION}.memories`;
 const RELATIONSHIPS_KEY = `agentcity.${SESSION_VERSION}.relationships`;
@@ -28,14 +30,16 @@ type PlayerTaskData = {
   completed_target_ids?: string[];
   current_target_index?: number;
   task_kind?: "targeted_talk" | "greet_all" | "ask_all" | "self_answer" | "open_task";
+  plan_summary?: string;
+  reasoning_summary?: string;
   assigned_day?: number;
   assigned_minute?: number;
-  expires_tick?: number;
   status?: string;
   last_cognition_tick?: number;
 };
 
 type GenerateCognition = (request: SessionCognitionRequest) => Promise<SessionCognitionResponse>;
+type GenerateTaskPlan = (request: SessionTaskPlanRequest) => Promise<SessionTaskPlanResponse>;
 
 export function sessionMemoryEnabled() {
   return typeof window !== "undefined" && process.env.NEXT_PUBLIC_MEMORY_MODE !== "server";
@@ -139,14 +143,28 @@ export async function sessionSetMode(mode: SimulationMode) {
   return saveAndReturn(city);
 }
 
-export async function sessionAssignTask(citizenId: string, payload: AssignTaskPayload) {
+export async function sessionAssignTask(citizenId: string, payload: AssignTaskPayload, generateTaskPlan: GenerateTaskPlan) {
   const city = requireSessionCity();
   const citizen = findCitizen(city, citizenId);
-  const target = payload.target_citizen_id ? findCitizen(city, payload.target_citizen_id) : null;
   const task = payload.task.trim();
-  const taskPlan = planManualTask(city, citizen, task, target, payload);
+  const taskPlan = await planManualTask(city, citizen, task, generateTaskPlan).catch(() => null);
+  if (!taskPlan) {
+    blockManualTask(
+      city,
+      citizen,
+      {
+        task,
+        status: "blocked",
+        task_kind: "open_task",
+        location_id: citizen.current_location_id,
+        plan_summary: "The AI planner was unavailable, so the citizen could not decide how to act.",
+      },
+      "agent_planning_blocked",
+      `${citizen.name} could not plan the player task because AI planning was unavailable: ${task}`,
+    );
+    return saveAndReturn(city);
+  }
   const locationId = taskPlan.location_id;
-  const durationTicks = Math.max(payload.duration_ticks ?? 6, taskPlan.target_citizen_ids.length * 3 + 2);
 
   citizen.personality = {
     ...citizen.personality,
@@ -158,9 +176,10 @@ export async function sessionAssignTask(citizenId: string, payload: AssignTaskPa
       completed_target_ids: [],
       current_target_index: 0,
       task_kind: taskPlan.task_kind,
+      plan_summary: taskPlan.player_visible_plan,
+      reasoning_summary: taskPlan.reasoning_summary,
       assigned_day: city.clock.day,
       assigned_minute: city.clock.minute_of_day,
-      expires_tick: city.clock.tick + durationTicks,
       status: "active",
     } satisfies PlayerTaskData,
   };
@@ -174,23 +193,23 @@ export async function sessionAssignTask(citizenId: string, payload: AssignTaskPa
   addMemory({
     citizen_id: citizen.citizen_id,
     kind: "episodic",
-    content: `The player assigned me a task: ${task}.`,
+    content: `The player assigned me a task: ${task}. My plan: ${taskPlan.player_visible_plan}`,
     importance: 0.78,
     salience: 0.82,
-    related_citizen_id: target?.citizen_id ?? null,
+    related_citizen_id: taskPlan.target_citizen_id,
     extra: { source: "player_task", location_id: locationId },
   });
   addEvent(city, {
     event_type: "player_task",
     location_id: locationId,
     actors: [citizen.citizen_id, ...taskPlan.target_citizen_ids].filter(Boolean),
-    description: taskPlan.description,
+    description: taskPlan.player_visible_plan,
     payload: {
       task,
-      duration_ticks: durationTicks,
       target_citizen_id: taskPlan.target_citizen_id,
       target_citizen_ids: taskPlan.target_citizen_ids,
       task_kind: taskPlan.task_kind,
+      reasoning_summary: taskPlan.reasoning_summary,
     },
     priority: 3,
   });
@@ -268,8 +287,31 @@ export async function sessionTick(generateCognition: GenerateCognition) {
   });
   if (cognitionCandidate) {
     await runTaskCognition(city, cognitionCandidate, generateCognition).catch(() => {
-      runTemplateCognition(city, cognitionCandidate);
+      const task = playerTask(cognitionCandidate);
+      if (task) {
+        blockManualTask(
+          city,
+          cognitionCandidate,
+          task,
+          "agent_cognition_blocked",
+          `${cognitionCandidate.name} could not continue the task because AI cognition was unavailable: ${task.task}`,
+        );
+      }
     });
+  } else if (city.simulation_mode === "autonomous") {
+    const socialMoment = producedEvents.find((event) => event.event_type === "social_opportunity");
+    if (socialMoment) {
+      await runAutonomousCognition(city, socialMoment, generateCognition).catch(() => {
+        addEvent(city, {
+          event_type: "agent_cognition_blocked",
+          location_id: socialMoment.location_id,
+          actors: socialMoment.actors,
+          description: "An autonomous conversation could not continue because AI cognition was unavailable.",
+          payload: { source_event_id: socialMoment.event_id },
+          priority: 3,
+        });
+      });
+    }
   }
 
   if (city.simulation_mode === "manual" && activeTaskCitizens(city).length === 0) {
@@ -363,57 +405,34 @@ export async function sessionApplyPolicy(payload: MayorPolicyPayload) {
   return saveAndReturn(city);
 }
 
-function planManualTask(
+async function planManualTask(
   city: CityState,
   citizen: CitizenAgent,
   task: string,
-  target: CitizenAgent | null,
-  payload: AssignTaskPayload,
+  generateTaskPlan: GenerateTaskPlan,
 ) {
-  const normalized = task.toLowerCase();
-  const otherCitizens = city.citizens.filter((item) => item.citizen_id !== citizen.citizen_id);
-  const mentionsEveryone = /\b(everyone|everybody|all|each|classmates|students|citizens)\b/.test(normalized);
-  const asksAboutFriends = /\b(how many|who|list|tell me|do you have)\b.*\bfriends?\b|\bfriends?\b.*\b(how many|who|list|do you have)\b/.test(
-    normalized,
-  );
-  const asksForSelfKnowledge =
-    asksAboutFriends ||
-    (/\b(how many|what|who|where|why|when)\b/.test(normalized) &&
-      /\b(you|your|yourself|friends|goals|money|health|mood|schedule)\b/.test(normalized) &&
-      !mentionsEveryone);
-  const task_kind: NonNullable<PlayerTaskData["task_kind"]> = target
-    ? "targeted_talk"
-    : asksForSelfKnowledge
-      ? "self_answer"
-      : mentionsEveryone
-        ? normalized.includes("ask") || normalized.includes("?")
-          ? "ask_all"
-          : "greet_all"
-        : "open_task";
-  const targetIds =
-    task_kind === "greet_all" || task_kind === "ask_all"
-      ? otherCitizens.map((item) => item.citizen_id)
-      : target
-        ? [target.citizen_id]
-        : [];
+  const plan = await generateTaskPlan({
+    city,
+    actor_id: citizen.citizen_id,
+    task,
+    memories: sessionMemories(citizen.citizen_id).slice(0, 8).map((memory) => memory.content),
+  });
+  const validCitizenIds = new Set(city.citizens.filter((item) => item.citizen_id !== citizen.citizen_id).map((item) => item.citizen_id));
+  const validLocationIds = new Set(city.locations.map((location) => location.location_id));
+  const targetIds = Array.from(new Set(plan.target_citizen_ids.filter((targetId) => validCitizenIds.has(targetId))));
   const firstTarget = targetIds[0] ? city.citizens.find((item) => item.citizen_id === targetIds[0]) : null;
   const locationId =
-    payload.location_id ??
-    target?.current_location_id ??
+    (plan.location_id && validLocationIds.has(plan.location_id) ? plan.location_id : null) ??
     firstTarget?.current_location_id ??
-    (task_kind === "self_answer" ? citizen.current_location_id : "loc_school");
+    citizen.current_location_id;
 
   return {
-    task_kind,
-    target_citizen_id: target?.citizen_id ?? firstTarget?.citizen_id ?? null,
+    task_kind: plan.task_kind,
+    target_citizen_id: firstTarget?.citizen_id ?? null,
     target_citizen_ids: targetIds,
     location_id: locationId,
-    description:
-      targetIds.length > 1
-        ? `The player asked ${citizen.name} to visit ${targetIds.length} classmates: ${task}`
-        : target
-          ? `The player asked ${citizen.name} to work with ${target.name}: ${task}`
-          : `The player asked ${citizen.name} to answer: ${task}`,
+    reasoning_summary: plan.reasoning_summary,
+    player_visible_plan: plan.player_visible_plan || `${citizen.name} is deciding how to handle: ${task}`,
   };
 }
 
@@ -584,13 +603,17 @@ function taskProgressLabel(city: CityState, citizen: CitizenAgent, task: PlayerT
 async function runTaskCognition(city: CityState, citizen: CitizenAgent, generateCognition: GenerateCognition) {
   const task = playerTask(citizen);
   if (!task) return;
-  if (task.task_kind === "self_answer" || (!task.target_citizen_id && !task.target_citizen_ids?.length)) {
-    answerSelfTask(city, citizen, task);
-    return;
-  }
   const target = currentTaskTarget(city, task);
   if (!target) {
-    finishManualTask(city, citizen, task, citizen.current_location_id);
+    const response = await generateCognition({
+      city,
+      actor_id: citizen.citizen_id,
+      target_id: null,
+      task: task.task,
+      observations: buildSoloTaskObservations(city, citizen, task),
+      memories: sessionMemories(citizen.citizen_id).slice(0, 8).map((memory) => memory.content),
+    });
+    applySoloCognition(city, citizen, task, response);
     return;
   }
   if (!nearCitizen(citizen, target)) {
@@ -608,6 +631,16 @@ async function runTaskCognition(city: CityState, citizen: CitizenAgent, generate
     memories: sessionMemories(citizen.citizen_id).slice(0, 5).map((memory) => memory.content),
   });
   applyCognition(city, citizen, target, task, response);
+}
+
+function buildSoloTaskObservations(city: CityState, citizen: CitizenAgent, task: PlayerTaskData) {
+  return [
+    `Player task: "${task.task}". ${citizen.name} has chosen to handle this without a conversation target.`,
+    task.plan_summary ? `Agent plan visible to player: ${task.plan_summary}` : "",
+    task.reasoning_summary ? `Agent private planning summary: ${task.reasoning_summary}` : "",
+    `${citizen.name} is at ${locationName(city, citizen.current_location_id)}, mood ${citizen.mood}, currently ${citizen.current_activity.toLowerCase()}.`,
+    `The answer or next action must come from ${citizen.name}'s own memory, relationships, goals, and current state.`,
+  ].filter(Boolean);
 }
 
 function buildTaskObservations(city: CityState, citizen: CitizenAgent, target: CitizenAgent, task: PlayerTaskData) {
@@ -633,107 +666,138 @@ function locationName(city: CityState, locationId: string) {
   return city.locations.find((location) => location.location_id === locationId)?.name ?? locationId;
 }
 
-function runTemplateCognition(city: CityState, citizen: CitizenAgent) {
-  const task = playerTask(citizen);
-  if (!task) return;
-  const target = currentTaskTarget(city, task);
-  if (!target) return;
-  applyCognition(city, citizen, target, task, {
-    thought: `${target.name.split(" ")[0]} gave me something honest to remember. I should keep following up.`,
-    mood: "Thoughtful",
-    memory: `${citizen.name} talked with ${target.name} about: ${task.task}`,
-    reflection: `${citizen.name} learned that small check-ins can start real trust.`,
-    importance: 0.68,
-    conversation: {
-      conversation_id: newId("convo"),
-      game_day: city.clock.day,
-      game_minute: city.clock.minute_of_day,
-      location_id: citizen.current_location_id,
-      actor_ids: [citizen.citizen_id, target.citizen_id],
-      summary: `${citizen.name} and ${target.name} had a focused talk. Relationship: ${relationshipLabelFromScore(citizen.relationship_scores[target.citizen_id] ?? 38)}.`,
-      transcript: [
-        {
-          speaker_id: citizen.citizen_id,
-          text: `I wanted to ask about this: ${task.task}`,
-        },
-        {
-          speaker_id: target.citizen_id,
-          text: "I am glad you asked. It makes school feel less lonely when someone notices.",
-        },
-        {
-          speaker_id: citizen.citizen_id,
-          text: "I will remember that and check in again later.",
-        },
-      ],
-    },
+async function runAutonomousCognition(city: CityState, event: CityEvent, generateCognition: GenerateCognition) {
+  const [actorId, targetId] = event.actors;
+  if (!actorId || !targetId) return;
+  const actor = city.citizens.find((citizen) => citizen.citizen_id === actorId);
+  const target = city.citizens.find((citizen) => citizen.citizen_id === targetId);
+  if (!actor || !target) return;
+
+  const relationshipScore = actor.relationship_scores[target.citizen_id] ?? 38;
+  const response = await generateCognition({
+    city,
+    actor_id: actor.citizen_id,
+    target_id: target.citizen_id,
+    task: `Have a natural city conversation with ${target.name}.`,
+    observations: [
+      `Autonomous social moment: ${event.description}`,
+      `${actor.name} and ${target.name} are ${relationshipLabelFromScore(relationshipScore)} at ${locationName(city, actor.current_location_id)}.`,
+      `${actor.name} is ${actor.mood.toLowerCase()} and ${target.name} is ${target.mood.toLowerCase()}.`,
+      "Let them talk like real students. The conversation should reveal whether they are strangers, acquaintances, or becoming friends.",
+    ],
+    memories: sessionMemories(actor.citizen_id).slice(0, 6).map((memory) => memory.content),
+  });
+  applyAutonomousCognition(city, actor, target, event, response);
+}
+
+function applyAutonomousCognition(
+  city: CityState,
+  actor: CitizenAgent,
+  target: CitizenAgent,
+  sourceEvent: CityEvent,
+  response: SessionCognitionResponse,
+) {
+  actor.current_thought = response.thought;
+  actor.mood = response.mood || actor.mood;
+  actor.memory_summary = compactSummary(actor.memory_summary, response.memory);
+
+  addMemory({
+    citizen_id: actor.citizen_id,
+    kind: "episodic",
+    content: response.memory,
+    importance: response.importance || 0.58,
+    salience: response.importance || 0.58,
+    related_citizen_id: target.citizen_id,
+    extra: { source: "autonomous_cognition", reflection: response.reflection, source_event_id: sourceEvent.event_id },
+  });
+
+  const conversation = validTaskConversation(response.conversation, actor, target);
+  if (!conversation) {
+    addEvent(city, {
+      event_type: "agent_cognition_blocked",
+      location_id: sourceEvent.location_id,
+      actors: [actor.citizen_id, target.citizen_id],
+      description: `${actor.name} and ${target.name} did not produce a complete AI conversation.`,
+      payload: { source_event_id: sourceEvent.event_id },
+      priority: 3,
+    });
+    return;
+  }
+
+  const before = relationshipLabelFromScore(actor.relationship_scores[target.citizen_id] ?? 38);
+  const savedConversation: Conversation = {
+    ...conversation,
+    conversation_id: conversation.conversation_id || newId("convo"),
+    game_day: city.clock.day,
+    game_minute: city.clock.minute_of_day,
+    location_id: conversation.location_id ?? actor.current_location_id,
+    actor_ids: [actor.citizen_id, target.citizen_id],
+    transcript: conversation.transcript.slice(0, 8),
+  };
+  strengthenRelationship(city, actor, target, savedConversation.summary);
+  const after = relationshipLabelFromScore(actor.relationship_scores[target.citizen_id] ?? 38);
+  savedConversation.summary = `${savedConversation.summary} Relationship: ${before} -> ${after}.`;
+  writeJson(CONVERSATIONS_KEY, [savedConversation, ...sessionConversations()].slice(0, 80));
+  addEvent(city, {
+    event_type: "conversation",
+    location_id: savedConversation.location_id,
+    actors: savedConversation.actor_ids,
+    description: `${actor.name} and ${target.name} talked autonomously: ${savedConversation.summary}`,
+    payload: { conversation_id: savedConversation.conversation_id, source_event_id: sourceEvent.event_id },
+    priority: 2,
   });
 }
 
-function answerSelfTask(city: CityState, citizen: CitizenAgent, task: PlayerTaskData) {
-  const answer = selfAnswerForTask(city, citizen, task.task);
+function applySoloCognition(city: CityState, citizen: CitizenAgent, task: PlayerTaskData, response: SessionCognitionResponse) {
+  const answer = response.thought || response.memory || response.reflection;
   citizen.current_activity = "Answered the player";
   citizen.current_thought = answer;
-  citizen.mood = "Helpful";
+  citizen.mood = response.mood || citizen.mood;
+  citizen.memory_summary = compactSummary(citizen.memory_summary, response.memory);
   citizen.personality = { ...citizen.personality, player_task: { ...task, last_cognition_tick: city.clock.tick } };
-  const conversation: Conversation = {
-    conversation_id: newId("convo"),
-    game_day: city.clock.day,
-    game_minute: city.clock.minute_of_day,
-    location_id: citizen.current_location_id,
-    actor_ids: [citizen.citizen_id],
-    summary: `${citizen.name} answered the player: ${answer}`,
-    transcript: [
-      {
-        speaker_id: citizen.citizen_id,
-        text: answer,
-      },
-    ],
-  };
-  writeJson(CONVERSATIONS_KEY, [conversation, ...sessionConversations()].slice(0, 80));
+
   addMemory({
     citizen_id: citizen.citizen_id,
     kind: "episodic",
-    content: `The player asked me "${task.task}" and I answered: ${answer}`,
-    importance: 0.62,
-    salience: 0.66,
+    content: response.memory || `${citizen.name} handled the player task: ${task.task}`,
+    importance: response.importance || 0.64,
+    salience: response.importance || 0.64,
     related_citizen_id: null,
-    extra: { source: "player_task_answer" },
+    extra: { source: "session_cognition", reflection: response.reflection, task_kind: task.task_kind },
   });
+
+  const responseConversation = response.conversation;
+  const conversation: Conversation = responseConversation
+    ? {
+        ...responseConversation,
+        conversation_id: responseConversation.conversation_id || newId("convo"),
+        game_day: city.clock.day,
+        game_minute: city.clock.minute_of_day,
+        location_id: responseConversation.location_id ?? citizen.current_location_id,
+        actor_ids: [citizen.citizen_id],
+        transcript: responseConversation.transcript.length
+          ? responseConversation.transcript
+          : [{ speaker_id: citizen.citizen_id, text: answer }],
+      }
+    : {
+        conversation_id: newId("convo"),
+        game_day: city.clock.day,
+        game_minute: city.clock.minute_of_day,
+        location_id: citizen.current_location_id,
+        actor_ids: [citizen.citizen_id],
+        summary: `${citizen.name} answered the player: ${answer}`,
+        transcript: [{ speaker_id: citizen.citizen_id, text: answer }],
+      };
+  writeJson(CONVERSATIONS_KEY, [conversation, ...sessionConversations()].slice(0, 80));
   addEvent(city, {
     event_type: "task_answer",
     location_id: citizen.current_location_id,
     actors: [citizen.citizen_id],
-    description: `${citizen.name} answered: ${answer}`,
-    payload: { task: task.task, answer },
+    description: `${citizen.name} answered through AI cognition: ${answer}`,
+    payload: { task: task.task, conversation_id: conversation.conversation_id },
     priority: 3,
   });
   finishManualTask(city, citizen, task, citizen.current_location_id);
-}
-
-function selfAnswerForTask(city: CityState, citizen: CitizenAgent, taskText: string) {
-  const normalized = taskText.toLowerCase();
-  if (normalized.includes("friend")) {
-    const activeIds = new Set(city.citizens.map((item) => item.citizen_id));
-    const closeFriends = citizen.friend_ids
-      .filter((id) => activeIds.has(id))
-      .map((id) => city.citizens.find((item) => item.citizen_id === id)?.name)
-      .filter((name): name is string => Boolean(name));
-    const acquaintances = Object.entries(citizen.relationship_scores)
-      .filter(([id, score]) => activeIds.has(id) && !citizen.friend_ids.includes(id) && score >= 35)
-      .map(([id]) => city.citizens.find((item) => item.citizen_id === id)?.name)
-      .filter((name): name is string => Boolean(name));
-    if (closeFriends.length > 0) {
-      return `I have ${closeFriends.length} close friend${closeFriends.length === 1 ? "" : "s"} right now: ${closeFriends.join(", ")}. I also know ${acquaintances.length} other classmate${acquaintances.length === 1 ? "" : "s"} well enough to build a friendship.`;
-    }
-    return `I do not have a close friend yet, but I know ${acquaintances.join(", ") || "a few classmates"} as acquaintances. I should talk with them more.`;
-  }
-  if (normalized.includes("goal")) {
-    return `My short-term goals are ${citizen.short_term_goals.join(", ")}. Long term, I want to ${citizen.long_term_goals.join(" and ")}.`;
-  }
-  if (normalized.includes("mood") || normalized.includes("feel")) {
-    return `I feel ${citizen.mood.toLowerCase()} right now. My happiness is ${Math.round(citizen.happiness)} and my stress is ${Math.round(citizen.stress)}.`;
-  }
-  return `I can answer from what I know about myself: I am ${citizen.name}, a ${citizen.age}-year-old ${citizen.profession.toLowerCase()}, and right now I am ${citizen.current_activity.toLowerCase()}.`;
 }
 
 function applyCognition(
@@ -776,7 +840,17 @@ function applyCognition(
     extra: { source: "session_cognition" },
   });
 
-  const conversation = response.conversation ?? fallbackTaskConversation(city, citizen, target, task.task, response.memory);
+  const conversation = validTaskConversation(response.conversation, citizen, target);
+  if (!conversation) {
+    blockManualTask(
+      city,
+      citizen,
+      task,
+      "agent_cognition_blocked",
+      `${citizen.name} could not complete the task because the AI did not produce a real exchange with ${target.name}.`,
+    );
+    return;
+  }
   if (conversation) {
     const savedConversation: Conversation = {
       ...conversation,
@@ -785,7 +859,10 @@ function applyCognition(
       game_minute: city.clock.minute_of_day,
       location_id: conversation.location_id ?? citizen.current_location_id,
       actor_ids: [citizen.citizen_id, target.citizen_id],
-      transcript: twoSidedTranscript(conversation.transcript, citizen, target, task.task),
+      transcript: conversation.transcript
+        .filter((line) => line.speaker_id && line.text.trim())
+        .map((line) => ({ speaker_id: line.speaker_id, text: line.text.trim() }))
+        .slice(0, 8),
     };
     const before = relationshipLabelFromScore(citizen.relationship_scores[target.citizen_id] ?? 38);
     strengthenRelationship(city, citizen, target, savedConversation.summary);
@@ -814,69 +891,19 @@ function applyCognition(
   }
 }
 
-function fallbackTaskConversation(
-  city: CityState,
+function validTaskConversation(
+  conversation: Conversation | null | undefined,
   citizen: CitizenAgent,
   target: CitizenAgent,
-  taskText: string,
-  memory: string,
-): Conversation {
-  const normalized = taskText.toLowerCase();
-  const isGreeting = /\b(hi|hello|greet|say hey|check in)\b/.test(normalized);
-  const isQuestion = normalized.includes("?") || /\b(ask|find out|how many|what|who|why|when|where)\b/.test(normalized);
-  const citizenLine = isGreeting
-    ? `Hi ${target.name.split(" ")[0]}. I wanted to say hello and see how your day is going.`
-    : isQuestion
-      ? `I wanted to ask you this: ${taskText}`
-      : `I wanted to talk with you about this: ${taskText}`;
-  const targetLine = isGreeting
-    ? `Hi ${citizen.name.split(" ")[0]}. Thanks for coming over. My day feels better when someone checks in.`
-    : isQuestion
-      ? "I can answer that from what I know. Thanks for asking me directly."
-      : "Thanks for checking in. I will remember that you came over to talk to me.";
-  return {
-    conversation_id: newId("convo"),
-    game_day: city.clock.day,
-    game_minute: city.clock.minute_of_day,
-    location_id: citizen.current_location_id,
-    actor_ids: [citizen.citizen_id, target.citizen_id],
-    summary: `${citizen.name} followed the task with ${target.name}: ${memory || taskText}`,
-    transcript: [
-      {
-        speaker_id: citizen.citizen_id,
-        text: citizenLine,
-      },
-      {
-        speaker_id: target.citizen_id,
-        text: targetLine,
-      },
-    ],
-  };
-}
-
-function twoSidedTranscript(
-  transcript: Conversation["transcript"],
-  citizen: CitizenAgent,
-  target: CitizenAgent,
-  taskText: string,
-) {
-  const lines = transcript
+): Conversation | null {
+  if (!conversation) return null;
+  const lines = conversation.transcript
     .filter((line) => line.speaker_id && line.text.trim())
     .map((line) => ({ speaker_id: line.speaker_id, text: line.text.trim() }));
-  if (!lines.some((line) => line.speaker_id === citizen.citizen_id)) {
-    lines.unshift({
-      speaker_id: citizen.citizen_id,
-      text: `I wanted to ask you about this: ${taskText}`,
-    });
-  }
-  if (!lines.some((line) => line.speaker_id === target.citizen_id)) {
-    const targetLine = {
-      speaker_id: target.citizen_id,
-      text: "I am a little nervous, but it helps that you asked me directly.",
-    };
-    lines.splice(Math.min(1, lines.length), 0, targetLine);
-  }
-  return lines.slice(0, 8);
+  const hasActorLine = lines.some((line) => line.speaker_id === citizen.citizen_id);
+  const hasTargetLine = lines.some((line) => line.speaker_id === target.citizen_id);
+  if (!hasActorLine || !hasTargetLine || lines.length < 2) return null;
+  return { ...conversation, transcript: lines };
 }
 
 function completeTask(city: CityState, citizen: CitizenAgent, task: PlayerTaskData, locationId: string) {
@@ -898,6 +925,33 @@ function completeTask(city: CityState, citizen: CitizenAgent, task: PlayerTaskDa
     salience: 0.78,
     related_citizen_id: task.target_citizen_id ?? null,
     extra: { source: "player_task_completed", location_id: locationId },
+  });
+}
+
+function blockManualTask(
+  city: CityState,
+  citizen: CitizenAgent,
+  task: PlayerTaskData,
+  eventType: "agent_planning_blocked" | "agent_cognition_blocked",
+  description: string,
+) {
+  const blocked = {
+    ...task,
+    status: "blocked",
+    blocked_day: city.clock.day,
+    blocked_minute: city.clock.minute_of_day,
+  };
+  citizen.personality = { ...citizen.personality, player_task: blocked };
+  citizen.current_activity = "AI planning unavailable";
+  citizen.current_thought = "I need my AI cognition before I can handle that task like a real person.";
+  citizen.short_term_goals = withoutPlayerTask(citizen.short_term_goals);
+  addEvent(city, {
+    event_type: eventType,
+    location_id: task.location_id ?? citizen.current_location_id,
+    actors: [citizen.citizen_id],
+    description,
+    payload: { task: task.task },
+    priority: 3,
   });
 }
 
@@ -986,9 +1040,10 @@ function playerTask(citizen: CitizenAgent): PlayerTaskData | null {
       data.task_kind === "open_task"
         ? data.task_kind
         : "open_task",
+    plan_summary: typeof data.plan_summary === "string" ? data.plan_summary : undefined,
+    reasoning_summary: typeof data.reasoning_summary === "string" ? data.reasoning_summary : undefined,
     assigned_day: numberOrUndefined(data.assigned_day),
     assigned_minute: numberOrUndefined(data.assigned_minute),
-    expires_tick: numberOrUndefined(data.expires_tick),
     status: typeof data.status === "string" ? data.status : "active",
     last_cognition_tick: numberOrUndefined(data.last_cognition_tick),
   };

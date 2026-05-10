@@ -16,7 +16,7 @@ This is controlled by `ACTIVE_CITIZEN_IDS`. Set it to `all` to activate the full
 
 1. The frontend opens the city with `GET /city/state`.
 2. The frontend connects to `WS /ws/city`.
-3. Simulation ticks update deterministic systems: clock, schedules, movement, needs, health, economy, education, transport, and city events.
+3. Simulation ticks update mechanical game systems: clock, movement, visible state, health, economy, education, transport, and city events.
 4. The cognition pipeline scores citizens for meaningful moments.
 5. Selected citizens retrieve memories from Postgres/pgvector.
 6. OpenAI Responses API generates structured thoughts, plans, conversations, memories, and reflections when `LLM_MODE=real`.

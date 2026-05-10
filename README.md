@@ -54,9 +54,9 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## LLM Modes
 
-`LLM_MODE=mock` runs a deterministic cognition fallback for development and tests.
+`LLM_MODE=real` requires `OPENAI_API_KEY` and uses the OpenAI Responses API for citizen thoughts, conversations, plans, reflections, and mayor summaries. Citizen task planning and dialogue do not use template fallbacks: if OpenAI cognition is unavailable, the game marks the task as blocked instead of pretending it completed.
 
-`LLM_MODE=real` requires `OPENAI_API_KEY` and uses the OpenAI Responses API for citizen thoughts, conversations, plans, reflections, and mayor summaries. Movement, schedules, needs, salary, inventory, and pathing stay deterministic so the game does not call the LLM constantly.
+The city engine still owns mechanical simulation work such as ticks, rendering, path movement, browser state, and persistence so the game remains stable and affordable.
 
 The default cognition limits are:
 
@@ -79,7 +79,7 @@ For durable memory, set `MEMORY_STORAGE=postgres` and provide Supabase, Neon, or
 
 - Watch five student agents move across a 40x40 top-down city map.
 - Tap or click any student to see thoughts, memory, relationships, mood, needs, money, schedule, and goals.
-- Use Manual Mode to assign a focused task to any student, choose a conversation target, and watch the task close when complete.
+- Use Manual Mode to assign a focused natural-language task to any student; the citizen decides who to approach and how to answer.
 - Use Autonomous Mode to trigger city events such as flu outbreak, traffic accident, food shortage, school exam, festival, bank policy change, and power outage.
 - Change mayor policies for tax, hospitals, school funding, roads, farming subsidies, and public health in Autonomous Mode.
 - Observe WebSocket-streamed thoughts, conversations, memories, reflections, and city metrics.
@@ -89,7 +89,7 @@ For durable memory, set `MEMORY_STORAGE=postgres` and provide Supabase, Neon, or
 
 1. Start in `Manual`.
 2. Tap Ava, Mateo, Noah, Iris, or Leo on the map to follow one student.
-3. Use `Give [name] a task`, choose a conversation target, and click `Assign Task`.
+3. Use `Give [name] a task`, type what you want, and click `Assign Task`; the citizen chooses the target and route.
 4. Open `Talk` to read the latest conversation as a transcript.
 5. Let the task finish automatically, or use `Pause` / `Close Task`.
 6. Switch to `Auto` when you want the students to move, meet, talk, and react without direct player instructions.

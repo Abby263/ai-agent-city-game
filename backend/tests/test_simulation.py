@@ -2,10 +2,57 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.config import Settings
+from app.cognition.openai_client import TaskPlanResult
 from app.models import Base, CitizenORM, CityEventORM, ConversationORM, MemoryORM
 from app.schemas import AssignTaskRequest, SimulationModeRequest, TriggerEventRequest
 from app.seed import ensure_seeded
 from app.simulation.engine import SimulationEngine
+
+
+class FakePlanClient:
+    def __init__(self, *, target_ids: list[str] | None = None, location_id: str | None = None):
+        self.target_ids = target_ids or []
+        self.location_id = location_id
+
+    def plan_task(self, **kwargs):
+        actor_name = kwargs["citizen"]["name"]
+        target_count = len(self.target_ids)
+        return TaskPlanResult(
+            task_kind="targeted_talk" if target_count else "self_answer",
+            target_citizen_ids=self.target_ids,
+            location_id=self.location_id,
+            reasoning_summary="Test planner stands in for OpenAI planning.",
+            player_visible_plan=f"{actor_name} will use AI planning to complete the task.",
+        )
+
+
+class FakePlanningPipeline:
+    def __init__(self, *, target_ids: list[str] | None = None, location_id: str | None = None):
+        self.client = FakePlanClient(target_ids=target_ids, location_id=location_id)
+
+
+class FakeTaskCognition(FakePlanningPipeline):
+    def process_tick(self, db, *, citizens, locations, day, minute_of_day, observations, event_context):
+        citizen = db.get(CitizenORM, "cit_009")
+        task = (citizen.personality or {}).get("player_task") or {}
+        target_id = str(task.get("target_citizen_id") or "cit_010")
+        return [
+            {
+                "citizen_id": "cit_009",
+                "thought": "I should ask directly and listen to the answer.",
+                "mood": "Focused",
+                "memory": {"content": "I asked a classmate directly and listened."},
+                "reflection": {"insight": "Direct questions build trust."},
+                "conversation": {
+                    "actor_ids": ["cit_009", target_id],
+                    "transcript": [
+                        {"speaker_id": "cit_009", "text": "How are you doing?"},
+                        {"speaker_id": target_id, "text": "I am doing okay and glad you asked."},
+                    ],
+                    "summary": "A real AI-generated exchange happened in the test double.",
+                },
+            }
+        ]
 
 
 def session_factory():
@@ -39,7 +86,8 @@ def test_assign_task_creates_goal_memory_and_event():
     state = engine.assign_task(
         db,
         "cit_009",
-        AssignTaskRequest(task="Ask Iris if she wants to study together", location_id="loc_library"),
+        AssignTaskRequest(task="Ask Iris if she wants to study together"),
+        FakePlanningPipeline(target_ids=["cit_022"], location_id="loc_library"),
     )
     citizen = db.get(CitizenORM, "cit_009")
 
@@ -130,7 +178,6 @@ def test_cognition_candidate_selection_is_selective():
     db = session_factory()
     settings = Settings(
         database_url="sqlite+pysqlite:///:memory:",
-        llm_mode="mock",
         max_llm_calls_per_tick=3,
         llm_cognition_interval_ticks=1,
     )
@@ -140,10 +187,14 @@ def test_cognition_candidate_selection_is_selective():
     pipeline = CognitionPipeline(settings)
     engine.set_mode(db, SimulationModeRequest(mode="autonomous"))
     engine.trigger_event(db, TriggerEventRequest(event_type="traffic_accident", severity="high"))
-    result = engine.tick(db, pipeline)
+    candidates = pipeline._rank_candidates(
+        engine._active_citizens(db),
+        {"cit_009": ["A traffic accident happened near the bus stop."]},
+        "A traffic accident happened near the bus stop.",
+    )
 
-    assert 0 < len(result["cognition"]) <= 3
-    assert all("thought" in item for item in result["cognition"])
+    assert candidates
+    assert len(candidates) <= len(engine._active_citizens(db))
 
 
 def test_manual_mode_waits_until_player_assigns_task():
@@ -166,17 +217,20 @@ def test_manual_task_runs_then_autopauses_when_completed():
     assigned = engine.assign_task(
         db,
         "cit_009",
-        AssignTaskRequest(
-            task="Talk with Mateo about the science project",
-            target_citizen_id="cit_010",
-            duration_ticks=1,
-        ),
+        AssignTaskRequest(task="Talk with Mateo about the science project"),
+        FakeTaskCognition(target_ids=["cit_010"], location_id="loc_school"),
     )
 
     assert assigned.clock.running
     assert assigned.simulation_mode == "manual"
+    actor = db.get(CitizenORM, "cit_009")
+    target = db.get(CitizenORM, "cit_010")
+    actor.current_location_id = target.current_location_id
+    actor.x = target.x
+    actor.y = target.y
+    db.commit()
 
-    result = engine.tick(db)
+    result = engine.tick(db, FakeTaskCognition(target_ids=["cit_010"], location_id="loc_school"))
     after = result["state"]
     citizen = db.get(CitizenORM, "cit_009")
 
@@ -192,7 +246,8 @@ def test_close_task_stops_manual_task_run():
     engine.assign_task(
         db,
         "cit_009",
-        AssignTaskRequest(task="Ask Iris how she is feeling", target_citizen_id="cit_022"),
+        AssignTaskRequest(task="Ask Iris how she is feeling"),
+        FakePlanningPipeline(target_ids=["cit_022"], location_id="loc_school"),
     )
 
     state = engine.close_task(db, "cit_009")

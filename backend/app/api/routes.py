@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.cognition.openai_client import CognitionUnavailableError
 from app.cognition.pipeline import CognitionPipeline
 from app.config import get_settings
 from app.database import get_db
@@ -22,6 +23,8 @@ from app.schemas import (
     Relationship,
     SessionCognitionRequest,
     SessionCognitionResponse,
+    SessionTaskPlanRequest,
+    SessionTaskPlanResponse,
     SimulationModeRequest,
     TriggerEventRequest,
 )
@@ -72,8 +75,6 @@ def get_citizens(include_inactive: bool = False, db: Session = Depends(get_db)) 
 def get_citizen(citizen_id: str, db: Session = Depends(get_db)) -> CitizenAgent:
     citizen = db.get(CitizenORM, citizen_id)
     if not citizen:
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=404, detail="Citizen not found")
     return CitizenAgent.model_validate(citizen)
 
@@ -126,8 +127,6 @@ def get_citizen_conversations(citizen_id: str, db: Session = Depends(get_db)) ->
 async def session_cognition(request: SessionCognitionRequest) -> SessionCognitionResponse:
     actor = next((citizen for citizen in request.city.citizens if citizen.citizen_id == request.actor_id), None)
     if not actor:
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=404, detail="Actor citizen not found in session state")
 
     target = (
@@ -142,6 +141,9 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
                 "citizen_id": target.citizen_id,
                 "name": target.name,
                 "profession": target.profession,
+                "mood": target.mood,
+                "current_activity": target.current_activity,
+                "current_location_id": target.current_location_id,
             }
         )
     else:
@@ -150,6 +152,9 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
                 "citizen_id": citizen.citizen_id,
                 "name": citizen.name,
                 "profession": citizen.profession,
+                "mood": citizen.mood,
+                "current_activity": citizen.current_activity,
+                "current_location_id": citizen.current_location_id,
             }
             for citizen in request.city.citizens
             if citizen.citizen_id != actor.citizen_id
@@ -160,15 +165,18 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
         )
     city_time = f"Day {request.city.clock.day}, {request.city.clock.minute_of_day // 60:02d}:{request.city.clock.minute_of_day % 60:02d}"
     event_context = " ".join(event.description for event in request.city.events[-6:] if event.priority >= 2)
-    result = cognition.client.generate(
-        citizen=actor.model_dump(mode="json"),
-        city_time=city_time,
-        observations=request.observations
-        or [f"{actor.name} is working on this player task: {request.task}"],
-        memories=request.memories,
-        nearby_citizens=nearby[:4],
-        event_context=event_context,
-    )
+    try:
+        result = cognition.client.generate(
+            citizen=actor.model_dump(mode="json"),
+            city_time=city_time,
+            observations=request.observations
+            or [f"{actor.name} is working on this player task: {request.task}"],
+            memories=request.memories,
+            nearby_citizens=nearby[:4],
+            event_context=event_context,
+        )
+    except CognitionUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
     conversation = None
     conversation_payload = result.conversation or {}
@@ -192,6 +200,34 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
         reflection=result.reflection,
         importance=result.importance,
         conversation=conversation,
+    )
+
+
+@router.post("/cognition/task-plan", response_model=SessionTaskPlanResponse)
+async def session_task_plan(request: SessionTaskPlanRequest) -> SessionTaskPlanResponse:
+    actor = next((citizen for citizen in request.city.citizens if citizen.citizen_id == request.actor_id), None)
+    if not actor:
+        raise HTTPException(status_code=404, detail="Actor citizen not found in session state")
+
+    try:
+        result = cognition.client.plan_task(
+            citizen=actor.model_dump(mode="json"),
+            city=request.city.model_dump(mode="json"),
+            task=request.task,
+            memories=request.memories,
+        )
+    except CognitionUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    valid_citizen_ids = {citizen.citizen_id for citizen in request.city.citizens if citizen.citizen_id != actor.citizen_id}
+    valid_location_ids = {location.location_id for location in request.city.locations}
+    target_ids = [citizen_id for citizen_id in result.target_citizen_ids if citizen_id in valid_citizen_ids]
+    location_id = result.location_id if result.location_id in valid_location_ids else None
+    return SessionTaskPlanResponse(
+        task_kind=result.task_kind,  # type: ignore[arg-type]
+        target_citizen_ids=target_ids,
+        location_id=location_id,
+        reasoning_summary=result.reasoning_summary,
+        player_visible_plan=result.player_visible_plan,
     )
 
 
@@ -267,7 +303,10 @@ async def assign_citizen_task(
     request: AssignTaskRequest,
     db: Session = Depends(get_db),
 ) -> CityState:
-    state = engine.assign_task(db, citizen_id, request)
+    try:
+        state = engine.assign_task(db, citizen_id, request, cognition)
+    except CognitionUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
     await manager.broadcast("city_state", state.model_dump(mode="json"))
     await manager.broadcast(
         "event",

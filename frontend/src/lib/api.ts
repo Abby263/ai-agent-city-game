@@ -7,6 +7,8 @@ import type {
   Relationship,
   SessionCognitionRequest,
   SessionCognitionResponse,
+  SessionTaskPlanRequest,
+  SessionTaskPlanResponse,
   SimulationMode,
   TriggerEventPayload,
 } from "@/lib/types";
@@ -107,7 +109,7 @@ export const api = {
     return request<Conversation[]>(`/citizens/${citizenId}/conversations`);
   },
   assignTask: async (citizenId: string, payload: AssignTaskPayload) => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionAssignTask(citizenId, payload);
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionAssignTask(citizenId, payload, generateSessionTaskPlan);
     return request<CityState>(`/citizens/${citizenId}/task`, {
       method: "POST",
       body: JSON.stringify(payload),
@@ -123,6 +125,13 @@ export const api = {
 
 async function generateSessionCognition(requestBody: SessionCognitionRequest): Promise<SessionCognitionResponse> {
   return request<SessionCognitionResponse>("/cognition/session", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+  });
+}
+
+async function generateSessionTaskPlan(requestBody: SessionTaskPlanRequest): Promise<SessionTaskPlanResponse> {
+  return request<SessionTaskPlanResponse>("/cognition/task-plan", {
     method: "POST",
     body: JSON.stringify(requestBody),
   });

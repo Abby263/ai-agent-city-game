@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from hashlib import sha256
 from uuid import uuid4
 
 from sqlalchemy import desc, select
@@ -85,15 +84,3 @@ class MemoryStore:
             scored.append((memory.importance + memory.salience + overlap * 0.2 + recency, memory))
         scored.sort(key=lambda item: item[0], reverse=True)
         return [memory for _score, memory in scored[:limit]]
-
-    @staticmethod
-    def deterministic_embedding(text: str, dimensions: int = 1536) -> list[float]:
-        digest = sha256(text.encode("utf-8")).digest()
-        values: list[float] = []
-        while len(values) < dimensions:
-            for byte in digest:
-                values.append((byte / 255.0) * 2 - 1)
-                if len(values) == dimensions:
-                    break
-            digest = sha256(digest).digest()
-        return values

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     redis_url: str | None = None
     cors_origins: str = "http://localhost:3000"
 
-    llm_mode: Literal["real", "mock"] = "mock"
+    llm_mode: Literal["real"] = "real"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-nano"
     openai_embedding_model: str = "text-embedding-3-small"

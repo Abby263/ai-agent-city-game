@@ -9,7 +9,7 @@ This guide sets up AgentCity with browser short-term session memory by default, 
 - Python 3.10+.
 - `uv` for Python dependency management.
 - Optional: a hosted Postgres database if you want durable memory. Short-term memory works without Neon or Supabase.
-- Optional: an OpenAI API key for real citizen cognition.
+- An OpenAI API key for real citizen cognition.
 
 ## Environment Files
 
@@ -40,8 +40,8 @@ Set these in the root `.env`.
 | `SUPABASE_DATABASE_URL` | Optional | `postgresql+psycopg://postgres.PROJECT_REF:...@aws-0-REGION.pooler.supabase.com:5432/postgres` | Used in Postgres mode if `DATABASE_URL` is empty. |
 | `NEON_DATABASE_URL` | Optional | `postgresql+psycopg://USER:PASSWORD@HOST.neon.tech/DB?sslmode=require` | Used in Postgres mode if `DATABASE_URL` and `SUPABASE_DATABASE_URL` are empty. |
 | `ALLOW_EPHEMERAL_DB_FALLBACK` | Optional | `true` | In Postgres mode, lets the API fall back to short-term memory if hosted Postgres is unreachable. |
-| `LLM_MODE` | Yes | `mock` or `real` | Use `mock` without an OpenAI key; use `real` for intelligent citizens. |
-| `OPENAI_API_KEY` | Required for real LLM | `sk-...` | Only needed when `LLM_MODE=real`. |
+| `LLM_MODE` | Yes | `real` | Intelligent gameplay requires OpenAI cognition. |
+| `OPENAI_API_KEY` | Yes | `sk-...` | Required for citizen planning, conversations, thoughts, and memory formation. |
 | `OPENAI_MODEL` | Yes | `gpt-4.1-nano` | Citizen cognition model. |
 | `OPENAI_EMBEDDING_MODEL` | Yes | `text-embedding-3-small` | Memory embedding model. |
 | `MAX_LLM_CALLS_PER_TICK` | Yes | `2` | Caps citizen cognition calls per simulation tick. Movement and basic needs do not call the LLM. |
@@ -127,14 +127,7 @@ LLM_COGNITION_INTERVAL_TICKS=4
 ACTIVE_CITIZEN_IDS=cit_009,cit_010,cit_021,cit_022,cit_026
 ```
 
-For local development without paid API calls:
-
-```bash
-LLM_MODE=mock
-OPENAI_API_KEY=
-```
-
-Mock mode keeps the game playable but uses deterministic template thoughts instead of real LLM cognition.
+Without `OPENAI_API_KEY`, citizen tasks are visibly blocked instead of using fake template cognition.
 
 ## Vercel Setup
 
@@ -156,8 +149,8 @@ Set these Vercel environment variables for Production, Preview, and Development:
 | Variable | Value |
 | --- | --- |
 | `MEMORY_STORAGE` | `short_term` |
-| `LLM_MODE` | `real` for production, or `mock` if no OpenAI key is available. |
-| `OPENAI_API_KEY` | Your OpenAI API key. Required for real intelligent mode. |
+| `LLM_MODE` | `real` |
+| `OPENAI_API_KEY` | Your OpenAI API key. Required for intelligent gameplay. |
 | `OPENAI_MODEL` | `gpt-4.1-nano` |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` |
 | `MAX_LLM_CALLS_PER_TICK` | `2` |
@@ -199,7 +192,7 @@ npx vercel --prod
 
 Repeat env additions for `preview` and `development`, or set them in the Vercel dashboard for all environments.
 
-Important: if `LLM_MODE=real` but `OPENAI_API_KEY` is missing, the backend falls back to non-intelligent template cognition.
+Important: if `LLM_MODE=real` but `OPENAI_API_KEY` is missing, cognition endpoints return unavailable and tasks are blocked. The app no longer fabricates template conversations.
 
 ## Install Dependencies
 
@@ -245,7 +238,7 @@ http://localhost:3000
 1. Start in `Manual`. Manual mode keeps the city quiet until you assign a task.
 2. Start with the default five-student cast: Ava, Mateo, Noah, Iris, and Leo. The older full-city citizens remain in the database/code but are inactive unless `ACTIVE_CITIZEN_IDS` changes.
 3. Tap or click a student on the map or in the roster.
-4. Use `Give [name] a task`, choose a conversation target, and click `Assign Task`.
+4. Use `Give [name] a task`, type a natural-language task, and click `Assign Task`. The citizen decides who to approach and where to go.
 5. Open `Talk` to follow the latest conversation transcript, relationship stage, task context, and recent city moments.
 6. Let the task finish automatically, click `Pause`, or use `Close Task` in the student profile.
 7. Switch to `Auto` when you want students to move, meet, talk, remember, and react autonomously.
@@ -313,7 +306,7 @@ For a backend-only offline smoke test:
 
 ```bash
 cd backend
-DATABASE_URL=sqlite:///./agentcity-dev.db LLM_MODE=mock uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+DATABASE_URL=sqlite:///./agentcity-dev.db LLM_MODE=real OPENAI_API_KEY=sk-your-key uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 This is not durable and does not provide pgvector semantic retrieval. The playable Vercel MVP uses browser short-term session memory instead.

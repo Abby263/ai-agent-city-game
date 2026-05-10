@@ -178,6 +178,9 @@ class CognitionPipeline:
                         "citizen_id": other.citizen_id,
                         "name": other.name,
                         "profession": other.profession,
+                        "mood": other.mood,
+                        "current_activity": other.current_activity,
+                        "current_location_id": other.current_location_id,
                     }
                 )
         return nearby[:4]

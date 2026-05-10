@@ -5,6 +5,7 @@ from uuid import uuid4
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.cognition.openai_client import CognitionUnavailableError
 from app.cognition.pipeline import CognitionPipeline, observations_by_actor
 from app.config import Settings
 from app.memory.store import MemoryStore
@@ -179,8 +180,11 @@ class SimulationEngine:
         db.flush()
 
         cognition_results: list[dict] = []
-        should_run_cognition = state.tick % self.settings.llm_cognition_interval_ticks == 0
-        should_run_cognition = should_run_cognition or any(event.priority >= 3 for event in events)
+        if simulation_mode == "manual":
+            should_run_cognition = any(event.priority >= 3 for event in events)
+        else:
+            should_run_cognition = state.tick % self.settings.llm_cognition_interval_ticks == 0
+            should_run_cognition = should_run_cognition or any(event.priority >= 3 for event in events)
         if cognition and should_run_cognition:
             observations = observations_by_actor(events)
             event_context = " ".join(
@@ -195,6 +199,7 @@ class SimulationEngine:
                 observations=observations,
                 event_context=event_context,
             )
+            events.extend(self._apply_task_cognition_results(db, state, cognition_results))
 
         if simulation_mode == "manual" and not self._active_task_citizens(citizens):
             state.running = False
@@ -316,7 +321,13 @@ class SimulationEngine:
         db.commit()
         return self.get_state(db)
 
-    def assign_task(self, db: Session, citizen_id: str, request: AssignTaskRequest) -> CityState:
+    def assign_task(
+        self,
+        db: Session,
+        citizen_id: str,
+        request: AssignTaskRequest,
+        cognition: CognitionPipeline | None = None,
+    ) -> CityState:
         state = self._state(db)
         active_ids = self._active_citizen_ids()
         if active_ids and citizen_id not in active_ids:
@@ -328,42 +339,66 @@ class SimulationEngine:
             from fastapi import HTTPException
 
             raise HTTPException(status_code=404, detail="Citizen not found")
-
-        target_citizen = None
-        if request.target_citizen_id:
-            if active_ids and request.target_citizen_id not in active_ids:
-                from fastapi import HTTPException
-
-                raise HTTPException(status_code=404, detail="Target citizen is inactive in the current playable roster")
-            target_citizen = db.get(CitizenORM, request.target_citizen_id)
-            if not target_citizen:
-                from fastapi import HTTPException
-
-                raise HTTPException(status_code=404, detail="Target citizen not found")
-
-        location_id = request.location_id or citizen.current_location_id
-        if target_citizen and not request.location_id:
-            location_id = target_citizen.current_location_id
-        if location_id and not db.get(LocationORM, location_id):
-            from fastapi import HTTPException
-
-            raise HTTPException(status_code=400, detail="Unknown location_id")
+        if not cognition:
+            raise CognitionUnavailableError("OpenAI task planning is required before a citizen can accept a task.")
 
         task = request.task.strip()
+        city_snapshot = self.get_state(db)
+        actor_snapshot = next(
+            (item for item in city_snapshot.citizens if item.citizen_id == citizen.citizen_id),
+            None,
+        )
+        if not actor_snapshot:
+            from fastapi import HTTPException
+
+            raise HTTPException(status_code=404, detail="Citizen is inactive in the current playable roster")
+        recent_memories = list(
+            db.scalars(
+                select(MemoryORM)
+                .where(MemoryORM.citizen_id == citizen.citizen_id)
+                .order_by(desc(MemoryORM.created_at))
+                .limit(8)
+            )
+        )
+        plan = cognition.client.plan_task(
+            citizen=actor_snapshot.model_dump(mode="json"),
+            city=city_snapshot.model_dump(mode="json"),
+            task=task,
+            memories=[memory.content for memory in recent_memories],
+        )
+        active_citizen_ids = {
+            item.citizen_id for item in city_snapshot.citizens if item.citizen_id != citizen.citizen_id
+        }
+        target_ids = [
+            target_id
+            for target_id in dict.fromkeys(plan.target_citizen_ids)
+            if target_id in active_citizen_ids
+        ]
+        first_target = db.get(CitizenORM, target_ids[0]) if target_ids else None
+        valid_location_ids = {location.location_id for location in city_snapshot.locations}
+        location_id = (
+            plan.location_id
+            if plan.location_id in valid_location_ids
+            else first_target.current_location_id if first_target else citizen.current_location_id
+        )
         personality = dict(citizen.personality or {})
         personality["player_task"] = {
             "task": task,
             "location_id": location_id,
+            "target_citizen_id": target_ids[0] if target_ids else None,
+            "target_citizen_ids": target_ids,
+            "completed_target_ids": [],
+            "current_target_index": 0,
+            "task_kind": plan.task_kind,
+            "plan_summary": plan.player_visible_plan,
+            "reasoning_summary": plan.reasoning_summary,
             "assigned_day": state.day,
             "assigned_minute": state.minute_of_day,
-            "expires_tick": state.tick + request.duration_ticks,
             "status": "active",
         }
-        if target_citizen:
-            personality["player_task"]["target_citizen_id"] = target_citizen.citizen_id
         citizen.personality = personality
         citizen.current_activity = f"Task: {task}"
-        citizen.current_thought = f"The player asked me to: {task}. I should focus on that next."
+        citizen.current_thought = plan.player_visible_plan or f"I need to think through the player task: {task}."
         existing_goals = [goal for goal in citizen.short_term_goals if not goal.startswith("Player task:")]
         citizen.short_term_goals = [f"Player task: {task}", *existing_goals][:5]
         if self._simulation_mode(state) == "manual":
@@ -373,26 +408,25 @@ class SimulationEngine:
             db,
             citizen_id=citizen.citizen_id,
             kind="episodic",
-            content=f"The player assigned me a task: {task}.",
+            content=f"The player assigned me a task: {task}. My plan: {plan.player_visible_plan}",
             importance=0.78,
             salience=0.82,
-            extra={"source": "player_task", "location_id": location_id},
+            related_citizen_id=target_ids[0] if target_ids else None,
+            extra={"source": "player_task", "location_id": location_id, "reasoning_summary": plan.reasoning_summary},
         )
         self._event(
             db,
             state=state,
             event_type="player_task",
             location_id=location_id,
-            actors=[actor for actor in [citizen.citizen_id, target_citizen.citizen_id if target_citizen else None] if actor],
-            description=(
-                f"The player asked {citizen.name} to: {task}"
-                if not target_citizen
-                else f"The player asked {citizen.name} to work with {target_citizen.name}: {task}"
-            ),
+            actors=[citizen.citizen_id, *target_ids],
+            description=plan.player_visible_plan or f"{citizen.name} is planning the player task: {task}",
             payload={
                 "task": task,
-                "duration_ticks": request.duration_ticks,
-                "target_citizen_id": target_citizen.citizen_id if target_citizen else None,
+                "target_citizen_id": target_ids[0] if target_ids else None,
+                "target_citizen_ids": target_ids,
+                "task_kind": plan.task_kind,
+                "reasoning_summary": plan.reasoning_summary,
             },
             priority=3,
         )
@@ -457,6 +491,12 @@ class SimulationEngine:
         player_task = self._player_task(citizen)
         task_was_active = player_task.get("status") == "active" if player_task else False
         target_location_id, activity = self._desired_location_and_activity(citizen, state.minute_of_day, state.tick)
+        active_target = self._current_task_target(db, player_task) if task_was_active else None
+        if active_target:
+            target_location_id = active_target.current_location_id
+            activity = f"Going to talk with {active_target.name}"
+        elif task_was_active:
+            activity = f"Thinking through: {player_task.get('task')}"
         citizen.current_activity = activity
 
         if not task_was_active and citizen.health < 55 and citizen.profession not in {"Doctor", "Nurse"}:
@@ -470,8 +510,8 @@ class SimulationEngine:
             citizen.current_activity = "Resting at home"
 
         target_location = locations.get(target_location_id) or locations[citizen.home_location_id]
-        citizen.target_x = target_location.x + target_location.width // 2
-        citizen.target_y = target_location.y + target_location.height // 2
+        citizen.target_x = active_target.x if active_target else target_location.x + target_location.width // 2
+        citizen.target_y = active_target.y if active_target else target_location.y + target_location.height // 2
 
         self._move_toward(citizen, citizen.target_x, citizen.target_y)
         arrived = citizen.x == citizen.target_x and citizen.y == citizen.target_y
@@ -497,36 +537,30 @@ class SimulationEngine:
 
         if task_was_active:
             latest_task = self._player_task(citizen) or player_task
-            target_id = str(latest_task.get("target_citizen_id") or "")
+            active_target = self._current_task_target(db, latest_task)
+            target_id = active_target.citizen_id if active_target else str(latest_task.get("target_citizen_id") or "")
             actors = [citizen.citizen_id, target_id] if target_id else [citizen.citizen_id]
             task_text = str(latest_task.get("task") or "the player task")
-            if int(latest_task.get("expires_tick", state.tick)) <= state.tick:
-                self._complete_player_task(db, state, citizen, latest_task, target_location.location_id)
-                events.append(
-                    self._event(
-                        db,
-                        state=state,
-                        event_type="player_task_completed",
-                        location_id=target_location.location_id,
-                        actors=actors,
-                        description=f"{citizen.name} completed the player task: {task_text}",
-                        payload={"task": task_text},
-                        priority=3,
-                    )
+            ready_for_cognition = not active_target or self._near_citizens(citizen, active_target)
+            progress = (
+                f"talking with {active_target.name}"
+                if active_target and ready_for_cognition
+                else f"walking to {active_target.name}"
+                if active_target
+                else "thinking through the task"
+            )
+            events.append(
+                self._event(
+                    db,
+                    state=state,
+                    event_type="player_task_ready" if ready_for_cognition else "player_task_travel",
+                    location_id=active_target.current_location_id if active_target else target_location.location_id,
+                    actors=actors,
+                    description=f"{citizen.name} is {progress}: {task_text}",
+                    payload={"task": task_text, "progress": progress},
+                    priority=3 if ready_for_cognition else 1,
                 )
-            else:
-                events.append(
-                    self._event(
-                        db,
-                        state=state,
-                        event_type="player_task_progress",
-                        location_id=target_location.location_id,
-                        actors=actors,
-                        description=f"{citizen.name} is working on the player task: {task_text}",
-                        payload={"task": task_text},
-                        priority=3,
-                    )
-                )
+            )
 
         if not task_was_active and previous_minute < 480 <= state.minute_of_day and citizen.work_location_id:
             events.append(
@@ -753,6 +787,120 @@ class SimulationEngine:
         if location.location_id == "loc_school" and citizen.profession == "Student":
             citizen.happiness = self._clamp(citizen.happiness + 1)
 
+    def _apply_task_cognition_results(
+        self,
+        db: Session,
+        state: SimulationStateORM,
+        cognition_results: list[dict],
+    ) -> list[CityEventORM]:
+        events: list[CityEventORM] = []
+        for result in cognition_results:
+            citizen_id = str(result.get("citizen_id") or "")
+            citizen = db.get(CitizenORM, citizen_id)
+            if not citizen:
+                continue
+            task = self._player_task(citizen)
+            if task.get("status") != "active":
+                continue
+
+            active_target = self._current_task_target(db, task)
+            conversation = result.get("conversation") if isinstance(result.get("conversation"), dict) else None
+            if active_target:
+                actor_ids = set(conversation.get("actor_ids", [])) if conversation else set()
+                transcript = conversation.get("transcript", []) if conversation else []
+                has_real_exchange = (
+                    active_target.citizen_id in actor_ids
+                    and citizen.citizen_id in actor_ids
+                    and isinstance(transcript, list)
+                    and len(transcript) >= 2
+                )
+                if not has_real_exchange:
+                    self._block_player_task(
+                        db,
+                        state,
+                        citizen,
+                        task,
+                        "The AI cognition response did not include a real two-person conversation.",
+                    )
+                    events.append(
+                        self._event(
+                            db,
+                            state=state,
+                            event_type="agent_cognition_blocked",
+                            location_id=citizen.current_location_id,
+                            actors=[citizen.citizen_id, active_target.citizen_id],
+                            description=f"{citizen.name} could not complete the task because the AI did not produce a real exchange.",
+                            payload={"task": task.get("task")},
+                            priority=3,
+                        )
+                    )
+                    continue
+
+                completed_target_ids = list(dict.fromkeys([*(task.get("completed_target_ids") or []), active_target.citizen_id]))
+                task["completed_target_ids"] = completed_target_ids
+                next_target_id = self._next_task_target_id(task)
+                task["target_citizen_id"] = next_target_id
+                if next_target_id:
+                    personality = dict(citizen.personality or {})
+                    personality["player_task"] = task
+                    citizen.personality = personality
+                    next_target = db.get(CitizenORM, next_target_id)
+                    if next_target:
+                        citizen.current_activity = f"Going to talk with {next_target.name}"
+                        citizen.current_thought = f"I talked with {active_target.name}. Next I need to find {next_target.name}."
+                    continue
+
+            self._complete_player_task(db, state, citizen, task, citizen.current_location_id)
+            target_ids = task.get("target_citizen_ids") or []
+            actors = [citizen.citizen_id, *[str(target_id) for target_id in target_ids]]
+            events.append(
+                self._event(
+                    db,
+                    state=state,
+                    event_type="player_task_completed",
+                    location_id=citizen.current_location_id,
+                    actors=actors,
+                    description=f"{citizen.name} completed the player task through AI cognition: {task.get('task')}",
+                    payload={
+                        "task": task.get("task"),
+                        "task_kind": task.get("task_kind"),
+                        "completed_target_ids": task.get("completed_target_ids") or [],
+                    },
+                    priority=3,
+                )
+            )
+        return events
+
+    def _block_player_task(
+        self,
+        db: Session,
+        state: SimulationStateORM,
+        citizen: CitizenORM,
+        task: dict,
+        reason: str,
+    ) -> None:
+        task["status"] = "blocked"
+        task["blocked_day"] = state.day
+        task["blocked_minute"] = state.minute_of_day
+        personality = dict(citizen.personality or {})
+        personality["player_task"] = task
+        citizen.personality = personality
+        citizen.current_activity = "AI cognition blocked"
+        citizen.current_thought = reason
+        citizen.short_term_goals = [
+            goal for goal in citizen.short_term_goals if not goal.startswith("Player task:")
+        ][:5]
+        self.memory_store.add_memory(
+            db,
+            citizen_id=citizen.citizen_id,
+            kind="episodic",
+            content=f"My player task could not finish because: {reason}",
+            importance=0.68,
+            salience=0.72,
+            related_citizen_id=str(task.get("target_citizen_id") or "") or None,
+            extra={"source": "player_task_blocked"},
+        )
+
     def _complete_player_task(
         self,
         db: Session,
@@ -776,12 +924,31 @@ class SimulationEngine:
             db,
             citizen_id=citizen.citizen_id,
             kind="episodic",
-            content=f"I completed the player task: {task.get('task')}.",
+            content=f"I completed the player task through AI cognition: {task.get('task')}.",
             importance=0.72,
             salience=0.78,
             related_citizen_id=str(task.get("target_citizen_id") or "") or None,
             extra={"source": "player_task_completed", "location_id": location_id},
         )
+
+    def _current_task_target(self, db: Session, task: dict) -> CitizenORM | None:
+        target_id = self._next_task_target_id(task)
+        return db.get(CitizenORM, target_id) if target_id else None
+
+    @staticmethod
+    def _next_task_target_id(task: dict) -> str | None:
+        target_ids = [str(target_id) for target_id in (task.get("target_citizen_ids") or []) if target_id]
+        if not target_ids and task.get("target_citizen_id"):
+            target_ids = [str(task["target_citizen_id"])]
+        completed = {str(target_id) for target_id in (task.get("completed_target_ids") or []) if target_id}
+        for target_id in target_ids:
+            if target_id not in completed:
+                return target_id
+        return None
+
+    @staticmethod
+    def _near_citizens(first: CitizenORM, second: CitizenORM) -> bool:
+        return first.current_location_id == second.current_location_id and abs(first.x - second.x) + abs(first.y - second.y) <= 2
 
     @staticmethod
     def _simulation_mode(state: SimulationStateORM) -> str:

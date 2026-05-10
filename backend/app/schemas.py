@@ -177,9 +177,6 @@ class MayorPolicyRequest(BaseModel):
 
 class AssignTaskRequest(BaseModel):
     task: str = Field(min_length=3, max_length=240)
-    location_id: str | None = None
-    target_citizen_id: str | None = None
-    duration_ticks: int = Field(default=4, ge=1, le=16)
 
 
 class SimulationModeRequest(BaseModel):
@@ -202,6 +199,21 @@ class SessionCognitionResponse(BaseModel):
     reflection: str
     importance: float
     conversation: Conversation | None = None
+
+
+class SessionTaskPlanRequest(BaseModel):
+    city: CityState
+    actor_id: str
+    task: str = Field(min_length=3, max_length=320)
+    memories: list[str] = Field(default_factory=list)
+
+
+class SessionTaskPlanResponse(BaseModel):
+    task_kind: Literal["targeted_talk", "greet_all", "ask_all", "self_answer", "open_task"]
+    target_citizen_ids: list[str] = Field(default_factory=list, max_length=12)
+    location_id: str | None = None
+    reasoning_summary: str
+    player_visible_plan: str
 
 
 class WebSocketEnvelope(BaseModel):

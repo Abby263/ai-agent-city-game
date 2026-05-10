@@ -169,9 +169,6 @@ export type MayorPolicyPayload = {
 
 export type AssignTaskPayload = {
   task: string;
-  location_id?: string | null;
-  target_citizen_id?: string | null;
-  duration_ticks?: number;
 };
 
 export type SessionCognitionRequest = {
@@ -190,4 +187,19 @@ export type SessionCognitionResponse = {
   reflection: string;
   importance: number;
   conversation: Conversation | null;
+};
+
+export type SessionTaskPlanRequest = {
+  city: CityState;
+  actor_id: string;
+  task: string;
+  memories: string[];
+};
+
+export type SessionTaskPlanResponse = {
+  task_kind: "targeted_talk" | "greet_all" | "ask_all" | "self_answer" | "open_task";
+  target_citizen_ids: string[];
+  location_id: string | null;
+  reasoning_summary: string;
+  player_visible_plan: string;
 };
