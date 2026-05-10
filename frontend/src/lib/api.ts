@@ -12,6 +12,7 @@ import type {
   SimulationMode,
   TriggerEventPayload,
 } from "@/lib/types";
+import { createInitialCity } from "@/lib/initial-city";
 import {
   getSessionCity,
   seedSession,
@@ -54,11 +55,12 @@ export const api = {
   getState: async () => {
     const sessionCity = getSessionCity();
     if (sessionMemoryEnabled() && sessionCity) return sessionCity;
+    if (sessionMemoryEnabled()) return seedSession(createInitialCity());
     const city = await request<CityState>("/city/state");
     return seedSession(city);
   },
   getCityConversations: async () => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionConversations();
+    if (sessionMemoryEnabled()) return sessionConversations();
     return request<Conversation[]>("/city/conversations");
   },
   start: async () => {

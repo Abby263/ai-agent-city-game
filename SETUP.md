@@ -144,10 +144,16 @@ The production app is intended to run at:
 https://ai-agent-city-game.vercel.app
 ```
 
+The hosted game is static-first to reduce Vercel Fluid Active CPU usage:
+
+- The Next.js game shell is exported as static files.
+- Initial city state, movement, short-term memory, relationships, and conversation history run in the browser.
+- `/api` is only used when the player asks for real OpenAI cognition, such as task planning or an agent conversation.
+
 The repo uses Vercel Services in `vercel.json`:
 
 - `frontend/` is mounted at `/`.
-- `backend/main.py` is mounted at `/api`.
+- `backend/main.py` is mounted at `/api` for OpenAI cognition and optional server mode.
 
 Connect the Vercel project to the GitHub repo. With Vercel Git integration enabled, every merge to `main` creates a new production deployment and every pull request gets a preview deployment.
 
@@ -200,6 +206,24 @@ npx vercel --prod
 Repeat env additions for `preview` and `development`, or set them in the Vercel dashboard for all environments.
 
 Important: if `LLM_MODE=real` but `OPENAI_API_KEY` is missing, cognition endpoints return unavailable and tasks are blocked. The app no longer fabricates template conversations.
+
+### Avoiding Vercel Free-Tier Pauses
+
+Vercel Hobby includes a limited amount of Fluid Active CPU per month for Functions. This app should not spend Function CPU on normal page loads. Keep these settings in production:
+
+```text
+NEXT_PUBLIC_MEMORY_MODE=browser
+NEXT_PUBLIC_API_URL=/api
+```
+
+Do not turn on server memory mode for the public demo unless you are ready to pay for more Function usage. Server mode sends normal ticks, reads, and memory calls through `/api`; browser mode keeps those in localStorage and calls `/api` only for real AI cognition.
+
+If the quota is already exhausted, the immediate options are:
+
+- wait until the next Vercel billing cycle resets the included usage
+- upgrade the Vercel team to Pro or enable paid on-demand usage
+- pause public traffic until the next cycle
+- temporarily remove or unset `OPENAI_API_KEY` to block cognition calls while keeping the static game loadable
 
 ## Install Dependencies
 

@@ -3,7 +3,7 @@
 import { create } from "zustand";
 
 import { API_URL, api } from "@/lib/api";
-import { saveSessionCity } from "@/lib/session-simulation";
+import { saveSessionCity, sessionMemoryEnabled } from "@/lib/session-simulation";
 import type {
   CityEvent,
   CityState,
@@ -16,6 +16,7 @@ import type {
 } from "@/lib/types";
 
 function resolveWebSocketUrl() {
+  if (sessionMemoryEnabled() && !process.env.NEXT_PUBLIC_WS_URL) return null;
   const configured = process.env.NEXT_PUBLIC_WS_URL;
   if (configured) return configured;
   if (typeof window === "undefined") return null;
