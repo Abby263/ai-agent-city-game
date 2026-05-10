@@ -298,32 +298,20 @@ class CitizenCognitionClient:
                 observations=observations,
                 private_memories=actor_memories,
                 event_context=event_context,
-                turn_goal="React to the reply with a short human follow-up, clarification, or thanks.",
-            )
-
-        def target_close(state: PrivateExchangeState) -> PrivateExchangeState:
-            return self._append_private_turn(
-                state,
-                speaker=target,
-                listener=actor,
-                city_time=city_time,
-                task=task,
-                observations=observations,
-                private_memories=target_memories,
-                event_context=event_context,
-                turn_goal="Close the exchange naturally in your own voice without repeating your earlier line.",
+                turn_goal=(
+                    "React to the listener's reply in your own voice. If they answered the question, "
+                    "acknowledge them with thanks, empathy, or a next step; do not repeat their answer as if it is your own."
+                ),
             )
 
         graph_builder = StateGraph(PrivateExchangeState)
         graph_builder.add_node("actor_open", actor_open)
         graph_builder.add_node("target_reply", target_reply)
         graph_builder.add_node("actor_follow_up", actor_follow_up)
-        graph_builder.add_node("target_close", target_close)
         graph_builder.add_edge(START, "actor_open")
         graph_builder.add_edge("actor_open", "target_reply")
         graph_builder.add_edge("target_reply", "actor_follow_up")
-        graph_builder.add_edge("actor_follow_up", "target_close")
-        graph_builder.add_edge("target_close", END)
+        graph_builder.add_edge("actor_follow_up", END)
         final_state = graph_builder.compile().invoke({"lines": [], "turn_results": {}})
 
         lines = final_state["lines"]
@@ -427,10 +415,13 @@ class CitizenCognitionClient:
             "event_context": event_context,
             "rules": [
                 "Write exactly one spoken line for the speaker.",
+                f"You are {speaker['name']}; every use of 'I' must refer to {speaker['name']}, not {listener['name']}.",
                 "Use a human tone with emotion, uncertainty, or a small follow-up when natural.",
                 "If asked whether something happened and it is not in your private memory or public transcript, say you are not sure or have not heard.",
                 "Do not answer using another citizen's private memory.",
+                "When replying after another citizen answered, acknowledge what they said instead of restating it in first person.",
                 "Do not repeat a line already present in public_transcript_so_far.",
+                "Do not repeat the same factual answer you already gave earlier in this conversation.",
                 "Memory must be written from the speaker's first-person perspective.",
             ],
         }

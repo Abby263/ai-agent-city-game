@@ -28,7 +28,7 @@ Every playable tick:
 1. The engine advances city time, sprite movement, location state, and visible events.
 2. The orchestrator creates observations for any active task or autonomous social moment.
 3. The LLM task planner decides the citizen's target citizens, location, and visible plan.
-4. LangGraph runs private exchange nodes: actor turn, target reply, actor follow-up, target close.
+4. LangGraph runs private exchange nodes: actor turn, target reply, actor follow-up.
 5. Each node invokes the current citizen's cached Deep Agent graph with a structured private-turn response contract.
 6. Each private turn receives only that citizen's private memory plus the public transcript so far.
 7. OpenAI Responses API returns strict JSON for the turn, spoken line, memory, reflection, and mood.
