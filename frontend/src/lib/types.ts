@@ -202,7 +202,7 @@ export type SessionTaskPlanRequest = {
 };
 
 export type SessionTaskPlanResponse = {
-  task_kind: "targeted_talk" | "greet_all" | "ask_all" | "self_answer" | "open_task";
+  task_kind: "targeted_talk" | "greet_all" | "ask_all" | "self_answer" | "open_task" | "go_to_location" | "go_with_citizen";
   target_citizen_ids: string[];
   location_id: string | null;
   reasoning_summary: string;

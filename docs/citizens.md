@@ -42,7 +42,7 @@ Runtime memory is not written back to YAML. The YAML is the immutable persona an
 During browser play, each active citizen gets an isolated short-term memory store:
 
 ```text
-agentcity.v9.memory.<citizen_id>
+agentcity.v10.memory.<citizen_id>
 ```
 
 The cognition endpoint receives a map of private memories by citizen id. The

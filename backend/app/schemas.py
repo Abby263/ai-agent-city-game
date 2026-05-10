@@ -214,7 +214,15 @@ class SessionTaskPlanRequest(BaseModel):
 
 
 class SessionTaskPlanResponse(BaseModel):
-    task_kind: Literal["targeted_talk", "greet_all", "ask_all", "self_answer", "open_task"]
+    task_kind: Literal[
+        "targeted_talk",
+        "greet_all",
+        "ask_all",
+        "self_answer",
+        "open_task",
+        "go_to_location",
+        "go_with_citizen",
+    ]
     target_citizen_ids: list[str] = Field(default_factory=list, max_length=12)
     location_id: str | None = None
     reasoning_summary: str

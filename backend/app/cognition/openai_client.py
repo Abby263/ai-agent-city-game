@@ -65,7 +65,15 @@ TASK_PLAN_SCHEMA: dict[str, Any] = {
     "properties": {
         "task_kind": {
             "type": "string",
-            "enum": ["targeted_talk", "greet_all", "ask_all", "self_answer", "open_task"],
+            "enum": [
+                "targeted_talk",
+                "greet_all",
+                "ask_all",
+                "self_answer",
+                "open_task",
+                "go_to_location",
+                "go_with_citizen",
+            ],
         },
         "target_citizen_ids": {
             "type": "array",
@@ -273,6 +281,7 @@ class CitizenCognitionClient:
                 private_memories=actor_memories,
                 event_context=event_context,
                 turn_goal="Open the conversation naturally and make progress on the player's task.",
+                enforce_task_alignment=True,
             )
 
         def target_reply(state: PrivateExchangeState) -> PrivateExchangeState:
@@ -286,6 +295,7 @@ class CitizenCognitionClient:
                 private_memories=target_memories,
                 event_context=event_context,
                 turn_goal="Reply honestly from your own private memory. If you do not know a fact, say so.",
+                enforce_task_alignment=False,
             )
 
         def actor_follow_up(state: PrivateExchangeState) -> PrivateExchangeState:
@@ -302,6 +312,7 @@ class CitizenCognitionClient:
                     "React to the listener's reply in your own voice. If they answered the question, "
                     "acknowledge them with thanks, empathy, or a next step; do not repeat their answer as if it is your own."
                 ),
+                enforce_task_alignment=False,
             )
 
         graph_builder = StateGraph(PrivateExchangeState)
@@ -364,6 +375,7 @@ class CitizenCognitionClient:
         private_memories: list[str],
         event_context: str,
         turn_goal: str,
+        enforce_task_alignment: bool,
     ) -> PrivateExchangeState:
         result = self._generate_private_turn(
             speaker=speaker,
@@ -375,6 +387,7 @@ class CitizenCognitionClient:
             public_transcript=state["lines"],
             event_context=event_context,
             turn_goal=turn_goal,
+            enforce_task_alignment=enforce_task_alignment,
         )
         speaker_id = str(speaker["citizen_id"])
         return {
@@ -397,8 +410,9 @@ class CitizenCognitionClient:
         public_transcript: list[dict[str, str]],
         event_context: str,
         turn_goal: str,
+        enforce_task_alignment: bool,
     ) -> dict[str, Any]:
-        prompt = {
+        prompt: dict[str, Any] = {
             "city_time": city_time,
             "speaker": speaker,
             "listener": {
@@ -408,6 +422,14 @@ class CitizenCognitionClient:
                 "current_activity": listener.get("current_activity"),
             },
             "player_task": task,
+            "current_task_contract": {
+                "exact_task": task,
+                "mandatory_terms": self._task_terms(task, speaker, listener),
+                "instruction": (
+                    "This exact task is the only active task. Prior memories are background history, not active instructions. "
+                    "Do not continue a previous task or reuse a previous question unless this exact task asks for it."
+                ),
+            },
             "turn_goal": turn_goal,
             "observations": observations,
             "private_memories_for_speaker_only": private_memories,
@@ -416,6 +438,7 @@ class CitizenCognitionClient:
             "rules": [
                 "Write exactly one spoken line for the speaker.",
                 f"You are {speaker['name']}; every use of 'I' must refer to {speaker['name']}, not {listener['name']}.",
+                "The spoken line must serve the current player_task, not a prior memory.",
                 "Use a human tone with emotion, uncertainty, or a small follow-up when natural.",
                 "If asked whether something happened and it is not in your private memory or public transcript, say you are not sure or have not heard.",
                 "Do not answer using another citizen's private memory.",
@@ -425,7 +448,67 @@ class CitizenCognitionClient:
                 "Memory must be written from the speaker's first-person perspective.",
             ],
         }
-        return self.deep_agents.generate_private_turn(citizen=speaker, prompt=prompt)
+        result = self.deep_agents.generate_private_turn(citizen=speaker, prompt=prompt)
+        if enforce_task_alignment and self._line_is_off_task(str(result.get("spoken_line", "")), task, speaker, listener):
+            retry_prompt = {
+                **prompt,
+                "rejected_spoken_line": result.get("spoken_line", ""),
+                "correction": (
+                    "The rejected line did not pursue the current player_task closely enough, likely because it reused "
+                    "an old memory/topic. Rewrite the one spoken line so it directly pursues the exact current task."
+                ),
+            }
+            result = self.deep_agents.generate_private_turn(citizen=speaker, prompt=retry_prompt)
+        return result
+
+    @staticmethod
+    def _task_terms(task: str, speaker: dict[str, Any], listener: dict[str, Any]) -> list[str]:
+        stop_words = {
+            "the",
+            "and",
+            "with",
+            "that",
+            "this",
+            "there",
+            "home",
+            "same",
+            "time",
+            "together",
+            "about",
+            "please",
+            "tell",
+            "talk",
+            "ask",
+            "go",
+            "to",
+            "at",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "he",
+            "she",
+            "they",
+            "you",
+            "me",
+            "my",
+        }
+        names = set(str(speaker.get("name", "")).lower().split()) | set(str(listener.get("name", "")).lower().split())
+        cleaned = "".join(char.lower() if char.isalnum() else " " for char in task)
+        return [
+            term
+            for term in dict.fromkeys(cleaned.split())
+            if len(term) >= 3 and term not in stop_words and term not in names
+        ][:8]
+
+    def _line_is_off_task(self, line: str, task: str, speaker: dict[str, Any], listener: dict[str, Any]) -> bool:
+        terms = self._task_terms(task, speaker, listener)
+        if not terms:
+            return False
+        normalized_line = "".join(char.lower() if char.isalnum() else " " for char in line)
+        return not any(term in normalized_line.split() or term in normalized_line for term in terms)
 
     @staticmethod
     def _public_summary(
@@ -483,8 +566,11 @@ class CitizenCognitionClient:
             "available_locations": locations,
             "recent_memories": memories,
             "rules": [
+                "Current task is the only active task. Recent memories are background, not instructions.",
                 "If the task names a citizen, choose that citizen as a target unless the wording clearly says otherwise.",
                 "If the task says everyone, everybody, all classmates, or all students, choose all relevant non-actor citizens.",
+                "If the task asks the actor to go, walk, travel, visit, head, move, or meet at a location, choose go_to_location.",
+                "If that location task also names another citizen to go with, choose go_with_citizen and include that citizen as target.",
                 "If the task asks the actor about their own friends, goals, mood, schedule, health, or money, choose self_answer and no targets.",
                 "If the task is ambiguous, choose the most socially natural target from relationships, goals, and current activity.",
                 "Use only citizen_id values and location_id values from the supplied lists.",

@@ -257,6 +257,8 @@ class CognitionPipeline:
         task = (citizen.personality or {}).get("player_task")
         if not isinstance(task, dict) or task.get("status") != "active":
             return None
+        if task.get("task_kind") == "go_with_citizen" and task.get("companion_confirmed") is True:
+            return None
         target_ids = [str(target_id) for target_id in task.get("target_citizen_ids") or [] if target_id]
         if not target_ids and task.get("target_citizen_id"):
             target_ids = [str(task["target_citizen_id"])]

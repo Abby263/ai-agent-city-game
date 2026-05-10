@@ -16,7 +16,7 @@ import type {
   TriggerEventPayload,
 } from "@/lib/types";
 
-const SESSION_VERSION = "v9";
+const SESSION_VERSION = "v10";
 const CITY_KEY = `agentcity.${SESSION_VERSION}.city`;
 const RELATIONSHIPS_KEY = `agentcity.${SESSION_VERSION}.relationships`;
 const CONVERSATIONS_KEY = `agentcity.${SESSION_VERSION}.conversations`;
@@ -28,13 +28,21 @@ type PlayerTaskData = {
   target_citizen_ids?: string[];
   completed_target_ids?: string[];
   current_target_index?: number;
-  task_kind?: "targeted_talk" | "greet_all" | "ask_all" | "self_answer" | "open_task";
+  task_kind?: "targeted_talk" | "greet_all" | "ask_all" | "self_answer" | "open_task" | "go_to_location" | "go_with_citizen";
+  companion_confirmed?: boolean;
   plan_summary?: string;
   reasoning_summary?: string;
   assigned_day?: number;
   assigned_minute?: number;
   status?: string;
   last_cognition_tick?: number;
+};
+
+type CompanionTaskData = {
+  leader_citizen_id: string;
+  task: string;
+  location_id: string;
+  status?: string;
 };
 
 type GenerateCognition = (request: SessionCognitionRequest) => Promise<SessionCognitionResponse>;
@@ -432,19 +440,25 @@ async function planManualTask(
     city,
     actor_id: citizen.citizen_id,
     task,
-    memories: sessionMemories(citizen.citizen_id).slice(0, 8).map((memory) => memory.content),
+    memories: scopedPrivateMemoryContext(citizen, task).slice(0, 8),
   });
   const validCitizenIds = new Set(city.citizens.filter((item) => item.citizen_id !== citizen.citizen_id).map((item) => item.citizen_id));
   const validLocationIds = new Set(city.locations.map((location) => location.location_id));
-  const targetIds = Array.from(new Set(plan.target_citizen_ids.filter((targetId) => validCitizenIds.has(targetId))));
+  const inferredTargetIds = inferMentionedCitizenIds(task, city, citizen.citizen_id);
+  const targetIds = Array.from(
+    new Set([...plan.target_citizen_ids, ...inferredTargetIds].filter((targetId) => validCitizenIds.has(targetId))),
+  );
   const firstTarget = targetIds[0] ? city.citizens.find((item) => item.citizen_id === targetIds[0]) : null;
+  const inferredLocationId = inferMentionedLocationId(task, city);
   const locationId =
     (plan.location_id && validLocationIds.has(plan.location_id) ? plan.location_id : null) ??
+    inferredLocationId ??
     firstTarget?.current_location_id ??
     citizen.current_location_id;
+  const taskKind = normalizePlannedTaskKind(task, plan.task_kind, Boolean(firstTarget), Boolean(inferredLocationId));
 
   return {
-    task_kind: plan.task_kind,
+    task_kind: taskKind,
     target_citizen_id: firstTarget?.citizen_id ?? null,
     target_citizen_ids: targetIds,
     location_id: locationId,
@@ -495,6 +509,19 @@ function updateCitizen(city: CityState, citizen: CitizenAgent, previousMinute: n
   }
   updateNeeds(citizen);
   if (arrived) applyLocationEffects(citizen, targetLocation.location_id);
+  if (arrived) {
+    const companionTask = activeCompanionTask(citizen);
+    if (companionTask && citizen.current_location_id === companionTask.location_id) {
+      citizen.personality = {
+        ...citizen.personality,
+        companion_task: { ...companionTask, status: "completed" },
+      };
+      citizen.current_thought = `I arrived at ${locationName(city, companionTask.location_id)} with the group.`;
+    }
+    if (taskWasActive && task && locationTaskReadyToFinish(citizen, task)) {
+      finishLocationTask(city, citizen, task, citizen.current_location_id);
+    }
+  }
 
   if (oldLocation !== citizen.current_location_id) {
     events.push(
@@ -508,16 +535,18 @@ function updateCitizen(city: CityState, citizen: CitizenAgent, previousMinute: n
     );
   }
 
-  if (taskWasActive && task) {
-    const actors = [citizen.citizen_id, activeTarget?.citizen_id ?? task.target_citizen_id].filter(Boolean) as string[];
-    const progress = taskProgressLabel(city, citizen, task);
+  const taskAfterArrival = playerTask(citizen);
+  if (taskAfterArrival?.status === "active") {
+    const activeTaskTarget = currentTaskTarget(city, taskAfterArrival);
+    const actors = [citizen.citizen_id, activeTaskTarget?.citizen_id ?? taskAfterArrival.target_citizen_id].filter(Boolean) as string[];
+    const progress = taskProgressLabel(city, citizen, taskAfterArrival);
     events.push(
       addEvent(city, {
-        event_type: activeTarget && !nearCitizen(citizen, activeTarget) ? "player_task_travel" : "player_task_progress",
-        location_id: activeTarget?.current_location_id ?? targetLocation.location_id,
+        event_type: activeTaskTarget && !nearCitizen(citizen, activeTaskTarget) ? "player_task_travel" : "player_task_progress",
+        location_id: activeTaskTarget?.current_location_id ?? targetLocation.location_id,
         actors,
-        description: `${citizen.name} is ${progress}: ${task.task}`,
-        payload: { task: task.task, progress },
+        description: `${citizen.name} is ${progress}: ${taskAfterArrival.task}`,
+        payload: { task: taskAfterArrival.task, progress },
         priority: 3,
       }),
     );
@@ -539,11 +568,36 @@ function updateCitizen(city: CityState, citizen: CitizenAgent, previousMinute: n
 function desiredLocation(city: CityState, citizen: CitizenAgent): [string, string] {
   const task = playerTask(citizen);
   if (task?.status === "active") {
+    if (task.task_kind === "go_to_location") {
+      return [task.location_id ?? citizen.current_location_id, `Going to ${locationName(city, task.location_id ?? citizen.current_location_id)}`];
+    }
+    if (task.task_kind === "go_with_citizen" && task.companion_confirmed) {
+      const companion = task.target_citizen_id
+        ? city.citizens.find((item) => item.citizen_id === task.target_citizen_id)
+        : null;
+      return [
+        task.location_id ?? citizen.current_location_id,
+        `Going to ${locationName(city, task.location_id ?? citizen.current_location_id)}${companion ? ` with ${companion.name}` : ""}`,
+      ];
+    }
     const target = currentTaskTarget(city, task);
     if (target) {
-      return [target.current_location_id, `Going to talk with ${target.name}`];
+      return [
+        target.current_location_id,
+        task.task_kind === "go_with_citizen"
+          ? `Going to coordinate with ${target.name}`
+          : `Going to talk with ${target.name}`,
+      ];
     }
     return [task.location_id ?? citizen.current_location_id, `Thinking through: ${task.task}`];
+  }
+  const companionTask = activeCompanionTask(citizen);
+  if (companionTask) {
+    const leader = city.citizens.find((item) => item.citizen_id === companionTask.leader_citizen_id);
+    return [
+      companionTask.location_id,
+      `Going to ${locationName(city, companionTask.location_id)}${leader ? ` with ${leader.name}` : ""}`,
+    ];
   }
   if (citizen.health < 55) return ["loc_hospital", "Seeking medical help"];
   if (citizen.hunger > 74) return ["loc_market", "Buying food"];
@@ -589,6 +643,7 @@ function runAutonomousSocial(city: CityState) {
 }
 
 function currentTaskTarget(city: CityState, task: PlayerTaskData) {
+  if (task.task_kind === "go_with_citizen" && task.companion_confirmed) return null;
   const targetIds = task.target_citizen_ids?.length
     ? task.target_citizen_ids
     : task.target_citizen_id
@@ -609,6 +664,10 @@ function nearCitizen(first: CitizenAgent, second: CitizenAgent) {
 
 function taskProgressLabel(city: CityState, citizen: CitizenAgent, task: PlayerTaskData) {
   if (task.task_kind === "self_answer") return "answering the player";
+  if (task.task_kind === "go_to_location") return `walking to ${locationName(city, task.location_id ?? citizen.current_location_id)}`;
+  if (task.task_kind === "go_with_citizen" && task.companion_confirmed) {
+    return `walking to ${locationName(city, task.location_id ?? citizen.current_location_id)} with the companion`;
+  }
   const target = currentTaskTarget(city, task);
   if (!target) return "wrapping up the task";
   const completed = task.completed_target_ids?.length ?? 0;
@@ -621,6 +680,11 @@ async function runTaskCognition(city: CityState, citizen: CitizenAgent, generate
   const task = playerTask(citizen);
   if (!task) return;
   const target = currentTaskTarget(city, task);
+  if (!target && isLocationTask(task)) {
+    citizen.current_thought = `I am focused on the current task: ${task.task}`;
+    citizen.personality = { ...citizen.personality, player_task: { ...task, last_cognition_tick: city.clock.tick } };
+    return;
+  }
   if (!target) {
     const response = await generateCognition({
       city,
@@ -628,9 +692,9 @@ async function runTaskCognition(city: CityState, citizen: CitizenAgent, generate
       target_id: null,
       task: task.task,
       observations: buildSoloTaskObservations(city, citizen, task),
-      memories: privateMemoryContext(citizen),
+      memories: scopedPrivateMemoryContext(citizen, task.task),
       private_memories: {
-        [citizen.citizen_id]: privateMemoryContext(citizen),
+        [citizen.citizen_id]: scopedPrivateMemoryContext(citizen, task.task),
       },
     });
     applySoloCognition(city, citizen, task, response);
@@ -650,10 +714,10 @@ async function runTaskCognition(city: CityState, citizen: CitizenAgent, generate
     require_conversation: true,
     task: task.task,
     observations: buildTaskObservations(city, citizen, target, task),
-    memories: privateMemoryContext(citizen),
+    memories: scopedPrivateMemoryContext(citizen, task.task, target),
     private_memories: {
-      [citizen.citizen_id]: privateMemoryContext(citizen),
-      [target.citizen_id]: privateMemoryContext(target),
+      [citizen.citizen_id]: scopedPrivateMemoryContext(citizen, task.task, target),
+      [target.citizen_id]: scopedPrivateMemoryContext(target, task.task, citizen),
     },
   });
   applyCognition(city, citizen, target, task, response);
@@ -679,10 +743,13 @@ function buildTaskObservations(city: CityState, citizen: CitizenAgent, target: C
       ? `${citizen.name} should literally greet ${target.name}, let ${target.name} answer, and leave a small human memory.`
       : task.task_kind === "ask_all"
         ? `${citizen.name} should ask ${target.name} the player's question, listen to the answer, and remember what was said.`
-        : `${citizen.name} should talk with ${target.name} to make progress on the player's task.`;
+        : task.task_kind === "go_with_citizen"
+          ? `${citizen.name} should ask ${target.name} to go to ${locationName(city, task.location_id ?? citizen.current_location_id)} together, wait for ${target.name}'s response, and then go there.`
+          : `${citizen.name} should talk with ${target.name} to make progress on the player's task.`;
 
   return [
     `Player task: "${task.task}". ${taskIntent}`,
+    "Current-task boundary: this is the only active player task. Do not continue, re-ask, or summarize an older task from memory unless the current task explicitly asks for it.",
     `${citizen.name} is physically near ${target.name} at ${locationName(city, citizen.current_location_id)}. ${routeProgress}`,
     `${citizen.name} and ${target.name} are ${relationshipLabelFromScore(relationshipScore)}. ${target.name} is ${target.mood.toLowerCase()} and currently ${target.current_activity.toLowerCase()}.`,
     "Memory boundary: the actor only knows their own memories and what other citizens say out loud in this conversation. Do not invent private facts for the target.",
@@ -698,6 +765,30 @@ function privateMemoryContext(citizen: CitizenAgent) {
     .slice(-6)
     .map((fact) => `${citizen.name} private conversation memory: ${fact}`);
   return [...memories, ...conversations];
+}
+
+function scopedPrivateMemoryContext(citizen: CitizenAgent, currentTask: string, target?: CitizenAgent | null) {
+  const rawMemories = sessionMemories(citizen.citizen_id);
+  const seed = rawMemories
+    .filter((memory) => memory.extra?.source === "seed")
+    .slice(0, 1)
+    .map((memory) => `${citizen.name} private identity memory: ${memory.content}`);
+  const relevant = rawMemories
+    .filter((memory) => memory.extra?.source !== "seed")
+    .filter((memory) => memoryRelevantToCurrentTask(memory.content, currentTask, target))
+    .slice(0, 5)
+    .map((memory) => `${citizen.name} private memory relevant to current task: ${memory.content}`);
+  const conversations = recentConversationFacts(citizen.citizen_id)
+    .filter((fact) => memoryRelevantToCurrentTask(fact, currentTask, target))
+    .slice(0, 4)
+    .map((fact) => `${citizen.name} private conversation history relevant to current task: ${fact}`);
+  return [
+    `${citizen.name} current active task, highest priority: ${currentTask}`,
+    "Prior memories are background only. Do not continue a prior task or repeat a prior topic unless the current active task explicitly asks for it.",
+    ...seed,
+    ...relevant,
+    ...conversations,
+  ];
 }
 
 function locationName(city: CityState, locationId: string) {
@@ -962,6 +1053,41 @@ function applyCognition(
     });
   }
 
+  if (task.task_kind === "go_with_citizen") {
+    const destinationId = task.location_id ?? citizen.current_location_id;
+    const coordinatedTask = {
+      ...updatedTask,
+      companion_confirmed: true,
+      target_citizen_id: target.citizen_id,
+      target_citizen_ids: [target.citizen_id],
+      completed_target_ids: [target.citizen_id],
+      last_cognition_tick: city.clock.tick,
+    };
+    citizen.personality = { ...citizen.personality, player_task: coordinatedTask };
+    citizen.current_activity = `Going to ${locationName(city, destinationId)} with ${target.name}`;
+    citizen.current_thought = `${target.name} and I are going to ${locationName(city, destinationId)} together.`;
+    target.personality = {
+      ...target.personality,
+      companion_task: {
+        leader_citizen_id: citizen.citizen_id,
+        task: task.task,
+        location_id: destinationId,
+        status: "active",
+      } satisfies CompanionTaskData,
+    };
+    target.current_activity = `Going to ${locationName(city, destinationId)} with ${citizen.name}`;
+    target.current_thought = `${citizen.name} asked me to go to ${locationName(city, destinationId)} together.`;
+    addEvent(city, {
+      event_type: "companion_task_confirmed",
+      location_id: citizen.current_location_id,
+      actors: [citizen.citizen_id, target.citizen_id],
+      description: `${citizen.name} and ${target.name} agreed to go to ${locationName(city, destinationId)} together.`,
+      payload: { task: task.task, location_id: destinationId },
+      priority: 3,
+    });
+    return;
+  }
+
   const targetCount = task.target_citizen_ids?.length ?? (task.target_citizen_id ? 1 : 0);
   if (targetCount > 0 && completedTargetIds.length >= targetCount) {
     finishManualTask(city, citizen, updatedTask, citizen.current_location_id);
@@ -1098,6 +1224,51 @@ function strengthenRelationship(city: CityState, first: CitizenAgent, second: Ci
   );
 }
 
+function isLocationTask(task: PlayerTaskData) {
+  return task.task_kind === "go_to_location" || task.task_kind === "go_with_citizen";
+}
+
+function locationTaskReadyToFinish(citizen: CitizenAgent, task: PlayerTaskData) {
+  if (task.status !== "active" || !isLocationTask(task) || !task.location_id) return false;
+  if (citizen.current_location_id !== task.location_id) return false;
+  return task.task_kind === "go_to_location" || Boolean(task.companion_confirmed);
+}
+
+function finishLocationTask(city: CityState, citizen: CitizenAgent, task: PlayerTaskData, locationId: string) {
+  if (task.task_kind === "go_with_citizen") {
+    for (const targetId of task.target_citizen_ids ?? []) {
+      const target = city.citizens.find((item) => item.citizen_id === targetId);
+      const companionTask = target ? activeCompanionTask(target) : null;
+      if (target && companionTask?.leader_citizen_id === citizen.citizen_id) {
+        target.personality = {
+          ...target.personality,
+          companion_task: { ...companionTask, status: "completed" },
+        };
+        target.current_activity = `Arrived at ${locationName(city, locationId)} with ${citizen.name}`;
+        target.current_thought = `I went to ${locationName(city, locationId)} with ${citizen.name}.`;
+      }
+    }
+  }
+  finishManualTask(city, citizen, task, locationId);
+}
+
+function activeCompanionTask(citizen: CitizenAgent): CompanionTaskData | null {
+  const raw = citizen.personality?.companion_task;
+  if (!raw || typeof raw !== "object") return null;
+  const data = raw as Record<string, unknown>;
+  const leaderId = typeof data.leader_citizen_id === "string" ? data.leader_citizen_id : "";
+  const task = typeof data.task === "string" ? data.task : "";
+  const locationId = typeof data.location_id === "string" ? data.location_id : "";
+  const status = typeof data.status === "string" ? data.status : "active";
+  if (!leaderId || !task || !locationId || status !== "active") return null;
+  return {
+    leader_citizen_id: leaderId,
+    task,
+    location_id: locationId,
+    status,
+  };
+}
+
 function playerTask(citizen: CitizenAgent): PlayerTaskData | null {
   const task = citizen.personality?.player_task;
   if (!task || typeof task !== "object") return null;
@@ -1120,9 +1291,12 @@ function playerTask(citizen: CitizenAgent): PlayerTaskData | null {
       data.task_kind === "greet_all" ||
       data.task_kind === "ask_all" ||
       data.task_kind === "self_answer" ||
-      data.task_kind === "open_task"
+      data.task_kind === "open_task" ||
+      data.task_kind === "go_to_location" ||
+      data.task_kind === "go_with_citizen"
         ? data.task_kind
         : "open_task",
+    companion_confirmed: data.companion_confirmed === true,
     plan_summary: typeof data.plan_summary === "string" ? data.plan_summary : undefined,
     reasoning_summary: typeof data.reasoning_summary === "string" ? data.reasoning_summary : undefined,
     assigned_day: numberOrUndefined(data.assigned_day),
@@ -1133,7 +1307,7 @@ function playerTask(citizen: CitizenAgent): PlayerTaskData | null {
 }
 
 function activeTaskCitizens(city: CityState) {
-  return city.citizens.filter((citizen) => playerTask(citizen)?.status === "active");
+  return city.citizens.filter((citizen) => playerTask(citizen)?.status === "active" || Boolean(activeCompanionTask(citizen)));
 }
 
 function addEvent(
@@ -1327,6 +1501,97 @@ function relationshipLabelFromScore(score: number) {
   if (score >= 58) return "friends";
   if (score >= 35) return "acquaintances";
   return "strangers";
+}
+
+function normalizePlannedTaskKind(
+  task: string,
+  planned: PlayerTaskData["task_kind"] | undefined,
+  hasTarget: boolean,
+  hasLocation: boolean,
+): PlayerTaskData["task_kind"] {
+  const lower = task.toLowerCase();
+  const isMovement = /\b(go|walk|head|travel|visit|come|take|bring|meet|move)\b/.test(lower);
+  if (hasLocation && isMovement) return hasTarget ? "go_with_citizen" : "go_to_location";
+  return planned ?? "open_task";
+}
+
+function inferMentionedCitizenIds(task: string, city: CityState, actorId: string) {
+  const lower = normalizeText(task);
+  return city.citizens
+    .filter((citizen) => citizen.citizen_id !== actorId)
+    .filter((citizen) => {
+      const names = citizen.name.toLowerCase().split(/\s+/).filter(Boolean);
+      return names.some((name) => lower.includes(name));
+    })
+    .map((citizen) => citizen.citizen_id);
+}
+
+function inferMentionedLocationId(task: string, city: CityState) {
+  const lower = normalizeText(task);
+  const matches = city.locations
+    .map((location) => {
+      const names = [
+        location.name.toLowerCase(),
+        location.type.toLowerCase().replaceAll("_", " "),
+        ...location.name.toLowerCase().split(/\s+/),
+      ];
+      const index = Math.max(...names.map((name) => lower.lastIndexOf(name)).filter((value) => value >= 0));
+      return { location, index: Number.isFinite(index) ? index : -1 };
+    })
+    .filter((item) => item.index >= 0)
+    .sort((a, b) => b.index - a.index);
+  return matches[0]?.location.location_id ?? null;
+}
+
+function memoryRelevantToCurrentTask(content: string, task: string, target?: CitizenAgent | null) {
+  const taskTerms = taskKeywords(task, target);
+  if (taskTerms.length === 0) return false;
+  const normalized = normalizeText(content);
+  return taskTerms.some((term) => normalized.includes(term));
+}
+
+function taskKeywords(task: string, target?: CitizenAgent | null) {
+  const stop = new Set([
+    "the",
+    "and",
+    "with",
+    "that",
+    "this",
+    "there",
+    "home",
+    "same",
+    "time",
+    "together",
+    "about",
+    "please",
+    "tell",
+    "talk",
+    "ask",
+    "go",
+    "to",
+    "at",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "he",
+    "she",
+    "they",
+    "you",
+    "me",
+    "my",
+  ]);
+  const targetNames = new Set((target?.name.toLowerCase().split(/\s+/) ?? []).filter(Boolean));
+  return Array.from(new Set(normalizeText(task).split(/\s+/)))
+    .filter((term) => term.length >= 3)
+    .filter((term) => !stop.has(term))
+    .filter((term) => !targetNames.has(term));
+}
+
+function normalizeText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9\s]/g, " ");
 }
 
 function compactSummary(existing: string, memory: string) {

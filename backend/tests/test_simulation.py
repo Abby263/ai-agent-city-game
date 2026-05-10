@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.config import Settings
-from app.cognition.openai_client import TaskPlanResult
+from app.cognition.openai_client import CitizenCognitionClient, TaskPlanResult
 from app.models import Base, CitizenORM, CityEventORM, ConversationORM, MemoryORM
 from app.schemas import AssignTaskRequest, SimulationModeRequest, TriggerEventRequest
 from app.seed import ensure_seeded
@@ -10,15 +10,22 @@ from app.simulation.engine import SimulationEngine
 
 
 class FakePlanClient:
-    def __init__(self, *, target_ids: list[str] | None = None, location_id: str | None = None):
+    def __init__(
+        self,
+        *,
+        target_ids: list[str] | None = None,
+        location_id: str | None = None,
+        task_kind: str | None = None,
+    ):
         self.target_ids = target_ids or []
         self.location_id = location_id
+        self.task_kind = task_kind
 
     def plan_task(self, **kwargs):
         actor_name = kwargs["citizen"]["name"]
         target_count = len(self.target_ids)
         return TaskPlanResult(
-            task_kind="targeted_talk" if target_count else "self_answer",
+            task_kind=self.task_kind or ("targeted_talk" if target_count else "self_answer"),
             target_citizen_ids=self.target_ids,
             location_id=self.location_id,
             reasoning_summary="Test planner stands in for OpenAI planning.",
@@ -27,8 +34,14 @@ class FakePlanClient:
 
 
 class FakePlanningPipeline:
-    def __init__(self, *, target_ids: list[str] | None = None, location_id: str | None = None):
-        self.client = FakePlanClient(target_ids=target_ids, location_id=location_id)
+    def __init__(
+        self,
+        *,
+        target_ids: list[str] | None = None,
+        location_id: str | None = None,
+        task_kind: str | None = None,
+    ):
+        self.client = FakePlanClient(target_ids=target_ids, location_id=location_id, task_kind=task_kind)
 
 
 class FakeTaskCognition(FakePlanningPipeline):
@@ -255,3 +268,69 @@ def test_close_task_stops_manual_task_run():
 
     assert not state.clock.running
     assert citizen.personality["player_task"]["status"] == "closed"
+
+
+def test_location_task_does_not_complete_before_arrival():
+    db = session_factory()
+    engine = SimulationEngine(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    assigned = engine.assign_task(
+        db,
+        "cit_009",
+        AssignTaskRequest(task="Go to the bank"),
+        FakePlanningPipeline(location_id="loc_bank", task_kind="go_to_location"),
+    )
+
+    result = engine.tick(db, FakePlanningPipeline(location_id="loc_bank", task_kind="go_to_location"))
+    citizen = db.get(CitizenORM, "cit_009")
+
+    assert assigned.clock.running
+    assert result["state"].clock.running
+    assert citizen.personality["player_task"]["status"] == "active"
+    assert citizen.current_location_id != "loc_bank"
+    assert any(event.event_type == "player_task_travel" for event in result["events"])
+
+
+def test_companion_location_task_coordinates_then_travels():
+    db = session_factory()
+    engine = SimulationEngine(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    engine.assign_task(
+        db,
+        "cit_009",
+        AssignTaskRequest(task="Go to the Bank along with Mateo"),
+        FakeTaskCognition(target_ids=["cit_010"], location_id="loc_bank", task_kind="go_with_citizen"),
+    )
+    actor = db.get(CitizenORM, "cit_009")
+    target = db.get(CitizenORM, "cit_010")
+    actor.current_location_id = target.current_location_id
+    actor.x = target.x
+    actor.y = target.y
+    db.commit()
+
+    result = engine.tick(db, FakeTaskCognition(target_ids=["cit_010"], location_id="loc_bank", task_kind="go_with_citizen"))
+    actor = db.get(CitizenORM, "cit_009")
+    target = db.get(CitizenORM, "cit_010")
+
+    assert actor.personality["player_task"]["status"] == "active"
+    assert actor.personality["player_task"]["companion_confirmed"] is True
+    assert target.personality["companion_task"]["status"] == "active"
+    assert target.personality["companion_task"]["location_id"] == "loc_bank"
+    assert any(event.event_type == "companion_task_confirmed" for event in result["events"])
+
+
+def test_task_alignment_flags_stale_topic_leakage():
+    client = CitizenCognitionClient(Settings(database_url="sqlite+pysqlite:///:memory:"))
+    speaker = {"name": "Ava Singh"}
+    listener = {"name": "Iris Novak"}
+
+    assert client._line_is_off_task(
+        "Hi Iris, did you catch who won the World Cup?",
+        "Go to the Bank along with Iris.",
+        speaker,
+        listener,
+    )
+    assert not client._line_is_off_task(
+        "Hey Iris, should we head to the bank together now?",
+        "Go to the Bank along with Iris.",
+        speaker,
+        listener,
+    )

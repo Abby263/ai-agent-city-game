@@ -30,12 +30,13 @@ Every playable tick:
 3. The LLM task planner decides the citizen's target citizens, location, and visible plan.
 4. LangGraph runs private exchange nodes: actor turn, target reply, actor follow-up.
 5. Each node invokes the current citizen's cached Deep Agent graph with a structured private-turn response contract.
-6. Each private turn receives only that citizen's private memory plus the public transcript so far.
-7. OpenAI Responses API returns strict JSON for the turn, spoken line, memory, reflection, and mood.
-8. The engine validates required conversations before closing the task.
-9. Conversations write separate memories for each participant.
-10. Relationship scores evolve from stranger to acquaintance to friend to trusted friend.
-11. The UI streams visible thoughts, conversations, memory updates, and relationship context.
+6. Each Deep Agent has turn tools for inspecting its own private memory, inspecting the exact active task, and choosing high-level city actions.
+7. Each private turn receives only that citizen's private memory plus the public transcript so far.
+8. The structured output contract returns the turn, spoken line, memory, reflection, and mood.
+9. The engine validates required conversations before closing the task.
+10. Conversations write separate memories for each participant.
+11. Relationship scores evolve from stranger to acquaintance to friend to trusted friend.
+12. The UI streams visible thoughts, conversations, memory updates, and relationship context.
 
 ## Memory Boundary
 

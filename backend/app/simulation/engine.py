@@ -492,20 +492,35 @@ class SimulationEngine:
         task_was_active = player_task.get("status") == "active" if player_task else False
         target_location_id, activity = self._desired_location_and_activity(citizen, state.minute_of_day, state.tick)
         active_target = self._current_task_target(db, player_task) if task_was_active else None
-        if active_target:
+        if task_was_active and self._is_location_task(player_task) and self._location_task_ready_for_travel(player_task):
+            target_location_id = str(player_task.get("location_id") or citizen.current_location_id)
+            activity = f"Going to {self._location_name(locations, target_location_id)}"
+        elif active_target:
             target_location_id = active_target.current_location_id
-            activity = f"Going to talk with {active_target.name}"
+            activity = (
+                f"Going to coordinate with {active_target.name}"
+                if player_task.get("task_kind") == "go_with_citizen"
+                else f"Going to talk with {active_target.name}"
+            )
         elif task_was_active:
             activity = f"Thinking through: {player_task.get('task')}"
+        elif companion_task := self._active_companion_task(citizen):
+            target_location_id = companion_task["location_id"]
+            leader = db.get(CitizenORM, companion_task["leader_citizen_id"])
+            activity = (
+                f"Going to {self._location_name(locations, target_location_id)}"
+                + (f" with {leader.name}" if leader else "")
+            )
         citizen.current_activity = activity
 
-        if not task_was_active and citizen.health < 55 and citizen.profession not in {"Doctor", "Nurse"}:
+        has_companion_task = bool(self._active_companion_task(citizen))
+        if not task_was_active and not has_companion_task and citizen.health < 55 and citizen.profession not in {"Doctor", "Nurse"}:
             target_location_id = "loc_hospital"
             citizen.current_activity = "Seeking medical help"
-        elif not task_was_active and citizen.hunger > 74 and citizen.money >= 4:
+        elif not task_was_active and not has_companion_task and citizen.hunger > 74 and citizen.money >= 4:
             target_location_id = "loc_market"
             citizen.current_activity = "Buying food"
-        elif not task_was_active and citizen.energy < 22:
+        elif not task_was_active and not has_companion_task and citizen.energy < 22:
             target_location_id = citizen.home_location_id
             citizen.current_activity = "Resting at home"
 
@@ -521,6 +536,12 @@ class SimulationEngine:
         self._update_needs(citizen)
         if arrived:
             self._apply_location_effects(citizen, target_location)
+            companion_task = self._active_companion_task(citizen)
+            if companion_task and citizen.current_location_id == companion_task["location_id"]:
+                self._mark_companion_task_completed(citizen, companion_task)
+            latest_task = self._player_task(citizen) or player_task
+            if task_was_active and self._location_task_ready_to_finish(citizen, latest_task):
+                self._complete_location_task(db, state, citizen, latest_task, citizen.current_location_id)
 
         if old_location != citizen.current_location_id:
             events.append(
@@ -535,18 +556,25 @@ class SimulationEngine:
                 )
             )
 
-        if task_was_active:
+        latest_task = self._player_task(citizen) or player_task
+        if latest_task.get("status") == "active":
             latest_task = self._player_task(citizen) or player_task
             active_target = self._current_task_target(db, latest_task)
             target_id = active_target.citizen_id if active_target else str(latest_task.get("target_citizen_id") or "")
             actors = [citizen.citizen_id, target_id] if target_id else [citizen.citizen_id]
             task_text = str(latest_task.get("task") or "the player task")
-            ready_for_cognition = not active_target or self._near_citizens(citizen, active_target)
+            is_location_task = self._is_location_task(latest_task)
+            ready_for_cognition = (
+                (not is_location_task and not active_target)
+                or bool(active_target and self._near_citizens(citizen, active_target))
+            )
             progress = (
                 f"talking with {active_target.name}"
                 if active_target and ready_for_cognition
                 else f"walking to {active_target.name}"
                 if active_target
+                else f"walking to {self._location_name(locations, str(latest_task.get('location_id') or citizen.current_location_id))}"
+                if is_location_task
                 else "thinking through the task"
             )
             events.append(
@@ -751,6 +779,9 @@ class SimulationEngine:
         player_task = dict((citizen.personality or {}).get("player_task") or {})
         if player_task.get("status") == "active":
             return str(player_task.get("location_id") or citizen.current_location_id), f"Task: {player_task.get('task')}"
+        companion_task = self._active_companion_task(citizen)
+        if companion_task:
+            return companion_task["location_id"], f"Task: {companion_task['task']}"
         for entry in citizen.daily_schedule:
             start = int(entry["start"])
             end = int(entry["end"])
@@ -838,6 +869,24 @@ class SimulationEngine:
 
                 completed_target_ids = list(dict.fromkeys([*(task.get("completed_target_ids") or []), active_target.citizen_id]))
                 task["completed_target_ids"] = completed_target_ids
+                if task.get("task_kind") == "go_with_citizen":
+                    self._confirm_companion_task(db, state, citizen, active_target, task)
+                    events.append(
+                        self._event(
+                            db,
+                            state=state,
+                            event_type="companion_task_confirmed",
+                            location_id=citizen.current_location_id,
+                            actors=[citizen.citizen_id, active_target.citizen_id],
+                            description=(
+                                f"{citizen.name} and {active_target.name} agreed to go to "
+                                f"{str(task.get('location_id') or citizen.current_location_id)} together."
+                            ),
+                            payload={"task": task.get("task"), "location_id": task.get("location_id")},
+                            priority=3,
+                        )
+                    )
+                    continue
                 next_target_id = self._next_task_target_id(task)
                 task["target_citizen_id"] = next_target_id
                 if next_target_id:
@@ -870,6 +919,102 @@ class SimulationEngine:
                 )
             )
         return events
+
+    @staticmethod
+    def _is_location_task(task: dict) -> bool:
+        return task.get("task_kind") in {"go_to_location", "go_with_citizen"}
+
+    @staticmethod
+    def _location_task_ready_for_travel(task: dict) -> bool:
+        return task.get("task_kind") == "go_to_location" or (
+            task.get("task_kind") == "go_with_citizen" and task.get("companion_confirmed") is True
+        )
+
+    def _location_task_ready_to_finish(self, citizen: CitizenORM, task: dict) -> bool:
+        if task.get("status") != "active" or not self._is_location_task(task):
+            return False
+        location_id = str(task.get("location_id") or "")
+        if not location_id or citizen.current_location_id != location_id:
+            return False
+        return task.get("task_kind") == "go_to_location" or task.get("companion_confirmed") is True
+
+    def _complete_location_task(
+        self,
+        db: Session,
+        state: SimulationStateORM,
+        citizen: CitizenORM,
+        task: dict,
+        location_id: str,
+    ) -> None:
+        if task.get("task_kind") == "go_with_citizen":
+            for target_id in task.get("target_citizen_ids") or []:
+                target = db.get(CitizenORM, str(target_id))
+                companion_task = self._active_companion_task(target) if target else None
+                if target and companion_task and companion_task["leader_citizen_id"] == citizen.citizen_id:
+                    self._mark_companion_task_completed(target, companion_task)
+                    target.current_activity = f"Arrived with {citizen.name}"
+                    target.current_thought = f"I went with {citizen.name} for the task: {task.get('task')}."
+        self._complete_player_task(db, state, citizen, task, location_id)
+
+    def _confirm_companion_task(
+        self,
+        db: Session,
+        state: SimulationStateORM,
+        citizen: CitizenORM,
+        target: CitizenORM,
+        task: dict,
+    ) -> None:
+        location_id = str(task.get("location_id") or citizen.current_location_id)
+        task["companion_confirmed"] = True
+        task["target_citizen_id"] = target.citizen_id
+        task["target_citizen_ids"] = [target.citizen_id]
+        task["last_cognition_tick"] = state.tick
+        personality = dict(citizen.personality or {})
+        personality["player_task"] = task
+        citizen.personality = personality
+        citizen.current_activity = f"Going with {target.name}"
+        citizen.current_thought = f"{target.name} and I agreed to go together for the current task."
+
+        target_personality = dict(target.personality or {})
+        target_personality["companion_task"] = {
+            "leader_citizen_id": citizen.citizen_id,
+            "task": str(task.get("task") or "the player task"),
+            "location_id": location_id,
+            "status": "active",
+        }
+        target.personality = target_personality
+        target.current_activity = f"Going with {citizen.name}"
+        target.current_thought = f"{citizen.name} asked me to go together for the current task."
+
+    @staticmethod
+    def _active_companion_task(citizen: CitizenORM | None) -> dict | None:
+        if not citizen:
+            return None
+        raw = (citizen.personality or {}).get("companion_task")
+        if not isinstance(raw, dict):
+            return None
+        leader_id = str(raw.get("leader_citizen_id") or "")
+        task = str(raw.get("task") or "")
+        location_id = str(raw.get("location_id") or "")
+        status = str(raw.get("status") or "active")
+        if not leader_id or not task or not location_id or status != "active":
+            return None
+        return {
+            "leader_citizen_id": leader_id,
+            "task": task,
+            "location_id": location_id,
+            "status": status,
+        }
+
+    @staticmethod
+    def _mark_companion_task_completed(citizen: CitizenORM, companion_task: dict) -> None:
+        personality = dict(citizen.personality or {})
+        personality["companion_task"] = {**companion_task, "status": "completed"}
+        citizen.personality = personality
+
+    @staticmethod
+    def _location_name(locations: dict[str, LocationORM], location_id: str) -> str:
+        return locations[location_id].name if location_id in locations else location_id
 
     def _block_player_task(
         self,
@@ -932,6 +1077,8 @@ class SimulationEngine:
         )
 
     def _current_task_target(self, db: Session, task: dict) -> CitizenORM | None:
+        if task.get("task_kind") == "go_with_citizen" and task.get("companion_confirmed") is True:
+            return None
         target_id = self._next_task_target_id(task)
         return db.get(CitizenORM, target_id) if target_id else None
 
@@ -964,7 +1111,7 @@ class SimulationEngine:
         return [
             citizen
             for citizen in citizens
-            if self._player_task(citizen).get("status") == "active"
+            if self._player_task(citizen).get("status") == "active" or self._active_companion_task(citizen)
         ]
 
     def _metrics(self, citizens: list[CitizenORM], events: list[CityEventORM]) -> CityMetrics:
