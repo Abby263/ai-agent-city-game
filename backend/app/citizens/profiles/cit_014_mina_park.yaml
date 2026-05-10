@@ -1,0 +1,12 @@
+citizen_id: cit_014
+name: Mina Park
+age: 31
+profession: Doctor
+work_location_id: loc_hospital
+position: [6, 5]
+skills: [pediatrics, diagnosis]
+mood: Steady
+current_thought: I should keep an eye on students who seem tired or sick.
+seed_memories:
+  - memory_id: mem_seed_cit_014
+    content: Mina Park is a doctor in Navora and values being useful to neighbors.

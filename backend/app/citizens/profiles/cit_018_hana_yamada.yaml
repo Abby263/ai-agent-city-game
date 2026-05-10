@@ -1,0 +1,12 @@
+citizen_id: cit_018
+name: Hana Yamada
+age: 42
+profession: Banker
+work_location_id: loc_bank
+position: [4, 6]
+skills: [risk, savings]
+mood: Steady
+current_thought: I should help people save without making them feel judged.
+seed_memories:
+  - memory_id: mem_seed_cit_018
+    content: Hana Yamada is a banker in Navora and values being useful to neighbors.

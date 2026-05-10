@@ -1,0 +1,12 @@
+citizen_id: cit_020
+name: Juniper Shaw
+age: 28
+profession: Farmer
+work_location_id: loc_farm
+position: [6, 5]
+skills: [greenhouse, markets]
+mood: Steady
+current_thought: I should plan harvest timing around what the market needs.
+seed_memories:
+  - memory_id: mem_seed_cit_020
+    content: Juniper Shaw is a farmer in Navora and values being useful to neighbors.

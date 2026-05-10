@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     max_conversations_per_tick: int = Field(default=1, ge=0, le=10)
     llm_cognition_interval_ticks: int = Field(default=4, ge=1, le=96)
     tick_minutes: int = Field(default=15, ge=5, le=60)
-    active_citizen_ids: str = "cit_009,cit_010,cit_021,cit_022,cit_026"
+    active_citizen_ids: str = "profile"
 
     model_config = SettingsConfigDict(
         env_file=("../.env", ".env"),
@@ -44,8 +44,13 @@ class Settings(BaseSettings):
 
     @property
     def parsed_active_citizen_ids(self) -> list[str]:
-        if self.active_citizen_ids.strip().lower() == "all":
+        normalized = self.active_citizen_ids.strip().lower()
+        if normalized == "all":
             return []
+        if normalized in {"", "profile"}:
+            from app.citizens.repository import active_profile_ids
+
+            return active_profile_ids()
         return [citizen_id.strip() for citizen_id in self.active_citizen_ids.split(",") if citizen_id.strip()]
 
     @property

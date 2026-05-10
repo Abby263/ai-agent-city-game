@@ -1,0 +1,12 @@
+citizen_id: cit_024
+name: Sofia Mendes
+age: 27
+profession: Nurse
+work_location_id: loc_hospital
+position: [6, 5]
+skills: [care, coordination]
+mood: Steady
+current_thought: I should notice quiet symptoms before they become emergencies.
+seed_memories:
+  - memory_id: mem_seed_cit_024
+    content: Sofia Mendes is a nurse in Navora and values being useful to neighbors.

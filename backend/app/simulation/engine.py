@@ -232,7 +232,7 @@ class SimulationEngine:
             ]
             for citizen in citizens:
                 if citizen.citizen_id in actors:
-                    citizen.health = self._clamp(citizen.health - 18 * severity_multiplier)
+                    citizen.health = self._clamp(citizen.health - 28 * severity_multiplier)
                     citizen.stress = self._clamp(citizen.stress + 14 * severity_multiplier)
                     self.memory_store.add_memory(
                         db,

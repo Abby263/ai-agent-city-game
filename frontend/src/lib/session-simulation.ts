@@ -16,7 +16,7 @@ import type {
   TriggerEventPayload,
 } from "@/lib/types";
 
-const SESSION_VERSION = "v7";
+const SESSION_VERSION = "v8";
 const CITY_KEY = `agentcity.${SESSION_VERSION}.city`;
 const MEMORIES_KEY = `agentcity.${SESSION_VERSION}.memories`;
 const RELATIONSHIPS_KEY = `agentcity.${SESSION_VERSION}.relationships`;
@@ -333,7 +333,7 @@ export async function sessionTriggerEvent(payload: TriggerEventPayload) {
     description = "A flu outbreak starts spreading around the school.";
     for (const citizen of city.citizens) {
       actors.push(citizen.citizen_id);
-      citizen.health = clamp(citizen.health - 12 * multiplier);
+      citizen.health = clamp(citizen.health - 28 * multiplier);
       citizen.stress = clamp(citizen.stress + 10 * multiplier);
       addMemory({
         citizen_id: citizen.citizen_id,
@@ -626,6 +626,8 @@ async function runTaskCognition(city: CityState, citizen: CitizenAgent, generate
     city,
     actor_id: citizen.citizen_id,
     target_id: target.citizen_id,
+    required_target_id: target.citizen_id,
+    require_conversation: true,
     task: task.task,
     observations: buildTaskObservations(city, citizen, target, task),
     memories: sessionMemories(citizen.citizen_id).slice(0, 5).map((memory) => memory.content),
@@ -678,6 +680,8 @@ async function runAutonomousCognition(city: CityState, event: CityEvent, generat
     city,
     actor_id: actor.citizen_id,
     target_id: target.citizen_id,
+    required_target_id: target.citizen_id,
+    require_conversation: true,
     task: `Have a natural city conversation with ${target.name}.`,
     observations: [
       `Autonomous social moment: ${event.description}`,

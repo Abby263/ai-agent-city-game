@@ -1,0 +1,12 @@
+citizen_id: cit_016
+name: Grace Okafor
+age: 39
+profession: Teacher
+work_location_id: loc_school
+position: [5, 3]
+skills: [history, coaching]
+mood: Steady
+current_thought: I should notice which students need encouragement today.
+seed_memories:
+  - memory_id: mem_seed_cit_016
+    content: Grace Okafor is a teacher in Navora and values being useful to neighbors.

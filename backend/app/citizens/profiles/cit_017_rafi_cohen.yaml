@@ -1,0 +1,12 @@
+citizen_id: cit_017
+name: Rafi Cohen
+age: 55
+profession: Shopkeeper
+work_location_id: loc_market
+position: [7, 4]
+skills: [pricing, community]
+mood: Steady
+current_thought: I should price things fairly so people trust the market.
+seed_memories:
+  - memory_id: mem_seed_cit_017
+    content: Rafi Cohen is a shopkeeper in Navora and values being useful to neighbors.

@@ -55,6 +55,7 @@ class CognitionPipeline:
                 limit=5,
             )
             nearby = self._nearby_citizens(citizen, citizens)
+            required_target_id = self._required_task_target_id(citizen)
             result = self.client.generate(
                 citizen=self._citizen_prompt(citizen),
                 city_time=city_time,
@@ -62,6 +63,8 @@ class CognitionPipeline:
                 memories=[memory.content for memory in memories],
                 nearby_citizens=nearby,
                 event_context=event_context,
+                required_target_id=required_target_id,
+                require_conversation=bool(required_target_id),
             )
 
             citizen.current_thought = result.thought
@@ -205,6 +208,20 @@ class CognitionPipeline:
             "long_term_goals": citizen.long_term_goals,
             "memory_summary": citizen.memory_summary,
         }
+
+    @staticmethod
+    def _required_task_target_id(citizen: CitizenORM) -> str | None:
+        task = (citizen.personality or {}).get("player_task")
+        if not isinstance(task, dict) or task.get("status") != "active":
+            return None
+        target_ids = [str(target_id) for target_id in task.get("target_citizen_ids") or [] if target_id]
+        if not target_ids and task.get("target_citizen_id"):
+            target_ids = [str(task["target_citizen_id"])]
+        completed = {str(target_id) for target_id in task.get("completed_target_ids") or [] if target_id}
+        for target_id in target_ids:
+            if target_id not in completed:
+                return target_id
+        return None
 
     def _create_conversation(
         self,

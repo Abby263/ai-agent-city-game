@@ -1,0 +1,12 @@
+citizen_id: cit_007
+name: Nora Kim
+age: 36
+profession: Police Officer
+work_location_id: loc_police
+position: [3, 3]
+skills: [safety, deescalation]
+mood: Steady
+current_thought: I should keep people safe without making the city feel tense.
+seed_memories:
+  - memory_id: mem_seed_cit_007
+    content: Nora Kim is a police officer in Navora and values being useful to neighbors.

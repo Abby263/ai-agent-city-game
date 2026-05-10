@@ -1,0 +1,12 @@
+citizen_id: cit_013
+name: Jon Bell
+age: 23
+profession: Engineer
+work_location_id: loc_power
+position: [8, 7]
+skills: [roads, power]
+mood: Steady
+current_thought: I should check the power grid before small issues become big ones.
+seed_memories:
+  - memory_id: mem_seed_cit_013
+    content: Jon Bell is an engineer in Navora and values being useful to neighbors.

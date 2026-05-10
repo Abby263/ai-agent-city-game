@@ -1,0 +1,12 @@
+citizen_id: cit_008
+name: Eli Morgan
+age: 52
+profession: Farmer
+work_location_id: loc_farm
+position: [5, 3]
+skills: [harvest, soil]
+mood: Steady
+current_thought: I should check the crops before the market starts asking for produce.
+seed_memories:
+  - memory_id: mem_seed_cit_008
+    content: Eli Morgan is a farmer in Navora and values being useful to neighbors.

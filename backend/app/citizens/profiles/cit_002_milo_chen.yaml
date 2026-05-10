@@ -1,0 +1,12 @@
+citizen_id: cit_002
+name: Milo Chen
+age: 34
+profession: Teacher
+work_location_id: loc_school
+position: [5, 3]
+skills: [teaching, mentoring]
+mood: Steady
+current_thought: I should prepare the classroom before the students arrive.
+seed_memories:
+  - memory_id: mem_seed_cit_002
+    content: Milo Chen is a teacher in Navora and values being useful to neighbors.

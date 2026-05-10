@@ -10,7 +10,7 @@ The default MVP keeps the full seeded city in storage but exposes only five acti
 - Iris Novak
 - Leo Brooks
 
-This is controlled by `ACTIVE_CITIZEN_IDS`. Set it to `all` to activate the full roster, or to any comma-separated citizen IDs for a custom cast.
+This is controlled by citizen profile files plus `ACTIVE_CITIZEN_IDS`. The default `ACTIVE_CITIZEN_IDS=profile` reads citizens marked `active: true` in `backend/app/citizens/profiles/*.yaml`. Set it to `all` to activate the full roster, or to any comma-separated citizen IDs for a custom cast.
 
 ## Runtime Flow
 

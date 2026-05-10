@@ -1,0 +1,12 @@
+citizen_id: cit_025
+name: Kai Turner
+age: 40
+profession: Researcher
+work_location_id: loc_lab
+position: [3, 3]
+skills: [epidemiology, data]
+mood: Steady
+current_thought: I should compare today's city signals with what happened before.
+seed_memories:
+  - memory_id: mem_seed_cit_025
+    content: Kai Turner is a researcher in Navora and values being useful to neighbors.

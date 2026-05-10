@@ -104,6 +104,10 @@ class CognitionUnavailableError(RuntimeError):
     pass
 
 
+class CognitionValidationError(RuntimeError):
+    pass
+
+
 class CitizenCognitionClient:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -129,6 +133,8 @@ class CitizenCognitionClient:
         memories: list[str],
         nearby_citizens: list[dict[str, Any]],
         event_context: str,
+        required_target_id: str | None = None,
+        require_conversation: bool = False,
     ) -> CognitionResult:
         if not self.client:
             raise CognitionUnavailableError("OpenAI cognition is unavailable. Set LLM_MODE=real and OPENAI_API_KEY.")
@@ -146,13 +152,23 @@ class CitizenCognitionClient:
             "relevant_memories": memories,
             "nearby_citizens": nearby_citizens,
             "event_context": event_context,
+            "conversation_contract": {
+                "required": require_conversation,
+                "required_target_citizen_id": required_target_id,
+                "requirements": [
+                    "If required is true, conversation.target_citizen_id must equal required_target_citizen_id.",
+                    "If required is true, conversation.lines must include at least one line from the actor and at least one line from the target.",
+                    "If the player asked the actor to tell, ask, invite, warn, explain, or report something to the target, the target must acknowledge or answer in their own voice.",
+                ],
+            },
             "rules": [
                 "Treat the first observation as the player's exact task context and satisfy it directly.",
                 "Use first-person inner thought for thought.",
                 "If the player asked someone to greet or say hi, make the transcript a natural greeting and response.",
                 "If the player asked a question, have the target answer it concretely from their own mood, activity, memory, and perspective.",
+                "If the player asked the actor to tell someone something, include the actor delivering that message and the target responding to it.",
                 "Make memory specific enough to affect future behavior.",
-                "Only include conversation lines if a nearby citizen is a natural target.",
+                "Only omit conversation lines when conversation_contract.required is false and no nearby citizen is a natural target.",
                 "Keep the result game-readable and concise.",
             ],
         }
@@ -176,8 +192,39 @@ class CitizenCognitionClient:
             request["reasoning"] = {"effort": "low"}
             request["text"]["verbosity"] = "low"
 
-        response = self.client.responses.create(**request)
-        parsed = json.loads(response.output_text)
+        parsed = json.loads(self.client.responses.create(**request).output_text)
+        errors = self._conversation_errors(
+            parsed,
+            actor_id=str(citizen["citizen_id"]),
+            required_target_id=required_target_id,
+            require_conversation=require_conversation,
+        )
+        for _attempt in range(2):
+            if not errors:
+                break
+            repair_prompt = {
+                "original_prompt": prompt,
+                "invalid_response": parsed,
+                "validation_errors": errors,
+                "repair_instruction": (
+                    "Return a corrected JSON response. Do not summarize the missing conversation. "
+                    "Write the actual lines spoken by both citizens."
+                ),
+            }
+            repair_request = dict(request)
+            repair_request["input"] = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": json.dumps(repair_prompt)},
+            ]
+            parsed = json.loads(self.client.responses.create(**repair_request).output_text)
+            errors = self._conversation_errors(
+                parsed,
+                actor_id=str(citizen["citizen_id"]),
+                required_target_id=required_target_id,
+                require_conversation=require_conversation,
+            )
+        if errors:
+            raise CognitionValidationError("; ".join(errors))
         return CognitionResult(**parsed)
 
     def plan_task(
@@ -260,3 +307,33 @@ class CitizenCognitionClient:
     def _supports_reasoning(model: str) -> bool:
         normalized = model.lower()
         return normalized.startswith(("gpt-5", "o1", "o3", "o4"))
+
+    @staticmethod
+    def _conversation_errors(
+        parsed: dict[str, Any],
+        *,
+        actor_id: str,
+        required_target_id: str | None,
+        require_conversation: bool,
+    ) -> list[str]:
+        if not require_conversation:
+            return []
+        errors: list[str] = []
+        conversation = parsed.get("conversation")
+        if not isinstance(conversation, dict):
+            return ["conversation is required for this task"]
+        target_id = conversation.get("target_citizen_id")
+        if required_target_id and target_id != required_target_id:
+            errors.append(f"conversation.target_citizen_id must be {required_target_id}")
+        lines = conversation.get("lines")
+        if not isinstance(lines, list) or len(lines) < 2:
+            errors.append("conversation.lines must contain at least two spoken lines")
+            return errors
+        speakers = {line.get("speaker_id") for line in lines if isinstance(line, dict)}
+        if actor_id not in speakers:
+            errors.append(f"conversation.lines must include actor speaker_id {actor_id}")
+        if required_target_id and required_target_id not in speakers:
+            errors.append(f"conversation.lines must include target speaker_id {required_target_id}")
+        if not str(conversation.get("summary") or "").strip():
+            errors.append("conversation.summary is required")
+        return errors

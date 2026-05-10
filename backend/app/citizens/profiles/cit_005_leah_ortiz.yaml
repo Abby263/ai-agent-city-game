@@ -1,0 +1,12 @@
+citizen_id: cit_005
+name: Leah Ortiz
+age: 41
+profession: Shopkeeper
+work_location_id: loc_market
+position: [8, 7]
+skills: [sales, stock]
+mood: Steady
+current_thought: I should make sure the market shelves are ready for morning customers.
+seed_memories:
+  - memory_id: mem_seed_cit_005
+    content: Leah Ortiz is a shopkeeper in Navora and values being useful to neighbors.

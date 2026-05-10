@@ -1,0 +1,12 @@
+citizen_id: cit_011
+name: Mayor Imani Cole
+age: 50
+profession: Mayor
+work_location_id: loc_city_hall
+position: [7, 4]
+skills: [policy, public speaking]
+mood: Steady
+current_thought: I should listen before making decisions for Navora.
+seed_memories:
+  - memory_id: mem_seed_cit_011
+    content: Mayor Imani Cole is a mayor in Navora and values being useful to neighbors.

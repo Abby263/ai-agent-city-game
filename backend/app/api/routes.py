@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.cognition.openai_client import CognitionUnavailableError
+from app.cognition.openai_client import CognitionUnavailableError, CognitionValidationError
 from app.cognition.pipeline import CognitionPipeline
 from app.config import get_settings
 from app.database import get_db
@@ -174,9 +174,13 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
             memories=request.memories,
             nearby_citizens=nearby[:4],
             event_context=event_context,
+            required_target_id=request.required_target_id or request.target_id,
+            require_conversation=request.require_conversation or bool(request.target_id),
         )
     except CognitionUnavailableError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except CognitionValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
     conversation = None
     conversation_payload = result.conversation or {}

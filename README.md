@@ -64,10 +64,14 @@ The default cognition limits are:
 MAX_LLM_CALLS_PER_TICK=2
 MAX_CONVERSATIONS_PER_TICK=1
 LLM_COGNITION_INTERVAL_TICKS=4
-ACTIVE_CITIZEN_IDS=cit_009,cit_010,cit_021,cit_022,cit_026
+ACTIVE_CITIZEN_IDS=profile
 ```
 
-Set `ACTIVE_CITIZEN_IDS=all` to activate the full seeded city later, or provide a comma-separated list to choose a custom playable cast. The inactive citizens remain in the codebase and database.
+Set `ACTIVE_CITIZEN_IDS=all` to activate the full seeded city later, or provide a comma-separated list to choose a custom playable cast. `profile` uses the citizens marked `active: true` in `backend/app/citizens/profiles/*.yaml`.
+
+## Adding Citizens
+
+Each citizen has a dedicated YAML persona file in `backend/app/citizens/profiles/`. Add a new citizen by creating one file with the citizen id, persona, schedule, skills, seed memories, and relationships. Runtime memories and relationships are stored in app state/database so they can grow over time without rewriting deployment files. See [docs/citizens.md](docs/citizens.md).
 
 ## Database
 

@@ -187,6 +187,8 @@ class SessionCognitionRequest(BaseModel):
     city: CityState
     actor_id: str
     target_id: str | None = None
+    required_target_id: str | None = None
+    require_conversation: bool = False
     task: str = Field(min_length=3, max_length=320)
     observations: list[str] = Field(default_factory=list)
     memories: list[str] = Field(default_factory=list)

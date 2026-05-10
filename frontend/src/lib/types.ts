@@ -175,6 +175,8 @@ export type SessionCognitionRequest = {
   city: CityState;
   actor_id: string;
   target_id?: string | null;
+  required_target_id?: string | null;
+  require_conversation?: boolean;
   task: string;
   observations: string[];
   memories: string[];

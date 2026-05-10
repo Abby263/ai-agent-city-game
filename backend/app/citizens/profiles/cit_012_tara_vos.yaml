@@ -1,0 +1,12 @@
+citizen_id: cit_012
+name: Tara Vos
+age: 32
+profession: Scientist
+work_location_id: loc_lab
+position: [4, 6]
+skills: [research, patterns]
+mood: Steady
+current_thought: I should look for patterns before jumping to conclusions.
+seed_memories:
+  - memory_id: mem_seed_cit_012
+    content: Tara Vos is a scientist in Navora and values being useful to neighbors.

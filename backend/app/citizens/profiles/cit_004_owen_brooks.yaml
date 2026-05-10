@@ -1,0 +1,12 @@
+citizen_id: cit_004
+name: Owen Brooks
+age: 44
+profession: Driver
+work_location_id: loc_bus_stop
+position: [4, 6]
+skills: [routes, logistics]
+mood: Steady
+current_thought: I should keep the morning routes predictable for everyone.
+seed_memories:
+  - memory_id: mem_seed_cit_004
+    content: Owen Brooks is a driver in Navora and values being useful to neighbors.

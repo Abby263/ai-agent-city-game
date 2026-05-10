@@ -1,0 +1,12 @@
+citizen_id: cit_019
+name: Luis Alvarez
+age: 33
+profession: Police Officer
+work_location_id: loc_police
+position: [8, 7]
+skills: [traffic, response]
+mood: Steady
+current_thought: I should keep the roads calm during the school commute.
+seed_memories:
+  - memory_id: mem_seed_cit_019
+    content: Luis Alvarez is a police officer in Navora and values being useful to neighbors.

@@ -1,0 +1,12 @@
+citizen_id: cit_023
+name: Felix Stone
+age: 30
+profession: Restaurant Cook
+work_location_id: loc_restaurant
+position: [8, 7]
+skills: [cooking, supply]
+mood: Steady
+current_thought: I should prep enough food for a city that changes its plans quickly.
+seed_memories:
+  - memory_id: mem_seed_cit_023
+    content: Felix Stone is a restaurant cook in Navora and values being useful to neighbors.

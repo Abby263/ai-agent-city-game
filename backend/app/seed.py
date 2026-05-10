@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.citizens.repository import CitizenProfile, load_citizen_profiles
 from app.models import CitizenORM, LocationORM, MemoryORM, RelationshipORM, SimulationStateORM, utcnow
 
 
@@ -37,206 +37,24 @@ LOCATIONS = [
 ]
 
 
-PEOPLE = [
-    ("cit_001", "Dr. Anaya Rao", 38, "Doctor", "loc_hospital", ["medicine", "triage"]),
-    ("cit_002", "Milo Chen", 34, "Teacher", "loc_school", ["teaching", "mentoring"]),
-    ("cit_003", "Priya Nair", 29, "Engineer", "loc_city_hall", ["repair", "planning"]),
-    ("cit_004", "Owen Brooks", 44, "Driver", "loc_bus_stop", ["routes", "logistics"]),
-    ("cit_005", "Leah Ortiz", 41, "Shopkeeper", "loc_market", ["sales", "stock"]),
-    ("cit_006", "Samir Patel", 47, "Banker", "loc_bank", ["loans", "accounts"]),
-    ("cit_007", "Nora Kim", 36, "Police Officer", "loc_police", ["safety", "deescalation"]),
-    ("cit_008", "Eli Morgan", 52, "Farmer", "loc_farm", ["harvest", "soil"]),
-    ("cit_009", "Ava Singh", 13, "Student", "loc_school", ["science", "debate"]),
-    ("cit_010", "Mateo Garcia", 14, "Student", "loc_school", ["math", "music"]),
-    ("cit_011", "Mayor Imani Cole", 50, "Mayor", "loc_city_hall", ["policy", "public speaking"]),
-    ("cit_012", "Tara Vos", 32, "Scientist", "loc_lab", ["research", "patterns"]),
-    ("cit_013", "Jon Bell", 23, "Engineer", "loc_power", ["roads", "power"]),
-    ("cit_014", "Mina Park", 31, "Doctor", "loc_hospital", ["pediatrics", "diagnosis"]),
-    ("cit_015", "Theo Reed", 45, "Driver", "loc_bus_stop", ["delivery", "maintenance"]),
-    ("cit_016", "Grace Okafor", 39, "Teacher", "loc_school", ["history", "coaching"]),
-    ("cit_017", "Rafi Cohen", 55, "Shopkeeper", "loc_market", ["pricing", "community"]),
-    ("cit_018", "Hana Yamada", 42, "Banker", "loc_bank", ["risk", "savings"]),
-    ("cit_019", "Luis Alvarez", 33, "Police Officer", "loc_police", ["traffic", "response"]),
-    ("cit_020", "Juniper Shaw", 28, "Farmer", "loc_farm", ["greenhouse", "markets"]),
-    ("cit_021", "Noah Mensah", 12, "Student", "loc_school", ["biology", "sports"]),
-    ("cit_022", "Iris Novak", 15, "Student", "loc_school", ["writing", "chemistry"]),
-    ("cit_023", "Felix Stone", 30, "Restaurant Cook", "loc_restaurant", ["cooking", "supply"]),
-    ("cit_024", "Sofia Mendes", 27, "Nurse", "loc_hospital", ["care", "coordination"]),
-    ("cit_025", "Kai Turner", 40, "Researcher", "loc_lab", ["epidemiology", "data"]),
-    ("cit_026", "Leo Brooks", 13, "Student", "loc_school", ["robotics", "sketching"]),
-]
-
-PLAYABLE_STUDENTS: dict[str, dict[str, object]] = {
-    "cit_009": {
-        "name": "Ava Singh",
-        "age": 13,
-        "skills": ["science", "debate"],
-        "mood": "Curious",
-        "thought": "I want to understand what my friends are really worried about today.",
-        "goals": ["Ask one friend how they are doing", "Finish the science worksheet"],
-    },
-    "cit_010": {
-        "name": "Mateo Garcia",
-        "age": 14,
-        "skills": ["math", "music"],
-        "mood": "Playful",
-        "thought": "Maybe I can turn today's school drama into a song idea.",
-        "goals": ["Practice music at the park", "Help someone with math homework"],
-    },
-    "cit_021": {
-        "name": "Noah Mensah",
-        "age": 12,
-        "skills": ["biology", "sports"],
-        "mood": "Energetic",
-        "thought": "I want to get through class and still have energy for the park.",
-        "goals": ["Check on Leo after class", "Organize a small game at the park"],
-    },
-    "cit_022": {
-        "name": "Iris Novak",
-        "age": 15,
-        "skills": ["writing", "chemistry"],
-        "mood": "Observant",
-        "thought": "There is a story in how everyone is reacting today. I should pay attention.",
-        "goals": ["Write down one meaningful conversation", "Study chemistry at the library"],
-    },
-    "cit_026": {
-        "name": "Leo Brooks",
-        "age": 13,
-        "skills": ["robotics", "sketching"],
-        "mood": "Thoughtful",
-        "thought": "I'm new to the group, so I should find a natural way to join the conversation.",
-        "goals": ["Make one real friend", "Show someone my robot sketch"],
-    },
-}
-
-
-def schedule_for(profession: str, work_location_id: str | None) -> list[dict[str, object]]:
-    if profession == "Student":
-        return [
-            {"start": 360, "end": 450, "activity": "Breakfast and commute", "location_id": "loc_homes"},
-            {"start": 450, "end": 900, "activity": "Attend school", "location_id": "loc_school"},
-            {"start": 900, "end": 1020, "activity": "Social time at park", "location_id": "loc_park"},
-            {"start": 1020, "end": 1260, "activity": "Homework and dinner", "location_id": "loc_homes"},
-            {"start": 1260, "end": 1440, "activity": "Sleep", "location_id": "loc_homes"},
-        ]
-    if profession in {"Doctor", "Nurse", "Scientist", "Researcher"}:
-        return [
-            {"start": 360, "end": 480, "activity": "Morning routine", "location_id": "loc_homes"},
-            {"start": 480, "end": 1020, "activity": f"{profession} work", "location_id": work_location_id},
-            {"start": 1020, "end": 1110, "activity": "Walk through park", "location_id": "loc_park"},
-            {"start": 1110, "end": 1320, "activity": "Home evening", "location_id": "loc_homes"},
-            {"start": 1320, "end": 1440, "activity": "Sleep", "location_id": "loc_homes"},
-        ]
-    return [
-        {"start": 360, "end": 480, "activity": "Morning routine", "location_id": "loc_homes"},
-        {"start": 480, "end": 1020, "activity": f"{profession} work", "location_id": work_location_id},
-        {"start": 1020, "end": 1110, "activity": "Errands at market", "location_id": "loc_market"},
-        {"start": 1110, "end": 1260, "activity": "Community time", "location_id": "loc_park"},
-        {"start": 1260, "end": 1440, "activity": "Home evening and sleep", "location_id": "loc_homes"},
-    ]
-
-
 def ensure_seeded(db: Session) -> None:
-    if db.scalar(select(SimulationStateORM).where(SimulationStateORM.id == "navora")):
-        ensure_locations(db)
-        ensure_playable_roster(db)
-        db.commit()
-        return
-
-    state = SimulationStateORM(
-        id="navora",
-        city_name="Navora",
-        day=1,
-        minute_of_day=6 * 60,
-        tick=0,
-        running=False,
-        policy=DEFAULT_POLICY,
-        metrics={},
-    )
-    db.add(state)
+    state = db.scalar(select(SimulationStateORM).where(SimulationStateORM.id == "navora"))
+    if not state:
+        state = SimulationStateORM(
+            id="navora",
+            city_name="Navora",
+            day=1,
+            minute_of_day=6 * 60,
+            tick=0,
+            running=False,
+            policy=DEFAULT_POLICY,
+            metrics={},
+        )
+        db.add(state)
 
     ensure_locations(db)
     db.flush()
-
-    home_offsets = [(3, 3), (5, 3), (7, 4), (4, 6), (8, 7), (6, 5)]
-    for index, (citizen_id, name, age, profession, work_location_id, skills) in enumerate(PEOPLE):
-        x, y = home_offsets[index % len(home_offsets)]
-        friends = [
-            PEOPLE[(index + 1) % len(PEOPLE)][0],
-            PEOPLE[(index + 5) % len(PEOPLE)][0],
-        ]
-        relationship_scores = {friend_id: 58.0 + (index % 7) for friend_id in friends}
-        db.add(
-            CitizenORM(
-                citizen_id=citizen_id,
-                name=name,
-                age=age,
-                profession=profession,
-                home_location_id="loc_homes",
-                work_location_id=work_location_id,
-                current_location_id="loc_homes",
-                x=x,
-                y=y,
-                target_x=x,
-                target_y=y,
-                money=130 + (index * 7) % 70,
-                health=82 + (index % 9),
-                hunger=18 + (index % 11),
-                energy=72 + (index % 18),
-                stress=16 + (index % 12),
-                happiness=65 + (index % 20),
-                reputation=48 + (index % 25),
-                family_ids=[],
-                friend_ids=friends,
-                relationship_scores=relationship_scores,
-                skills=skills,
-                personality={
-                    "openness": 45 + (index * 7) % 50,
-                    "conscientiousness": 50 + (index * 5) % 45,
-                    "warmth": 48 + (index * 3) % 48,
-                    "risk_tolerance": 25 + (index * 4) % 55,
-                },
-                daily_schedule=schedule_for(profession, work_location_id),
-                short_term_goals=["Get through the morning routine"],
-                long_term_goals=[
-                    f"Become a trusted {profession.lower()} in Navora",
-                    "Build stronger community relationships",
-                ],
-                current_activity="Waking up at home",
-                current_thought="I should get ready for the day in Navora.",
-                memory_summary=f"{name} knows Navora as a close community where work and reputation matter.",
-                mood="Steady",
-            )
-        )
-
-    for index, (citizen_id, name, _age, profession, _work, _skills) in enumerate(PEOPLE):
-        db.add(
-            MemoryORM(
-                memory_id=f"mem_seed_{citizen_id}",
-                citizen_id=citizen_id,
-                kind="semantic",
-                content=f"{name} is a {profession} in Navora and values being useful to neighbors.",
-                importance=0.62,
-                salience=0.55,
-                embedding=None,
-                extra={"seed": True},
-                created_at=utcnow(),
-            )
-        )
-        friend_id = PEOPLE[(index + 1) % len(PEOPLE)][0]
-        db.add(
-            RelationshipORM(
-                relationship_id=f"rel_{citizen_id}_{friend_id}",
-                citizen_id=citizen_id,
-                other_citizen_id=friend_id,
-                trust=58 + (index % 15),
-                warmth=55 + (index % 12),
-                familiarity=45 + (index % 18),
-                notes="They often cross paths during daily routines.",
-            )
-        )
-
-    ensure_playable_roster(db)
+    ensure_citizens(db)
     db.commit()
 
 
@@ -262,106 +80,106 @@ def ensure_locations(db: Session) -> None:
         location.services = services
 
 
-def ensure_playable_roster(db: Session) -> None:
-    settings = get_settings()
-    active_ids = settings.parsed_active_citizen_ids or list(PLAYABLE_STUDENTS)
-    home_offsets = [(3, 3), (5, 3), (7, 4), (4, 6), (8, 7)]
+def ensure_citizens(db: Session) -> None:
+    profiles = load_citizen_profiles()
+    for profile in profiles.values():
+        _upsert_citizen(db, profile)
+    db.flush()
+    for profile in profiles.values():
+        _ensure_memories(db, profile)
+        _ensure_relationships(db, profile)
 
-    for index, citizen_id in enumerate(active_ids):
-        profile = PLAYABLE_STUDENTS.get(citizen_id)
-        if not profile:
-            continue
-        citizen = _pending_by_id(db, CitizenORM, "citizen_id", citizen_id) or db.get(CitizenORM, citizen_id)
-        x, y = home_offsets[index % len(home_offsets)]
-        if not citizen:
-            citizen = CitizenORM(
-                citizen_id=citizen_id,
-                name=str(profile["name"]),
-                age=int(profile["age"]),
-                profession="Student",
-                home_location_id="loc_homes",
-                work_location_id="loc_school",
-                current_location_id="loc_homes",
-                x=x,
-                y=y,
-                target_x=x,
-                target_y=y,
-            )
-            db.add(citizen)
 
-        citizen.name = str(profile["name"])
-        citizen.age = int(profile["age"])
-        citizen.profession = "Student"
-        citizen.work_location_id = "loc_school"
-        citizen.skills = list(profile["skills"])  # type: ignore[arg-type]
-        citizen.daily_schedule = schedule_for("Student", "loc_school")
-        citizen.short_term_goals = list(profile["goals"])  # type: ignore[arg-type]
-        citizen.long_term_goals = [
-            "Build a real friendship circle in Navora",
-            "Become more confident at school",
-        ]
-        citizen.current_thought = str(profile["thought"])
-        citizen.memory_summary = (
-            f"{profile['name']} is one of five active student agents in Navora. "
-            "Their friendships, school stress, private goals, and conversations are the focus of this MVP."
+def _upsert_citizen(db: Session, profile: CitizenProfile) -> None:
+    x, y = profile.position
+    citizen = _pending_by_id(db, CitizenORM, "citizen_id", profile.citizen_id) or db.get(
+        CitizenORM,
+        profile.citizen_id,
+    )
+    created = citizen is None
+    if not citizen:
+        citizen = CitizenORM(
+            citizen_id=profile.citizen_id,
+            name=profile.name,
+            age=profile.age,
+            profession=profile.profession,
+            home_location_id=profile.home_location_id,
+            work_location_id=profile.work_location_id,
+            current_location_id=profile.current_location_id,
+            x=x,
+            y=y,
+            target_x=x,
+            target_y=y,
         )
-        citizen.mood = str(profile["mood"])
-        personality = dict(citizen.personality or {})
-        personality.update({"playable": True, "student_arc": True})
-        citizen.personality = personality
-        citizen.updated_at = utcnow()
+        db.add(citizen)
 
-    for index, citizen_id in enumerate(active_ids):
-        if citizen_id not in PLAYABLE_STUDENTS:
-            continue
-        friends = [other_id for other_id in active_ids if other_id != citizen_id]
-        citizen = _pending_by_id(db, CitizenORM, "citizen_id", citizen_id) or db.get(CitizenORM, citizen_id)
-        if not citizen:
-            continue
-        citizen.friend_ids = friends[:2]
-        citizen.relationship_scores = {friend_id: 42.0 + index for friend_id in friends}
-        citizen.money = max(float(citizen.money or 0), 95.0)
-        citizen.health = max(float(citizen.health or 0), 82.0)
-        citizen.hunger = min(float(citizen.hunger or 20), 35.0)
-        citizen.energy = max(float(citizen.energy or 0), 72.0)
-        citizen.stress = min(float(citizen.stress or 20), 34.0)
-        citizen.happiness = max(float(citizen.happiness or 0), 64.0)
-        for other_id in friends:
-            relationship_id = f"rel_{citizen_id}_{other_id}"
-            relationship = _pending_by_id(db, RelationshipORM, "relationship_id", relationship_id) or db.get(
-                RelationshipORM,
-                relationship_id,
-            )
-            if not relationship:
-                relationship = RelationshipORM(
-                    relationship_id=relationship_id,
-                    citizen_id=citizen_id,
-                    other_citizen_id=other_id,
-                )
-                db.add(relationship)
-            relationship.trust = 36 + (index % 4) * 3
-            relationship.warmth = 38 + (index % 5) * 3
-            relationship.familiarity = 18 + (index % 3) * 4
-            relationship.notes = "They are part of the same small student circle and can become closer through repeated conversations."
+    citizen.name = profile.name
+    citizen.age = profile.age
+    citizen.profession = profile.profession
+    citizen.home_location_id = profile.home_location_id
+    citizen.work_location_id = profile.work_location_id
+    citizen.skills = profile.skills
+    citizen.family_ids = profile.family_ids
+    personality = dict(citizen.personality or {})
+    personality.update(profile.personality)
+    citizen.personality = personality
+    citizen.daily_schedule = profile.daily_schedule
+    citizen.long_term_goals = profile.long_term_goals
+    if created:
+        citizen.friend_ids = profile.friend_ids
+        citizen.relationship_scores = profile.relationship_scores
+        citizen.short_term_goals = profile.short_term_goals
+        citizen.current_activity = profile.current_activity
+        citizen.current_thought = profile.current_thought
+        citizen.memory_summary = profile.memory_summary
+        citizen.mood = profile.mood
+        citizen.money = profile.money
+        citizen.health = profile.health
+        citizen.hunger = profile.hunger
+        citizen.energy = profile.energy
+        citizen.stress = profile.stress
+        citizen.happiness = profile.happiness
+        citizen.reputation = profile.reputation
+    citizen.updated_at = utcnow()
 
-        seed_memory_id = f"mem_student_arc_{citizen_id}"
-        if not db.get(MemoryORM, seed_memory_id):
-            db.add(
-                MemoryORM(
-                    memory_id=seed_memory_id,
-                    citizen_id=citizen_id,
-                    kind="semantic",
-                    content=(
-                        f"{citizen.name} is part of the current five-student playable cast. "
-                        "The player is watching how this small group becomes friends over time."
-                    ),
-                    importance=0.72,
-                    salience=0.7,
-                    embedding=None,
-                    extra={"seed": True, "playable_student_arc": True},
-                    created_at=utcnow(),
-                )
+
+def _ensure_memories(db: Session, profile: CitizenProfile) -> None:
+    for memory in profile.seed_memories:
+        if db.get(MemoryORM, memory.memory_id):
+            continue
+        db.add(
+            MemoryORM(
+                memory_id=memory.memory_id,
+                citizen_id=profile.citizen_id,
+                kind=memory.kind,
+                content=memory.content,
+                importance=memory.importance,
+                salience=memory.salience,
+                embedding=None,
+                extra={"seed": True, "source": "citizen_profile"},
+                created_at=utcnow(),
             )
+        )
+
+
+def _ensure_relationships(db: Session, profile: CitizenProfile) -> None:
+    for relationship_profile in profile.relationships:
+        relationship_id = f"rel_{profile.citizen_id}_{relationship_profile.other_citizen_id}"
+        relationship = _pending_by_id(db, RelationshipORM, "relationship_id", relationship_id) or db.get(
+            RelationshipORM,
+            relationship_id,
+        )
+        if not relationship:
+            relationship = RelationshipORM(
+                relationship_id=relationship_id,
+                citizen_id=profile.citizen_id,
+                other_citizen_id=relationship_profile.other_citizen_id,
+                trust=relationship_profile.trust,
+                warmth=relationship_profile.warmth,
+                familiarity=relationship_profile.familiarity,
+                notes=relationship_profile.notes,
+            )
+            db.add(relationship)
 
 
 def _pending_by_id(db: Session, model: type, key: str, value: str):

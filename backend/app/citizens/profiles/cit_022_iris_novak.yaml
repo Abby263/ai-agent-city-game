@@ -1,0 +1,65 @@
+citizen_id: cit_022
+name: Iris Novak
+age: 15
+profession: Student
+active: true
+work_location_id: loc_school
+position: [4, 6]
+money: 151
+health: 85
+hunger: 35
+energy: 75
+stress: 24
+happiness: 67
+reputation: 51
+skills: [writing, chemistry]
+mood: Observant
+personality:
+  playable: true
+  student_arc: true
+  openness: 88
+  conscientiousness: 71
+  warmth: 62
+  risk_tolerance: 33
+current_thought: There is a story in how everyone is reacting today. I should pay attention.
+short_term_goals:
+  - Write down one meaningful conversation
+  - Study chemistry at the library
+long_term_goals:
+  - Build a real friendship circle in Navora
+  - Become more confident at school
+memory_summary: Iris Novak is one of five active student agents in Navora. Her observations, writing, school stress, and conversations are the focus of this MVP.
+friend_ids: [cit_009, cit_010]
+relationship_scores:
+  cit_009: 45
+  cit_010: 45
+  cit_021: 45
+  cit_026: 45
+relationships:
+  - other_citizen_id: cit_009
+    trust: 45
+    warmth: 47
+    familiarity: 18
+    notes: They are part of the same small student circle and can become closer through repeated conversations.
+  - other_citizen_id: cit_010
+    trust: 45
+    warmth: 47
+    familiarity: 18
+    notes: They are part of the same small student circle and can become closer through repeated conversations.
+  - other_citizen_id: cit_021
+    trust: 45
+    warmth: 47
+    familiarity: 18
+    notes: They are part of the same small student circle and can become closer through repeated conversations.
+  - other_citizen_id: cit_026
+    trust: 45
+    warmth: 47
+    familiarity: 18
+    notes: They are part of the same small student circle and can become closer through repeated conversations.
+seed_memories:
+  - memory_id: mem_seed_cit_022
+    content: Iris Novak is a student in Navora and values being useful to neighbors.
+  - memory_id: mem_student_arc_cit_022
+    content: Iris Novak is part of the current five-student playable cast. The player is watching how this small group becomes friends over time.
+    importance: 0.72
+    salience: 0.7

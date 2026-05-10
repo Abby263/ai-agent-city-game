@@ -1,0 +1,12 @@
+citizen_id: cit_006
+name: Samir Patel
+age: 47
+profession: Banker
+work_location_id: loc_bank
+position: [6, 5]
+skills: [loans, accounts]
+mood: Steady
+current_thought: I should balance caution with helping families who need support.
+seed_memories:
+  - memory_id: mem_seed_cit_006
+    content: Samir Patel is a banker in Navora and values being useful to neighbors.

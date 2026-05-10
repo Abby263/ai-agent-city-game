@@ -1,0 +1,12 @@
+citizen_id: cit_001
+name: Dr. Anaya Rao
+age: 38
+profession: Doctor
+work_location_id: loc_hospital
+position: [3, 3]
+skills: [medicine, triage]
+mood: Steady
+current_thought: I should make sure the hospital is ready before the city wakes up.
+seed_memories:
+  - memory_id: mem_seed_cit_001
+    content: Dr. Anaya Rao is a doctor in Navora and values being useful to neighbors.

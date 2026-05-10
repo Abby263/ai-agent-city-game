@@ -48,7 +48,7 @@ Set these in the root `.env`.
 | `MAX_CONVERSATIONS_PER_TICK` | Yes | `1` | Caps conversations created per tick. |
 | `LLM_COGNITION_INTERVAL_TICKS` | Yes | `4` | Runs LLM cognition every N ticks unless a high-priority in-tick event needs it. |
 | `TICK_MINUTES` | Yes | `15` | In-game minutes per tick. |
-| `ACTIVE_CITIZEN_IDS` | Yes | `cit_009,cit_010,cit_021,cit_022,cit_026` | Default playable roster: five student agents. Use `all` to activate the full city, or a comma-separated list for a custom cast. |
+| `ACTIVE_CITIZEN_IDS` | Yes | `profile` | Uses citizens marked `active: true` in `backend/app/citizens/profiles/*.yaml`. Use `all` to activate the full city, or a comma-separated list for a custom cast. |
 | `CORS_ORIGINS` | Yes | `http://localhost:3000` | Comma-separated frontend origins. |
 
 Redis is not required for V1 gameplay.
@@ -124,8 +124,10 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 MAX_LLM_CALLS_PER_TICK=2
 MAX_CONVERSATIONS_PER_TICK=1
 LLM_COGNITION_INTERVAL_TICKS=4
-ACTIVE_CITIZEN_IDS=cit_009,cit_010,cit_021,cit_022,cit_026
+ACTIVE_CITIZEN_IDS=profile
 ```
+
+`ACTIVE_CITIZEN_IDS=profile` is recommended. It keeps the active cast controlled from the citizen YAML files.
 
 Without `OPENAI_API_KEY`, citizen tasks are visibly blocked instead of using fake template cognition.
 
@@ -157,7 +159,7 @@ Set these Vercel environment variables for Production, Preview, and Development:
 | `MAX_CONVERSATIONS_PER_TICK` | `1` |
 | `LLM_COGNITION_INTERVAL_TICKS` | `4` |
 | `TICK_MINUTES` | `15` |
-| `ACTIVE_CITIZEN_IDS` | `cit_009,cit_010,cit_021,cit_022,cit_026` |
+| `ACTIVE_CITIZEN_IDS` | `profile` |
 | `CORS_ORIGINS` | `https://ai-agent-city-game.vercel.app` |
 | `NEXT_PUBLIC_API_URL` | `/api` |
 | `NEXT_PUBLIC_MEMORY_MODE` | `browser` |
