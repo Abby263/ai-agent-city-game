@@ -6,6 +6,12 @@ This repo is `ai-agent-city-game`. The visible product name is `AgentCity`.
 
 Play online: https://ai-agent-city-game.vercel.app
 
+## License
+
+AgentCity is released under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+You may use, modify, and distribute it for non-commercial purposes. Commercial
+use requires a separate commercial license from the project owner.
+
 ## Stack
 
 - Frontend: Next.js, React, Phaser, Tailwind, shadcn-style primitives, Zustand
@@ -23,6 +29,107 @@ AgentCity uses a Hermes-inspired loop: citizens collect observations, retrieve m
 The live task/conversation path now uses LangGraph to run private exchange nodes and invokes a cached Deep Agent graph for each citizen turn. Each citizen turn receives only that citizen's private memory plus the public transcript so far. This prevents Ava from reading Mateo's memory, and it prevents Mateo from claiming he was invited to dinner unless Mateo actually remembers that or hears it in conversation.
 
 Manual Mode is the easiest way to follow the game: the city waits, the player assigns one student task, the task runs, conversations/memories are written, and the city pauses when the task completes. Autonomous Mode starts the living-city loop: students follow routines, meet naturally, LLM cognition can generate conversations, and relationships shift from strangers to acquaintances to friends over time.
+
+## How Agents Interact
+
+Each citizen is both a visible game entity and a private AI actor. The game engine
+handles mechanical state: clock ticks, map movement, location arrival, task status,
+relationship scores, and memory writes. The AI layer handles cognition: deciding
+who to approach, what to say, what the exchange means, and what each participant
+remembers afterward.
+
+The important rule is memory isolation. A citizen never receives another citizen's
+private memory file. When Ava talks to Noah, Ava can use Ava's memories and the
+public transcript. Noah can use Noah's memories and the same transcript. New facts
+move through spoken lines, not hidden prompt leakage.
+
+For a manual player task, the flow is:
+
+1. Player assigns a natural-language task to one citizen.
+2. The orchestrator asks OpenAI to turn the task into a plan: task kind, target
+   citizens, route/location, and a player-visible summary.
+3. The browser simulation moves the actor toward the selected target or location.
+4. When the actor is ready, LangGraph runs the conversation as private turn nodes.
+5. Each turn invokes that speaker's cached Deep Agent with tools for only that
+   speaker's memory, current task, and allowed high-level city actions.
+6. The structured response returns spoken text, private thought, mood, memory,
+   reflection, and importance.
+7. The game writes separate memories for each participant, updates relationships,
+   appends transcript lines, and closes the task only after a real exchange occurs.
+
+## Architecture Diagrams
+
+### Runtime Architecture
+
+```mermaid
+flowchart LR
+  Player["Player / Mayor Observer"]
+  Browser["Next.js + Phaser\nStatic game shell"]
+  LocalMemory["Browser localStorage\nshort-term city memory"]
+  Api["FastAPI /api\ncognition endpoints"]
+  Planner["OpenAI Responses API\nstructured task planning"]
+  LangGraph["LangGraph exchange graph"]
+  DeepAgents["Cached Deep Agents\none per citizen"]
+  TurnLLM["OpenAI model\nprivate turn generation"]
+  Profiles["Citizen YAML profiles\npersona, skills, seed memory"]
+
+  Player --> Browser
+  Browser <--> LocalMemory
+  Browser -->|"assign task / step cognition only"| Api
+  Api --> Planner
+  Api --> LangGraph
+  LangGraph --> DeepAgents
+  DeepAgents --> TurnLLM
+  Profiles --> Browser
+  Profiles --> Api
+```
+
+### Manual Task Conversation
+
+```mermaid
+sequenceDiagram
+  participant P as Player
+  participant UI as Browser Game
+  participant O as Orchestrator API
+  participant A as Actor Deep Agent
+  participant B as Target Deep Agent
+  participant M as Memory Stores
+
+  P->>UI: Assign "Ask Noah how his day was"
+  UI->>O: Plan task with city state and actor memory
+  O-->>UI: Target Noah, location Homes, task kind targeted_talk
+  UI->>UI: Move Ava toward Noah
+  UI->>O: Request private exchange
+  O->>A: Ava turn with Ava memory + public transcript
+  A-->>O: Spoken line, thought, mood, memory
+  O->>B: Noah turn with Noah memory + transcript so far
+  B-->>O: Spoken line, thought, mood, memory
+  O->>A: Ava follow-up with Ava memory + transcript so far
+  A-->>O: Spoken line, reflection, importance
+  O-->>UI: Structured conversation result
+  UI->>M: Write Ava memory and Noah memory separately
+  UI->>UI: Update transcript, relationship, task status
+```
+
+### Memory Boundary
+
+```mermaid
+flowchart TB
+  AvaMemory["Ava private memories"]
+  NoahMemory["Noah private memories"]
+  Transcript["Public transcript\nspoken lines only"]
+  AvaAgent["Ava Deep Agent"]
+  NoahAgent["Noah Deep Agent"]
+  Relationship["Shared relationship state"]
+
+  AvaMemory --> AvaAgent
+  Transcript --> AvaAgent
+  NoahMemory --> NoahAgent
+  Transcript --> NoahAgent
+  AvaAgent --> Transcript
+  NoahAgent --> Transcript
+  Transcript --> Relationship
+```
 
 ## Local Setup
 
