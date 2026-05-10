@@ -68,7 +68,7 @@ This means:
 The backend still provides the initial seeded city and optional OpenAI cognition through `/api/cognition/session`.
 
 Memory is isolated per citizen in browser mode. The browser stores each citizen's
-short-term memories under `agentcity.v10.memory.<citizen_id>`, and the backend
+short-term memories under `agentcity.v11.memory.<citizen_id>`, and the backend
 conversation workflow only passes a citizen the memories for the current speaking
 agent. Spoken transcript lines are public; private memory is not.
 

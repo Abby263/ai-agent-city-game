@@ -16,7 +16,7 @@ import type {
   TriggerEventPayload,
 } from "@/lib/types";
 
-const SESSION_VERSION = "v10";
+const SESSION_VERSION = "v11";
 const CITY_KEY = `agentcity.${SESSION_VERSION}.city`;
 const RELATIONSHIPS_KEY = `agentcity.${SESSION_VERSION}.relationships`;
 const CONVERSATIONS_KEY = `agentcity.${SESSION_VERSION}.conversations`;
