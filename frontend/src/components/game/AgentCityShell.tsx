@@ -390,13 +390,15 @@ export function AgentCityShell() {
       />
 
       <section className="relative min-h-0 px-2 pt-2 pb-3 sm:px-3 lg:h-full lg:pb-3">
-        <div id="city-map" className="glass-panel relative h-[68dvh] min-h-[430px] scroll-mt-24 overflow-hidden rounded-xl bg-[#0a1226] sm:h-[72dvh] lg:h-full lg:min-h-0">
+        <div id="city-map" className="glass-panel holo-grid hud-frame relative h-[68dvh] min-h-[430px] scroll-mt-24 overflow-hidden rounded-2xl bg-[#0a1226] sm:h-[72dvh] lg:h-full lg:min-h-0">
           <GameCanvas
             city={city}
             selectedCitizenId={selectedCitizen?.citizen_id ?? null}
             onSelectCitizen={handleSelectCitizen}
             onHoverChange={setHoverInfo}
           />
+          <div className="scanlines" aria-hidden />
+          <div className="map-vignette" aria-hidden />
           <SceneOverlay
             citizen={selectedCitizen ?? null}
             city={city}
@@ -559,14 +561,14 @@ function TopHeader({
   const PeriodIcon = period.icon;
   const isStreaming = connectionStatus === "connected";
   return (
-    <header className="sticky top-0 z-30 flex min-w-0 flex-col gap-3 border-b border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.92)] px-3 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:static lg:py-0">
+    <header className="sticky top-0 z-30 flex min-w-0 flex-col gap-3 border-b border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.88)] px-3 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:static lg:py-0">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[rgb(var(--accent))] via-[rgb(125_211_252)] to-[rgb(var(--violet))] text-[#06121f] shadow-[0_0_24px_rgba(56,189,248,0.32)]">
+        <div className="brand-bloom relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[rgb(var(--accent))] via-[rgb(125_211_252)] to-[rgb(var(--violet))] text-[#06121f] shadow-[0_0_24px_rgba(56,189,248,0.32)]">
           <Building2 className="h-5 w-5" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="truncate text-xl font-bold tracking-tight text-grad-accent">{cityName ?? "Navora"}</h1>
+            <h1 className="truncate text-xl font-bold tracking-tight text-grad-neon">{cityName ?? "Navora"}</h1>
             <Badge tone="accent">AgentCity</Badge>
           </div>
           <div className="mt-0.5 flex min-w-0 items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
@@ -659,7 +661,7 @@ function ModeControl({
   ];
 
   return (
-    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel-strong),0.85)] p-1">
+    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel-strong),0.85)] p-1 backdrop-blur">
       {choices.map((choice) => {
         const Icon = choice.icon;
         const active = mode === choice.mode;
@@ -668,9 +670,9 @@ function ModeControl({
             key={choice.mode}
             disabled={busy}
             onClick={() => onModeChange(choice.mode)}
-            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition ${
+            className={`focus-ring flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition ${
               active
-                ? "bg-[rgb(var(--accent-2))] text-[#06121f] shadow-[0_4px_14px_rgba(74,222,128,0.28)]"
+                ? "seg-active-warm"
                 : "text-[rgb(var(--muted-strong))] hover:bg-white/5"
             }`}
             title={`${choice.label}: ${choice.detail}`}
@@ -707,7 +709,7 @@ function SpeedControl({
     { key: "4x", label: "4×", icon: Play },
   ];
   return (
-    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel-strong),0.85)] p-1">
+    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel-strong),0.85)] p-1 backdrop-blur">
       {choices.map((choice) => {
         const Icon = choice.icon;
         const active = speed === choice.key;
@@ -716,9 +718,9 @@ function SpeedControl({
             key={choice.key}
             disabled={busy || (mode === "manual" && choice.key !== "paused" && activeTaskCount === 0)}
             onClick={() => onSpeed(choice.key)}
-            className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition ${
+            className={`focus-ring flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition ${
               active
-                ? "bg-[rgb(var(--accent))] text-[#06121f] shadow-[0_4px_14px_rgba(56,189,248,0.45)]"
+                ? "seg-active"
                 : "text-[rgb(var(--muted-strong))] hover:bg-white/5"
             }`}
           >
@@ -744,10 +746,28 @@ function ClockBlock({
   running: boolean;
   icon: ComponentType<{ className?: string }>;
 }) {
+  const [hh, mm] = time.split(":");
+  const minuteOfDay = (Number(hh) || 0) * 60 + (Number(mm) || 0);
+  const dayPct = Math.max(0, Math.min(100, (minuteOfDay / 1440) * 100));
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel),0.85)] px-4 py-1.5">
-      <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${period.tint}`}>
-        <Icon className="h-4 w-4" />
+    <div className="relative flex items-center gap-3 rounded-2xl border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel),0.85)] px-4 py-1.5 backdrop-blur">
+      <div className="relative grid h-10 w-10 place-items-center">
+        <div
+          className="day-arc absolute inset-0 rounded-full opacity-90"
+          style={{
+            WebkitMask:
+              "radial-gradient(circle, transparent 56%, black 58%)",
+            mask: "radial-gradient(circle, transparent 56%, black 58%)",
+          }}
+        />
+        <div className={`relative grid h-7 w-7 place-items-center rounded-full ${period.tint}`}>
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+        <span
+          aria-hidden
+          className="absolute h-1.5 w-1.5 -translate-y-[18px] rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.85)]"
+          style={{ transform: `rotate(${(dayPct / 100) * 360}deg) translateY(-18px)` }}
+        />
       </div>
       <div className="leading-tight">
         <div className="flex items-center gap-2">
@@ -788,21 +808,21 @@ function MapPanelDock({
   ];
 
   return (
-    <div className="pointer-events-auto absolute bottom-3 right-3 top-3 z-40 hidden w-[76px] flex-col items-stretch justify-center gap-2 sm:flex">
+    <div className="pointer-events-auto absolute bottom-3 right-3 top-3 z-40 hidden w-[80px] flex-col items-stretch justify-center gap-2 sm:flex">
       {controls.map((control) => {
         const Icon = control.icon;
         const active = activePanel === control.panel;
         return (
           <button
             key={control.panel}
-            className={`flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur transition ${
+            className={`focus-ring relative flex min-h-[80px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur-md transition-all ${
               active
-                ? "border-[rgba(56,189,248,0.7)] bg-[rgba(56,189,248,0.18)]"
-                : "border-[rgba(var(--border),0.65)] bg-[rgba(8,12,24,0.72)] hover:bg-[rgba(8,12,24,0.9)]"
+                ? "border-[rgba(56,189,248,0.85)] bg-[linear-gradient(140deg,rgba(56,189,248,0.22),rgba(167,139,250,0.14))] shadow-[0_0_28px_rgba(56,189,248,0.35)]"
+                : "border-[rgba(var(--border),0.65)] bg-[rgba(8,12,24,0.72)] hover:-translate-y-0.5 hover:border-[rgba(125,211,252,0.55)] hover:bg-[rgba(8,12,24,0.9)]"
             }`}
             onClick={() => onOpen(active ? null : control.panel)}
           >
-            <Icon className="h-5 w-5 shrink-0 text-[rgb(var(--accent))]" />
+            <Icon className={`h-5 w-5 shrink-0 transition ${active ? "text-[rgb(125,211,252)] drop-shadow-[0_0_8px_rgba(56,189,248,0.65)]" : "text-[rgb(var(--accent))]"}`} />
             <span className="min-w-0">
               <span className="block text-[11px] font-semibold leading-tight">{control.label}</span>
               <span className="block max-w-[60px] truncate font-mono text-[8px] uppercase tracking-wide text-[rgb(var(--muted))]">
@@ -844,11 +864,11 @@ function GameDrawer({
   return (
     <aside
       id={id}
-      className={`fixed inset-x-2 bottom-20 z-50 flex max-h-[74dvh] min-h-0 flex-col overflow-hidden rounded-2xl border border-[rgba(var(--border),0.88)] bg-[rgba(8,12,24,0.95)] shadow-[0_28px_80px_rgba(0,0,0,0.62)] backdrop-blur-xl lg:absolute lg:inset-x-auto lg:max-h-none ${sideClass}`}
+      className={`drawer-in fixed inset-x-2 bottom-20 z-50 flex max-h-[74dvh] min-h-0 flex-col overflow-hidden rounded-2xl border border-[rgba(var(--border),0.88)] bg-[rgba(8,12,24,0.95)] shadow-[0_28px_80px_rgba(0,0,0,0.62)] backdrop-blur-xl lg:absolute lg:inset-x-auto lg:max-h-none ${sideClass}`}
     >
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(var(--border),0.7)] px-3 py-3">
+      <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(var(--border),0.7)] px-3 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgba(56,189,248,0.16)] text-[rgb(var(--accent))]">
+          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[linear-gradient(140deg,rgba(56,189,248,0.22),rgba(167,139,250,0.14))] text-[rgb(125,211,252)] shadow-[inset_0_0_0_1px_rgba(125,211,252,0.4)]">
             <Icon className="h-4 w-4" />
           </div>
           <div className="min-w-0">
@@ -858,9 +878,10 @@ function GameDrawer({
             </div>
           </div>
         </div>
-        <button className="btn-pill px-2 py-2" onClick={onClose} title="Close panel">
+        <button className="btn-pill focus-ring px-2 py-2" onClick={onClose} title="Close panel">
           <X className="h-4 w-4" />
         </button>
+        <div className="gradient-divider absolute inset-x-0 bottom-0" aria-hidden />
       </div>
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
         {children}
@@ -943,19 +964,21 @@ function MobilePlayDock({
     { panel: "story", label: "Talk", icon: MessageSquareText },
   ];
   return (
-    <nav className="fixed inset-x-2 bottom-3 z-40 grid grid-cols-4 gap-1 rounded-2xl border border-[rgba(var(--border),0.9)] bg-[rgba(8,12,24,0.94)] p-1.5 shadow-[0_16px_42px_rgba(0,0,0,0.55)] backdrop-blur lg:hidden">
+    <nav className="fixed inset-x-2 bottom-3 z-40 grid grid-cols-4 gap-1 rounded-2xl border border-[rgba(var(--border),0.9)] bg-[rgba(8,12,24,0.94)] p-1.5 shadow-[0_16px_42px_rgba(0,0,0,0.55)] backdrop-blur-md lg:hidden">
       {items.map((item) => {
         const Icon = item.icon;
         const active = activePanel === item.panel;
         return (
           <button
             key={item.label}
-            className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition ${
-              active ? "bg-[rgba(56,189,248,0.16)] text-[rgb(var(--foreground))]" : "text-[rgb(var(--muted-strong))] hover:bg-white/5"
+            className={`focus-ring flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition ${
+              active
+                ? "bg-[linear-gradient(140deg,rgba(56,189,248,0.22),rgba(167,139,250,0.14))] text-[rgb(var(--foreground))] shadow-[inset_0_0_0_1px_rgba(125,211,252,0.35)]"
+                : "text-[rgb(var(--muted-strong))] hover:bg-white/5"
             }`}
             onClick={() => onOpen(item.panel)}
           >
-            <Icon className="h-4 w-4 text-[rgb(var(--accent))]" />
+            <Icon className={`h-4 w-4 ${active ? "text-[rgb(125,211,252)]" : "text-[rgb(var(--accent))]"}`} />
             {item.label}
           </button>
         );
@@ -966,7 +989,7 @@ function MobilePlayDock({
 
 function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
   return (
-    <div className="scrollbar-thin absolute left-2 right-2 top-2 z-20 max-h-[calc(100%-24px)] overflow-y-auto rounded-2xl border border-[rgba(var(--accent),0.55)] bg-[rgba(8,12,24,0.93)] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur sm:left-4 sm:right-auto sm:top-4 sm:max-h-[calc(100%-92px)] sm:max-w-[430px] sm:p-4">
+    <div className="fade-up scrollbar-thin absolute left-2 right-2 top-2 z-20 max-h-[calc(100%-24px)] overflow-y-auto rounded-2xl border border-[rgba(var(--accent),0.55)] bg-[rgba(8,12,24,0.93)] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur-md sm:left-4 sm:right-auto sm:top-4 sm:max-h-[calc(100%-92px)] sm:max-w-[430px] sm:p-4">
       <div className="mb-3 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-base font-semibold">
@@ -1074,18 +1097,19 @@ function HeroStatCard({
   icon: ComponentType<{ className?: string }>;
   delta?: string;
 }) {
+  const cardTone = tone === "water" ? "accent" : tone;
   return (
-    <div className="metric-card">
+    <div className="metric-card" data-tone={cardTone}>
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
             <Icon className="h-3 w-3" />
             {label}
           </div>
-          <div className="mt-1 font-mono text-xl font-semibold tabular-nums">{value}</div>
+          <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-grad-accent">{value}</div>
         </div>
         {delta ? (
-          <span className="rounded-full bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted-strong))]">
+          <span className="rounded-full border border-white/5 bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted-strong))]">
             {delta}
           </span>
         ) : null}
@@ -1268,11 +1292,13 @@ function SceneOverlay({
         : "Autonomous paused";
   return (
     <>
-      <div className="pointer-events-none absolute left-2 right-2 top-2 z-10 rounded-xl border border-[rgba(var(--border),0.62)] bg-[rgba(8,12,24,0.72)] p-2 shadow-2xl backdrop-blur sm:left-3 sm:right-auto sm:top-3 sm:max-w-[390px]">
+      <div className="pointer-events-none absolute left-2 right-2 top-2 z-10 overflow-hidden rounded-xl border border-[rgba(var(--border),0.62)] bg-[rgba(8,12,24,0.78)] p-2 shadow-2xl backdrop-blur-md sm:left-3 sm:right-auto sm:top-3 sm:max-w-[390px]">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[rgba(125,211,252,0.65)] to-transparent" />
         <div className="mb-1 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            <Route className="h-3.5 w-3.5" />
+            <Route className="h-3.5 w-3.5 text-[rgb(125,211,252)]" />
             Live focus
+            <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-[rgb(125,211,252)] live-dot" />
           </div>
           <Badge tone={gameMode === "manual" && activeTaskCount === 0 ? "warning" : city?.clock.running ? "success" : "default"}>
             {statusText}
@@ -1304,7 +1330,7 @@ function SceneOverlay({
 
 function HoverTooltip({ hover }: { hover: NonNullable<HoverInfo> }) {
   return (
-    <div className="pointer-events-none absolute bottom-20 left-1/2 -translate-x-1/2 rounded-xl border border-[rgba(var(--accent),0.5)] bg-[rgba(8,12,24,0.94)] px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur">
+    <div className="fade-up pointer-events-none absolute bottom-20 left-1/2 -translate-x-1/2 rounded-xl border border-[rgba(125,211,252,0.5)] bg-[rgba(8,12,24,0.94)] px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_24px_rgba(56,189,248,0.18)] backdrop-blur">
       {hover.kind === "location" ? (
         <div className="flex items-center gap-2">
           {locationIcon(hover.data.type)}
@@ -1344,7 +1370,7 @@ function SceneLegend() {
     { icon: TreePine, label: "Park", color: "text-[rgb(74,222,128)]" },
   ];
   return (
-    <div className="absolute bottom-2 left-2 right-2 hidden gap-1.5 overflow-x-auto rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.82)] p-2 backdrop-blur scrollbar-thin sm:flex">
+    <div className="fade-up absolute bottom-2 left-2 right-2 hidden gap-1.5 overflow-x-auto rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.82)] p-2 backdrop-blur-md scrollbar-thin sm:flex">
       {items.map((item) => {
         const Icon = item.icon;
         return (
@@ -1605,13 +1631,14 @@ function AssignTaskPanel({
 
   return (
     <form
-      className="rounded-xl border border-[rgba(var(--accent),0.45)] bg-[rgba(56,189,248,0.08)] p-3"
+      className="relative overflow-hidden rounded-xl border border-[rgba(var(--accent),0.45)] bg-[linear-gradient(150deg,rgba(56,189,248,0.10),rgba(167,139,250,0.06))] p-3 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.08)]"
       onSubmit={submitTask}
     >
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[rgba(125,211,252,0.6)] to-transparent" />
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold">
-            <Target className="h-4 w-4 text-[rgb(var(--accent))]" />
+            <Target className="h-4 w-4 text-[rgb(125,211,252)] drop-shadow-[0_0_6px_rgba(56,189,248,0.55)]" />
             Give {citizen.name.split(" ")[0]} a task
           </div>
           <p className="mt-0.5 text-[11px] leading-snug text-[rgb(var(--muted))]">
@@ -1679,7 +1706,7 @@ function AssignTaskPanel({
       />
 
       <Button
-        className="mt-2 w-full"
+        className="shine-btn mt-2 w-full"
         type="submit"
         size="sm"
         disabled={busy || task.trim().length < 3}
@@ -2033,10 +2060,10 @@ function ConversationFlowRow({
 
   return (
     <div className="relative flex gap-3">
-      <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(var(--border),0.9)] bg-[#071222] font-mono text-[10px] text-[rgb(var(--accent))]">
+      <div className="timeline-node relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(125,211,252,0.5)] bg-[#071222] font-mono text-[10px] text-[rgb(125,211,252)] shadow-[0_0_12px_rgba(56,189,248,0.25)]">
         {index + 1}
       </div>
-      <article className="min-w-0 flex-1 rounded-xl border border-[rgba(var(--border-soft),0.78)] bg-[rgba(6,11,22,0.72)] p-3">
+      <article className="min-w-0 flex-1 rounded-xl border border-[rgba(var(--border-soft),0.78)] bg-[rgba(6,11,22,0.72)] p-3 transition hover:border-[rgba(125,211,252,0.55)]">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             {speaker ? (

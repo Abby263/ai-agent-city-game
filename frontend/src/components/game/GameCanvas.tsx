@@ -1132,18 +1132,18 @@ function MapZoomControls({
   onReset: () => void;
 }) {
   return (
-    <div className="pointer-events-auto absolute bottom-3 right-3 z-30 flex items-center overflow-hidden rounded-xl border border-[rgba(var(--border),0.72)] bg-[rgba(8,12,24,0.78)] shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur sm:bottom-auto sm:right-24 sm:top-3">
-      <button className="px-3 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-white/10" onClick={onZoomOut} title="Zoom out">
-        -
+    <div className="pointer-events-auto absolute bottom-3 right-3 z-30 flex items-center overflow-hidden rounded-xl border border-[rgba(125,211,252,0.35)] bg-[rgba(8,12,24,0.82)] shadow-[0_10px_28px_rgba(0,0,0,0.32),0_0_18px_rgba(56,189,248,0.10)] backdrop-blur-md sm:bottom-auto sm:right-24 sm:top-3">
+      <button className="focus-ring px-3 py-2 text-sm font-semibold text-[rgb(var(--foreground))] transition hover:bg-[rgba(56,189,248,0.16)]" onClick={onZoomOut} title="Zoom out">
+        −
       </button>
       <button
-        className="border-x border-[rgba(var(--border),0.55)] px-2.5 py-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted-strong))] hover:bg-white/10"
+        className="focus-ring border-x border-[rgba(var(--border),0.55)] px-2.5 py-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted-strong))] transition hover:bg-[rgba(56,189,248,0.16)]"
         onClick={onReset}
         title="Reset zoom"
       >
         {Math.round(zoom * 100)}%
       </button>
-      <button className="px-3 py-2 text-sm font-semibold text-[rgb(var(--foreground))] hover:bg-white/10" onClick={onZoomIn} title="Zoom in">
+      <button className="focus-ring px-3 py-2 text-sm font-semibold text-[rgb(var(--foreground))] transition hover:bg-[rgba(56,189,248,0.16)]" onClick={onZoomIn} title="Zoom in">
         +
       </button>
     </div>
@@ -1161,9 +1161,13 @@ function MiniMap({
 }) {
   if (!city) return null;
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-30 w-[126px] rounded-xl border border-[rgba(var(--border),0.72)] bg-[rgba(8,12,24,0.76)] p-2 shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur sm:w-[164px]">
+    <div className="pointer-events-none absolute bottom-3 left-3 z-30 w-[126px] overflow-hidden rounded-xl border border-[rgba(125,211,252,0.35)] bg-[rgba(8,12,24,0.82)] p-2 shadow-[0_10px_28px_rgba(0,0,0,0.32),0_0_18px_rgba(56,189,248,0.10)] backdrop-blur-md sm:w-[164px]">
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[rgba(125,211,252,0.6)] to-transparent" />
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted-strong))]">Mini-map</span>
+        <span className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wide text-[rgb(125,211,252)]">
+          <span className="h-1.5 w-1.5 rounded-full bg-[rgb(125,211,252)] live-dot" />
+          Mini-map
+        </span>
         <span className="rounded-full bg-white/10 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wide text-[rgb(var(--muted))]">
           {weather}
         </span>
