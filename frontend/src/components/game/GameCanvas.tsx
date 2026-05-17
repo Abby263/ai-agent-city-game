@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { CityState, Location } from "@/lib/types";
 
@@ -35,10 +35,6 @@ export function GameCanvas({
   const onSelectRef = useRef(onSelectCitizen);
   const onHoverRef = useRef(onHoverChange);
   const [zoom, setZoom] = useState(1);
-  const weather = useMemo(
-    () => weatherFor(city?.clock.minute_of_day ?? 8 * 60, city?.clock.day ?? 1, city?.events ?? []),
-    [city?.clock.day, city?.clock.minute_of_day, city?.events],
-  );
 
   useEffect(() => {
     latestCityRef.current = city;
@@ -1115,7 +1111,6 @@ export function GameCanvas({
         onZoomOut={() => setZoom((value) => Math.max(0.8, Number((value - 0.25).toFixed(2))))}
         onReset={() => setZoom(1)}
       />
-      <MiniMap city={city} selectedCitizenId={selectedCitizenId} weather={weather} />
     </div>
   );
 }
@@ -1150,69 +1145,6 @@ function MapZoomControls({
   );
 }
 
-function MiniMap({
-  city,
-  selectedCitizenId,
-  weather,
-}: {
-  city: CityState | null;
-  selectedCitizenId: string | null;
-  weather: WeatherKind;
-}) {
-  if (!city) return null;
-  return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-30 w-[126px] overflow-hidden rounded-xl border border-[rgba(125,211,252,0.35)] bg-[rgba(8,12,24,0.82)] p-2 shadow-[0_10px_28px_rgba(0,0,0,0.32),0_0_18px_rgba(56,189,248,0.10)] backdrop-blur-md sm:w-[164px]">
-      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[rgba(125,211,252,0.6)] to-transparent" />
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1 font-mono text-[9px] uppercase tracking-wide text-[rgb(125,211,252)]">
-          <span className="h-1.5 w-1.5 rounded-full bg-[rgb(125,211,252)] live-dot" />
-          Mini-map
-        </span>
-        <span className="rounded-full bg-white/10 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wide text-[rgb(var(--muted))]">
-          {weather}
-        </span>
-      </div>
-      <div className="relative aspect-square overflow-hidden rounded-lg border border-[rgba(var(--border-soft),0.75)] bg-[#204b35]">
-        <div className="absolute left-[30%] top-0 h-full w-[7.5%] bg-[#1f2937]" />
-        <div className="absolute left-[62.5%] top-0 h-full w-[7.5%] bg-[#1f2937]" />
-        <div className="absolute left-0 top-[32.5%] h-[7.5%] w-full bg-[#1f2937]" />
-        <div className="absolute left-0 top-[62.5%] h-[7.5%] w-full bg-[#1f2937]" />
-        {city.locations.map((location) => (
-          <div
-            key={location.location_id}
-            className="absolute rounded-[2px] opacity-90 ring-1 ring-black/40"
-            style={{
-              left: pct(location.x),
-              top: pct(location.y),
-              width: pct(location.width),
-              height: pct(location.height),
-              backgroundColor: minimapLocationColor(location.type),
-            }}
-            title={location.name}
-          />
-        ))}
-        {city.citizens.map((citizen) => {
-          const selected = citizen.citizen_id === selectedCitizenId;
-          return (
-            <div
-              key={citizen.citizen_id}
-              className={`absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border ${
-                selected ? "border-[#facc15] bg-[#facc15] shadow-[0_0_12px_rgba(250,204,21,0.9)]" : "border-white/80 bg-[#86efac]"
-              }`}
-              style={{ left: pct(citizen.x + 0.5), top: pct(citizen.y + 0.5) }}
-              title={citizen.name}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function pct(value: number) {
-  return `${(value / MAP_TILES) * 100}%`;
-}
-
 function labelFor(name: string) {
   return name
     .replace("Police Station", "Police")
@@ -1241,27 +1173,6 @@ function locationColor(type: string) {
     bus_stop: 0x4b5563,
   };
   return colors[type] ?? 0x475569;
-}
-
-function minimapLocationColor(type: string) {
-  const colors: Record<string, string> = {
-    home: "#a78b5f",
-    hospital: "#ef4444",
-    school: "#3b82f6",
-    bank: "#8b5cf6",
-    market: "#f97316",
-    restaurant: "#fb7185",
-    pharmacy: "#22d3ee",
-    farm: "#84cc16",
-    police: "#2563eb",
-    city_hall: "#f59e0b",
-    lab: "#10b981",
-    library: "#a855f7",
-    power: "#f97316",
-    park: "#22c55e",
-    bus_stop: "#94a3b8",
-  };
-  return colors[type] ?? "#64748b";
 }
 
 function darken(hex: number, factor: number) {
