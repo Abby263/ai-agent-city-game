@@ -39,7 +39,7 @@ export const actions: ActionSpec[] = [
   { id: "hit", icon: "👊", label: "Hit", group: "conflict", verb: "hit", target: { trust: -30, warmth: -30, feelings: { resentment: 40 }, emotions: { anger: 35, fear: 30 } }, witness: -15 },
 ];
 
-const presentTense: Record<ActionId, string> = {
+export const presentTense: Record<ActionId, string> = {
   meet: "comes over to talk to", invite: "invites", hug: "hugs", high_five: "high-fives", compliment: "compliments", gift: "gives a gift to",
   help: "offers to help", comfort: "comforts", apologize: "apologises to", share_secret: "shares a secret with", flirt: "flirts with",
   ask_out: "asks out", confess: "confesses their feelings to", kiss: "kisses", propose: "proposes to", tease: "teases",

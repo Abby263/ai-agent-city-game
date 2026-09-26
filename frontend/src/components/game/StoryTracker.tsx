@@ -4,6 +4,8 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, Eye, Play, X } from "lucide-react";
 import { activeStories, type Story } from "@/lib/stories";
 import { liveElection, playerTurn } from "@/lib/elections";
+import { nextChoices, type Choice } from "@/lib/choices";
+import { ChoiceButtons } from "./NextChoices";
 import { useGameStore } from "@/lib/store";
 import type { CityState } from "@/lib/types";
 
@@ -14,9 +16,10 @@ export function watchStory(story: Story) {
 }
 
 /** "Happening now": the latest storyline you set in motion, beat by beat, with a button to watch it. */
-export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onVote, onAsk }: {
+export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onVote, onAsk, onChoose }: {
   city: CityState; onOpenAll: () => void; busy?: boolean; onOpenBallots?: () => void;
   onVote?: (candidateId: string | null) => void; onAsk?: (candidateId: string) => void;
+  onChoose?: (choice: Choice, storyId: string) => void;
 }) {
   const stories = activeStories(city);
   const [hidden, setHidden] = useState<string[]>([]);
@@ -27,7 +30,9 @@ export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onV
   const turn = election ? playerTurn(city) : undefined;
   const me = turn && city.citizens.find((c) => c.citizen_id === turn.voterId)?.name.split(" ")[0];
   const latestTalk = [...story.beats].reverse().find((b) => b.conversation_id);
-  const beats = story.beats.slice(open ? -3 : -1);
+  const choices = story.kind === "election" ? [] : nextChoices(city, story.focus_ids, story.latest ?? story.kind);
+  // With choices on the card, the two latest beats are enough context.
+  const beats = story.beats.slice(open ? (choices.length && onChoose ? -2 : -3) : -1);
   return (
     <section className="story-tracker" aria-label="Happening now" aria-live="polite">
       <header>
@@ -75,8 +80,11 @@ export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onV
           </div>
         </div>
       )}
-      {city.simulation_mode !== "autonomous" && !election && story.beats.length < 3 && (
-        <p className="story-status">Switch on Auto to see how the rest of the town reacts over time.</p>
+      {!election && open && onChoose && choices.length > 0 && (
+        <div className="story-next">
+          <small>What happens next? You decide.</small>
+          <ChoiceButtons choices={choices} busy={busy} onPick={(c) => onChoose(c, story.id)} />
+        </div>
       )}
       <div className="story-actions">
         <button className="outline-action" onClick={() => watchStory(story)}><Eye size={14} /> Watch</button>

@@ -19,6 +19,8 @@ export type Story = {
   /** City minute after which the story is considered finished. */
   ends: number;
   beats: StoryBeat[];
+  /** The latest move made in it (e.g. "action_hug"), so the next choices follow where the story went. */
+  latest?: string;
 };
 
 const now = (city: CityState) => city.clock.day * 1440 + city.clock.minute_of_day;

@@ -24,7 +24,7 @@ const skies: Array<{ condition: WeatherOverride["condition"]; icon: string; labe
 export function GodPanel({ city, busy, act, onMessage, onStarted }: {
   city: CityState;
   busy: boolean;
-  act: (action: () => Promise<CityState>) => Promise<void>;
+  act: (action: () => Promise<CityState>) => Promise<unknown>;
   onMessage: (text: string) => void;
   /** Close the panel and fly the camera to where it's happening. */
   onStarted: (ids: string[], locationId?: string) => void;

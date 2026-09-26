@@ -46,6 +46,11 @@ import { GodPanel } from "./GodPanel";
 import { StoryTracker } from "./StoryTracker";
 import { liveElection, playerTurn } from "@/lib/elections";
 import { ActionPanel } from "./ActionPanel";
+import { PersonBar } from "./PersonBar";
+import { NextMoveCard } from "./NextChoices";
+import { nextChoices, type Choice } from "@/lib/choices";
+import { activeStories } from "@/lib/stories";
+import type { ActionId } from "@/lib/actions";
 import { minutesBehindRealTime } from "@/lib/session-simulation";
 import { calendarDay, calendarStartFor } from "@/lib/calendar";
 import { dayWeather } from "@/lib/weather";
@@ -111,6 +116,10 @@ export function AgentCityShell() {
   const speechInput = useRef<HTMLTextAreaElement>(null);
   const [taskDraft, setTaskDraft] = useState("");
   const [recipient, setRecipient] = useState("");
+  // Tapping someone opens a small bar of things to do with them, not a full panel.
+  const [personId, setPersonId] = useState<string | null>(null);
+  const [actTarget, setActTarget] = useState<string | undefined>();
+  const lastScene = useGameStore((state) => state.lastScene);
   const [filter, setFilter] = useState("all");
   const [focusedConversation, setFocusedConversation] = useState<string | null>(null);
   const [cityBonds, setCityBonds] = useState<Relationship[]>([]);
@@ -183,6 +192,11 @@ export function AgentCityShell() {
   const targetId = nearby.some((c) => c.citizen_id === recipient)
     ? recipient
     : (nearby[0]?.citizen_id ?? "");
+  const personCitizen = personId ? city?.citizens.find((c) => c.citizen_id === personId) : undefined;
+  // After a scene that isn't already part of a story (stories offer their own choices), ask what happens next.
+  const sceneInStory = !!lastScene && !!city && activeStories(city).some((s) => s.beats.some((b) => b.conversation_id === lastScene.conversationId));
+  const sceneChoices = lastScene && city && !sceneInStory ? nextChoices(city, lastScene.actorIds) : [];
+  const sceneNames = (lastScene?.actorIds ?? []).map((id) => shortName(city?.citizens.find((c) => c.citizen_id === id))).join(" and ");
   const activeTask = selected?.personality.player_task as
     { task: string; status: string; plan_summary?: string } | undefined;
 
@@ -243,18 +257,20 @@ export function AgentCityShell() {
 
   const act = useCallback(
     async (action: () => Promise<CityState>) => {
-      if (flight.current) return;
+      if (flight.current) return false;
       flight.current = true;
       setBusy(true);
       setMessage("");
       try {
         setCity(await action());
+        return true;
       } catch (error) {
         setMessage(
           error instanceof Error
             ? error.message
             : "This action could not finish.",
         );
+        return false;
       } finally {
         flight.current = false;
         setBusy(false);
@@ -342,6 +358,65 @@ export function AgentCityShell() {
     },
     [selectCitizen],
   );
+
+  /** A tap on someone in town or in the strip: quick actions, unless you're browsing profiles. */
+  const tap = useCallback((id: string) => {
+    if (panel === "citizens") { choose(id); return; }
+    void selectCitizen(id);
+    setPersonId(id);
+    setPanel(null);
+  }, [panel, choose, selectCitizen]);
+  /** Opens the chat with someone, walking the character you play over first if needed. */
+  const openChat = useCallback((id: string) => {
+    setPersonId(null);
+    setRecipient(id);
+    setFilter("all");
+    setPanel("journal");
+    window.setTimeout(() => speechInput.current?.focus(), 60);
+  }, []);
+  const talkTo = useCallback((id: string) => {
+    const current = latestCity.current;
+    const you = current?.citizens.find((c) => c.citizen_id === current.policy.player_citizen_id);
+    const them = current?.citizens.find((c) => c.citizen_id === id);
+    if (you && them && you.current_location_id === them.current_location_id) openChat(id);
+    // The person you're going to comes first, so the camera frames where you'll arrive.
+    else void act(() => api.approach(id)).then((ok) => { if (ok) { openChat(id); if (you) useGameStore.getState().focusOn([id, you.citizen_id]); } });
+  }, [act, openChat]);
+  const quickAction = useCallback((targetId: string, action: ActionId) => {
+    const current = latestCity.current;
+    const you = current?.policy.player_citizen_id as string | undefined;
+    if (!you) return;
+    setPersonId(null);
+    void act(async () => {
+      const { city: next, outcome, error } = await api.performAction(you, targetId, action);
+      setMessage(error ? `${outcome.headline} (${error})` : outcome.headline);
+      return next;
+    }).then((ok) => { if (ok) openChat(targetId); });
+  }, [act, openChat]);
+  /** "What happens next?": the player's move, continuing the story it came from. */
+  const pickChoice = useCallback((choice: Choice, storyId?: string) => {
+    useGameStore.getState().clearLastScene();
+    const yours = choice.actor_id === latestCity.current?.policy.player_citizen_id;
+    void act(async () => {
+      const { city: next, outcome, error } = await api.performAction(choice.actor_id, choice.target_id, choice.action, "", storyId ? { storyId } : { track: true });
+      setMessage(error ? `${outcome.headline} (${error})` : `${outcome.headline} Watch what happens.`);
+      return next;
+    }).then((ok) => { if (ok && yours) openChat(choice.target_id); });
+  }, [act, openChat]);
+  const openActions = useCallback((id: string) => {
+    const you = latestCity.current?.policy.player_citizen_id as string | undefined;
+    void selectCitizen(you ?? id);
+    setActTarget(you ? id : undefined);
+    setPage("act");
+    setPanel("citizens");
+    setPersonId(null);
+  }, [selectCitizen]);
+  // An unanswered "what next?" fades after a while so the town keeps moving.
+  useEffect(() => {
+    if (!lastScene) return;
+    const timer = window.setTimeout(() => useGameStore.getState().clearLastScene(), 45000);
+    return () => window.clearTimeout(timer);
+  }, [lastScene]);
 
   async function pause() {
     // Pause can invalidate a pending AI response immediately.
@@ -508,7 +583,7 @@ export function AgentCityShell() {
           <GameCanvas
             city={city}
             selectedCitizenId={player?.citizen_id ?? selectedCitizenId}
-            onSelectCitizen={choose}
+            onSelectCitizen={tap}
           />
           {pendingExchange && !playbackQueue.length && (
             <div className="world-conversation-pending" role="status">
@@ -563,6 +638,16 @@ export function AgentCityShell() {
                 <small>YOU ARE</small>
                 <strong>{player.name}</strong>
               </div>
+              <label className="banner-go" title="Go somewhere">
+                <MapPin size={15} />
+                <select aria-label="Go to a place" value="" disabled={busy}
+                  onChange={(event) => event.target.value && void act(() => api.walkTo(event.target.value))}>
+                  <option value="">Go to…</option>
+                  {city?.locations.filter((l) => l.location_id !== player.current_location_id).map((l) => (
+                    <option key={l.location_id} value={l.location_id}>{l.name}</option>
+                  ))}
+                </select>
+              </label>
               <button
                 className="icon-button"
                 aria-label="Return to observer"
@@ -573,9 +658,22 @@ export function AgentCityShell() {
               </button>
             </div>
           )}
-          {city && !playbackQueue.length && <StoryTracker city={city} onOpenAll={() => setPanel("news")} busy={busy}
+          {city && personCitizen && !playbackQueue.length && (
+            <PersonBar city={city} citizen={personCitizen} player={player} busy={busy} onClose={() => setPersonId(null)}
+              onTalk={talkTo} onAction={quickAction} onMore={openActions}
+              onProfile={(id) => { setPersonId(null); choose(id); }}
+              onPlayAs={(id) => { void api.takeControl(id).then(setCity); setPersonId(id); }}
+              onWatch={(id) => useGameStore.getState().focusOn([id])}
+              onGoTo={(locationId) => { setPersonId(null); void act(() => api.walkTo(locationId)); }} />
+          )}
+          {city && !personCitizen && !playbackQueue.length && sceneChoices.length > 0 && (
+            <NextMoveCard names={sceneNames} choices={sceneChoices} busy={busy} onPick={(c) => pickChoice(c)}
+              onDismiss={() => useGameStore.getState().clearLastScene()} />
+          )}
+          {city && !personCitizen && !sceneChoices.length && !playbackQueue.length && <StoryTracker city={city} onOpenAll={() => setPanel("news")} busy={busy}
             onOpenBallots={() => void act(api.openBallots)} onVote={(id) => void act(() => api.castBallot(id))}
-            onAsk={(id) => void act(() => api.callCandidate(id)).then(() => { setRecipient(id); setPanel("journal"); })} />}
+            onAsk={(id) => void act(() => api.callCandidate(id)).then((ok) => { if (ok) openChat(id); })}
+            onChoose={pickChoice} />}
           {!city && (
             <div className="world-loading">{error || "Opening Nakameguro..."}</div>
           )}
@@ -588,7 +686,7 @@ export function AgentCityShell() {
                   selected?.citizen_id === citizen.citizen_id &&
                   panel === "citizens"
                 }
-                onClick={() => choose(citizen.citizen_id)}
+                onClick={() => tap(citizen.citizen_id)}
               >
                 <CitizenPortrait citizen={citizen} size={44} />
                 <span>
@@ -950,7 +1048,7 @@ export function AgentCityShell() {
                     </>
                   )}
                   {page === "act" && city && (
-                    <ActionPanel key={selected.citizen_id} city={city} actor={selected} busy={busy} act={act} onMessage={setMessage} />
+                    <ActionPanel key={`${selected.citizen_id}-${actTarget ?? ""}`} city={city} actor={selected} initialTargetId={actTarget} busy={busy} act={act} onMessage={setMessage} />
                   )}
                   {page === "memories" && (
                     <>
@@ -1053,19 +1151,33 @@ export function AgentCityShell() {
                       <select
                         aria-label="Speak to"
                         value={targetId}
-                        onChange={(event) => setRecipient(event.target.value)}
+                        disabled={busy}
+                        onChange={(event) => {
+                          const id = event.target.value;
+                          // Someone elsewhere: go to them first, then talk.
+                          if (nearby.some((c) => c.citizen_id === id)) setRecipient(id);
+                          else talkTo(id);
+                        }}
                       >
                         <option value="" disabled>
-                          {nearby.length ? "Choose someone" : "Nobody nearby"}
+                          {nearby.length ? "Choose someone" : "Nobody nearby: pick anyone below"}
                         </option>
-                        {nearby.map((citizen) => (
-                          <option
-                            key={citizen.citizen_id}
-                            value={citizen.citizen_id}
-                          >
-                            {citizen.name}
-                          </option>
-                        ))}
+                        {nearby.length > 0 && (
+                          <optgroup label="Here with you">
+                            {nearby.map((citizen) => (
+                              <option key={citizen.citizen_id} value={citizen.citizen_id}>
+                                {citizen.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        <optgroup label="Elsewhere (you'll go to them)">
+                          {city?.citizens.filter((c) => c.citizen_id !== player.citizen_id && !nearby.includes(c)).map((citizen) => (
+                            <option key={citizen.citizen_id} value={citizen.citizen_id}>
+                              {citizen.name} · {city.locations.find((l) => l.location_id === citizen.current_location_id)?.name}
+                            </option>
+                          ))}
+                        </optgroup>
                       </select>
                     </div>
                     <div className="speech-input">

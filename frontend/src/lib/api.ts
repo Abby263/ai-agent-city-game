@@ -42,6 +42,7 @@ import {
   sessionAddPlan,
   sessionStartElectionAuto,
   sessionAdvanceAutoElection,
+  sessionApproach,
   sessionCallCandidate,
   sessionCastVote,
   sessionOpenBallots,
@@ -81,8 +82,9 @@ export const api = {
   callCandidate: (candidateId: string) => sessionCallCandidate(candidateId),
   setTimeMode: (mode: "live" | "fast") => sessionSetTimeMode(mode),
   addPlan: (a: string, b: string, plan: { day: number; minute: number; location_id: string }, topic: string) => sessionAddPlan(a, b, plan, topic),
-  performAction: (actorId: string, targetId: string, action: import("./actions").ActionId, note = "") =>
-    sessionPerformAction(actorId, targetId, action, note, generateSessionCognition),
+  performAction: (actorId: string, targetId: string, action: import("./actions").ActionId, note = "", thread: import("./session-simulation").ActionThread = {}) =>
+    sessionPerformAction(actorId, targetId, action, note, generateSessionCognition, thread),
+  approach: (targetId: string) => sessionApproach(targetId),
   syncToRealTime: () => sessionSyncToRealTime(),
   socialBeat: (onCognitionStart?: (request: SessionCognitionRequest) => void) => sessionSocialBeat((request) => {
     onCognitionStart?.(request);

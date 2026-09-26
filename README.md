@@ -15,9 +15,10 @@ Deployment URL: [ai-agent-city-game.vercel.app](https://ai-agent-city-game.verce
 
 ## Play This Version
 
-- **Explore the town:** drag to orbit, scroll to zoom, and right-drag to pan. On a phone, use one finger to orbit and two fingers to pan/pinch. Follow tracks the selected citizen; Town overview frames the neighborhood. Tap a character or their name to select them.
+- **Explore the town:** drag to orbit, scroll to zoom, and right-drag to pan. On a phone, use one finger to orbit and two fingers to pan/pinch. Follow tracks the selected citizen; Town overview frames the neighborhood. Tap a character, their name or their portrait to get a quick bar of things to do with them: talk, hug, compliment, argue and more, play as them, or open their profile.
 - **Citizens:** select anyone from the portrait strip or roster. Life, Memories, and Bonds have independently scrollable content.
-- **Play as:** take over a citizen, choose a destination, then open Talk and speak in your own words to someone at that location. Only the other citizen's reply is generated. Return to AI whenever you want.
+- **Play as:** take over a citizen, then tap anyone and choose **Go and talk to…**: you walk over and the chat opens, ready for your words. Talk can also reach anyone in town, and **Go to…** in the "You are" banner takes you to any place. Only the other citizen's reply is generated. Return to AI whenever you want.
+- **You decide what happens next:** when a scene ends, pick the next move for the two people in it (apologise, confront, hug, share a secret, ask out…) and watch them react. Stories in **Happening now** offer the same choices, and they follow wherever the story has gone.
 - **Manual:** assign a task to a citizen or move your controlled citizen. The world pauses when work ends or needs a decision.
 - **Auto:** routines and occasional conversations run while the tab is visible. Pause always remains available, including during an AI request.
 - **Talk:** chronological dialogue with speaker/recipient names and task separators. Scroll back without being dragged to the latest message. Use the citizen filter to follow one person's story.

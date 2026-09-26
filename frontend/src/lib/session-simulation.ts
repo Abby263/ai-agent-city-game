@@ -1279,7 +1279,10 @@ export async function sessionCreateSituation(request: ScenarioRequest, generate?
  * Any resident can do something to any other: the actor goes to the target, the action takes effect
  * at once, then the target reacts in their own AI-generated words (only the reply when the player acts).
  */
-export async function sessionPerformAction(actorId: string, targetId: string, actionId: ActionId, note: string, generate: GenerateCognition):
+/** A choice made in "What happens next?": continue that story, or start one so the thread stays tracked. */
+export type ActionThread = { storyId?: string; track?: boolean };
+
+export async function sessionPerformAction(actorId: string, targetId: string, actionId: ActionId, note: string, generate: GenerateCognition, thread: ActionThread = {}):
   Promise<{ city: CityState; outcome: ActionOutcome; talked: boolean; error?: string }> {
   const city = requireSessionCity();
   const actor = findCitizen(city, actorId), target = findCitizen(city, targetId);
@@ -1295,7 +1298,13 @@ export async function sessionPerformAction(actorId: string, targetId: string, ac
   if (city.encounter && [actorId, targetId].some((id) => [city.encounter!.actor_id, city.encounter!.target_id].includes(id))) city.encounter = null;
   const outcome = performAction(city, actor, target, actionId, { sink: lifeSink(city), adjustBonds: (changes) => adjustBonds(city, changes), bond: bondLookup(city) }, text);
   const spec = actionCatalog.find((a) => a.id === actionId)!;
-  if (spec.group === "love" || spec.group === "conflict" || actionId === "gift") {
+  const story = thread.storyId ? city.stories?.find((s) => s.id === thread.storyId) : undefined;
+  if (story) {
+    story.actors = [...new Set([...story.actors, actorId, targetId])];
+    story.ends = Math.max(story.ends, cityMinute(city) + 12 * 60);
+    addBeat(city, story.id, { icon: "👉", text: `You chose: ${outcome.headline}` });
+    story.latest = `action_${actionId}`;
+  } else if (thread.track || spec.group === "love" || spec.group === "conflict" || actionId === "gift") {
     const onlookers = city.citizens.filter((c) => c !== actor && c !== target && c.current_location_id === target.current_location_id).map((c) => c.citizen_id);
     startStory(city, { id: newId("story"), kind: `action_${actionId}`, icon: spec.icon, title: outcome.headline, actors: [actorId, targetId, ...onlookers].slice(0, 10),
       focus_ids: [actorId, targetId], location_id: target.current_location_id, first: { icon: spec.icon, text: outcome.headline }, length: 24 * 60 });
@@ -1323,6 +1332,24 @@ export async function sessionPerformAction(actorId: string, targetId: string, ac
   } catch (error) {
     return { city: isStale(live) ? requireSessionCity() : saved, outcome, talked: false, error: error instanceof Error ? error.message : "They could not talk right now." };
   }
+}
+
+/** The resident you play goes over to someone, ready to talk. No AI call: you speak first. */
+export async function sessionApproach(targetId: string) {
+  const city = requireSessionCity();
+  const playerId = city.policy.player_citizen_id as string | null | undefined;
+  if (!playerId) throw new Error("Play as someone first.");
+  const you = findCitizen(city, playerId), target = findCitizen(city, targetId);
+  if (you === target) throw new Error("Choose someone else.");
+  if (/sleep/i.test(target.current_activity)) throw new Error(`${target.name.split(" ")[0]} is asleep 😴. Try again when they're up.`);
+  if (you.current_location_id !== target.current_location_id) {
+    you.current_location_id = target.current_location_id;
+    you.x = you.target_x = target.x;
+    you.y = you.target_y = target.y;
+  }
+  you.current_activity = `With ${target.name}`;
+  city.policy.player_destination = null;
+  return saveAndReturn(city);
 }
 
 /** Turns a plan agreed in the player's chat into a real meet-up both residents remember. */

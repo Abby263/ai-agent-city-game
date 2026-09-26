@@ -14,16 +14,18 @@ const groups: Array<{ id: ActionGroup; label: string }> = [
 ];
 
 /** Make any resident do something to any other, then watch both of them react. */
-export function ActionPanel({ city, actor, busy, act, onMessage }: {
+export function ActionPanel({ city, actor, initialTargetId, busy, act, onMessage }: {
   city: CityState;
   actor: CitizenAgent;
+  /** Who the action is aimed at when the panel opens (e.g. the person you just tapped). */
+  initialTargetId?: string;
   busy: boolean;
-  act: (action: () => Promise<CityState>) => Promise<void>;
+  act: (action: () => Promise<CityState>) => Promise<unknown>;
   onMessage: (text: string) => void;
 }) {
   const others = city.citizens.filter((c) => c.citizen_id !== actor.citizen_id);
   const nearby = others.filter((c) => c.current_location_id === actor.current_location_id);
-  const [targetId, setTargetId] = useState((nearby[0] ?? others[0])?.citizen_id ?? "");
+  const [targetId, setTargetId] = useState(others.some((c) => c.citizen_id === initialTargetId) ? initialTargetId! : (nearby[0] ?? others[0])?.citizen_id ?? "");
   const [note, setNote] = useState("");
   const [result, setResult] = useState("");
   const target = others.find((c) => c.citizen_id === targetId);

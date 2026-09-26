@@ -48,6 +48,9 @@ type GameStore = {
   focusRequest: { ids: string[]; onlyIfHidden: boolean; at: number; locationId?: string } | null;
   focusOn: (ids: string[], onlyIfHidden?: boolean, locationId?: string) => void;
   finishPlayback: (id: string) => void;
+  /** The scene that just finished, so the player can decide what happens next. */
+  lastScene: { conversationId: string; actorIds: string[]; at: number } | null;
+  clearLastScene: () => void;
   replayConversation: (id: string) => void;
   connectionStatus: "idle" | "connecting" | "connected" | "offline";
   error: string | null;
@@ -117,9 +120,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setInlineTalk: (inlineTalk) => set({ inlineTalk }),
   focusRequest: null,
   focusOn: (ids, onlyIfHidden = false, locationId) => set({ focusRequest: { ids, onlyIfHidden, at: Date.now(), locationId } }),
-  finishPlayback: (id) => set((state) => ({
-    playbackQueue: state.playbackQueue.filter((c) => c.conversation_id !== id),
-  })),
+  finishPlayback: (id) => set((state) => {
+    const scene = state.playbackQueue.find((c) => c.conversation_id === id);
+    const remaining = state.playbackQueue.filter((c) => c.conversation_id !== id);
+    // Only the last scene in a row asks "what next?", and never for a replay or your own chat.
+    const lastScene = scene && !scene.replay && !scene.player_chat && !remaining.length
+      ? { conversationId: id, actorIds: scene.actor_ids, at: Date.now() } : remaining.length ? null : state.lastScene;
+    return { playbackQueue: remaining, lastScene };
+  }),
+  lastScene: null,
+  clearLastScene: () => set({ lastScene: null }),
   replayConversation: (id) => set((state) => {
     const conversation = state.cityConversations.find((c) => c.conversation_id === id);
     if (!conversation?.transcript.length || state.playbackQueue.some((c) => c.conversation_id === id)) return state;

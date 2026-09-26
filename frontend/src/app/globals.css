@@ -1920,3 +1920,48 @@ select {
 .story-card .outline-action { min-height: 30px; padding: 4px 10px; flex-shrink: 0; }
 .story-card .story-beats li { color: #3d4540; }
 .story-card .text-action { font-size: 12px; padding: 0 4px; }
+
+/* Tap someone: quick actions without leaving the map. */
+.person-bar { position: absolute; z-index: 12; left: 50%; transform: translateX(-50%); bottom: 116px; width: min(560px, calc(100% - 32px));
+  padding: 10px 12px 12px; border-radius: 12px; background: #1f2328f2; color: #fff; border: 1px solid #ffffff40; box-shadow: 0 10px 30px #0b181155; }
+.person-bar header { display: flex; gap: 10px; align-items: center; }
+.person-bar header > div { flex: 1; min-width: 0; }
+.person-bar header strong { display: flex; gap: 8px; align-items: baseline; font-size: 14px; }
+.person-bar header strong small { font-weight: 400; font-size: 11.5px; color: #bcc6c9; }
+.person-bar header span { display: flex; gap: 4px; align-items: center; font-size: 12px; color: #cfd8d2; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.person-bar header .icon-button { color: #cfd8d2; background: transparent; border-color: transparent; }
+.person-bar-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.person-bar-actions .primary-action { min-height: 34px; padding: 6px 12px; }
+.chip-action { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 5px 10px; border-radius: 999px;
+  border: 1px solid #ffffff40; background: #ffffff10; color: #fff; font-size: 12.5px; cursor: pointer; }
+.chip-action:hover:not(:disabled) { background: #ffffff22; }
+.chip-action:disabled { opacity: 0.5; cursor: default; }
+.person-bar .go-to, .banner-go { display: inline-flex; align-items: center; gap: 5px; }
+.person-bar .go-to { padding: 0 4px 0 10px; border-radius: 999px; border: 1px solid #ffe19c80; color: #ffe19c; }
+.person-bar .go-to select { background: transparent; color: #fff; border: 0; min-height: 32px; font-size: 12.5px; }
+.person-bar .go-to option { color: #111; }
+.banner-go { margin-left: 4px; color: #367a58; }
+.banner-go select { border: 1px solid #cfdcd1; border-radius: 6px; background: #fff; font-size: 12px; min-height: 28px; max-width: 110px; }
+
+/* "What happens next?" after a scene or in a story. */
+.next-move { position: absolute; z-index: 11; left: 20px; top: 92px; width: min(380px, calc(100% - 40px)); padding: 10px 12px 12px;
+  border-radius: 12px; background: #1f2328f2; color: #fff; border: 1px solid #ffe19c66; box-shadow: 0 10px 30px #0b181155; }
+.next-move header { display: flex; align-items: center; }
+.next-move header .icon-button { width: 28px; height: 28px; min-width: 28px; color: #cfd8d2; background: transparent; border-color: transparent; }
+.next-move > p { margin: 4px 0 8px; font-size: 12.5px; color: #cfd8d2; }
+.next-choices { display: grid; gap: 6px; }
+.story-tracker .next-choices { display: flex; flex-wrap: wrap; }
+.next-choices button { display: flex; align-items: center; gap: 8px; text-align: left; min-height: 36px; padding: 6px 10px; border-radius: 8px;
+  border: 1px solid #ffffff38; background: #ffffff10; color: #fff; font-size: 13px; cursor: pointer; }
+.next-choices button:hover:not(:disabled) { background: #ffe19c22; border-color: #ffe19c99; }
+.next-choices button:disabled { opacity: 0.5; cursor: default; }
+.story-next { margin-top: 10px; }
+.story-next small { display: block; margin-bottom: 6px; font-size: 11.5px; color: #ffe19c; }
+.conversation-on-stage .person-bar, .conversation-on-stage .next-move { display: none; }
+.world-stage:has(.person-bar) .camera-modes { visibility: hidden; }
+@media (max-width: 760px) {
+  .person-bar { bottom: 104px; }
+  .next-move { top: auto; bottom: 150px; left: 12px; width: calc(100% - 24px); }
+}
+.story-tracker { max-height: calc(100% - 270px); overflow-y: auto; }
+.story-next .next-choices button { min-height: 32px; padding: 5px 10px; border-radius: 999px; font-size: 12.5px; }
