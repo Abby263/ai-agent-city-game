@@ -1,11 +1,11 @@
 # Releasing Nakameguro For Everyone
 
-The game is one experience for everyone: adults, kids and families. The same rules apply to all players.
+The current cast is entirely 18+. This document retains the safeguards and release gates for a game that may be played by families; an adult cast is not a child-safety certification.
 
 ## In Place
 
 - **Player text checks** (`frontend/src/lib/safety.ts`, mirrored in `backend/app/safety.py`). Speech, tasks and election platforms are checked in the browser before any AI request, and again by the API, so a modified client cannot skip them. Blocked: phone numbers, emails, street addresses, passwords, links and common profanity or slurs, including simple disguises such as `sh1t` or `f.u.c.k`. Messages about self-harm are not sent to the AI; the player is pointed to a parent, teacher or other trusted adult.
-- **Child-safety prompt rules** (`CHILD_SAFETY_RULES`). Appended to every Deep Agent and structured model call: age-appropriate content only, no romance, violence, drugs or frightening content, no swearing even when provoked, never ask for personal details, never suggest secrets from adults, model kindness and repair.
+- **Citizen-safety prompt rules** (`CITIZEN_SAFETY_RULES`). Appended to every Deep Agent and structured model call: adult characters with non-explicit romance and non-graphic conflict, privacy boundaries, and no invented pregnancies or births. Child protections remain conditional safeguards if minors return. These prompts are not a substitute for output moderation.
 - **Onboarding** reminds players that citizens are AI characters and that real personal details must never be shared.
 - **Readability.** Interface text is at least 11px.
 

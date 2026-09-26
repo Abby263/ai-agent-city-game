@@ -40,13 +40,13 @@ short_term_goals:
 - Find out what Haruto is hiding
 long_term_goals:
 - Renovate the shop
-memory_summary: I run HappyMart 24 next to the shrine. I know everyone in the neighbourhood. My husband Kenji is the station master; our son Haruto is fourteen.
+memory_summary: I run HappyMart 24 next to the shrine. I know everyone in the neighbourhood. My husband Kenji is the station master; our son Haruto is twenty-two and works at the station. Sakura Kobayashi works shifts in my shop.
 relationship_scores:
   cit_040: 88
   cit_042: 88
 seed_memories:
 - memory_id: mem_seed_cit_041
-  content: I run HappyMart 24 next to the shrine. I know everyone in the neighbourhood. My husband Kenji is the station master; our son Haruto is fourteen.
+  content: I run HappyMart 24 next to the shrine. I know everyone in the neighbourhood. My husband Kenji is the station master; our son Haruto is twenty-two and works at the station. Sakura Kobayashi works shifts in my shop.
   importance: 0.8
 life:
   sex: female

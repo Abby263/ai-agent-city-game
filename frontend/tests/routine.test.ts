@@ -27,19 +27,25 @@ test("hobbies follow each resident's skills", () => {
   assert.equal(hobbyStop({ skills: [] }).location_id, "loc_park");
 });
 
-test("school days send students to school; weekends do not", () => {
+test("young adults go to their own jobs and keep hobbies on days off", () => {
   const ava = byName("Ava");
-  assert.equal(routineStop(ava, 1, 600).location_id, "loc_school");
+  assert.equal(routineStop(ava, 1, 600).activity, "Working as lab assistant");
   const saturday = routineStop(ava, 6, 600);
   assert.notEqual(saturday.location_id, "loc_school");
   assert.equal(saturday.location_id, "loc_lab");
   assert.equal(routineStop(ava, 6, 750).location_id, "loc_restaurant");
 });
 
-test("club afternoons on Tuesday and Thursday use hobbies", () => {
+test("hobbies fit around shifts instead of replacing work", () => {
   const eliot = byName("Eliot");
-  assert.equal(routineStop(eliot, 1, 960).location_id, "loc_park");
+  assert.equal(routineStop(eliot, 1, 960).location_id, "loc_mall");
   assert.equal(routineStop(eliot, 2, 960).location_id, "loc_farm");
+  const ava = byName("Ava");
+  assert.equal(routineStop(ava, 1, 1125).activity, hobbyStop(ava).activity);
+  const sakura = byName("Sakura");
+  assert.equal(hobbyStop(sakura).location_id, "loc_restaurant");
+  assert.match(routineStop(sakura, 2, 660).activity, /Piano practice/);
+  assert.match(routineStop(sakura, 1, 1300).activity, /Piano practice/);
 });
 
 test("nameplate icons describe what residents are doing", async () => {

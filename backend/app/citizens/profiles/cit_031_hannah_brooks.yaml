@@ -1,6 +1,6 @@
 citizen_id: cit_031
 name: Hannah Brooks
-age: 36
+age: 44
 profession: Bank clerk
 active: true
 work_location_id: loc_bank
@@ -32,20 +32,20 @@ personality:
     shirt: '#c98ea7'
     background: '#f3dce6'
   playable: true
-current_thought: Eleven days until the due date. Is the cot even assembled?
+current_thought: Leo seems happier at the substation. Maybe it is time to focus on my own promotion.
 short_term_goals:
-- Finish the baby's room
-- Hand over my work before leave
+- Turn Leo's old room into a sewing corner
+- Prepare my branch supervisor application
 long_term_goals:
-- Give both kids a calm, happy home
-memory_summary: I work at Aobadai Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.
+- Keep a calm, happy home for all of us
+memory_summary: I work at Aobadai Bank. Our son Leo is nineteen now and working at the substation, and I'm proud and a little lost. Walter, Tom's dad, lives with us.
 relationship_scores:
   cit_030: 88
   cit_032: 78
   cit_026: 90
 seed_memories:
 - memory_id: mem_seed_cit_031
-  content: I work at Aobadai Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.
+  content: I work at Aobadai Bank. Our son Leo is nineteen now and working at the substation, and I'm proud and a little lost. Walter, Tom's dad, lives with us.
   importance: 0.8
 life:
   sex: female
@@ -72,11 +72,8 @@ life:
     - 3
     - 4
   ambition:
-    goal: Welcome our second baby safely
-    kind: family
-    progress: 60
+    goal: Get promoted to branch supervisor
+    kind: career
+    progress: 40
   conditions: []
-  wants_children: true
-  pregnancy:
-    partner_id: cit_030
-    due_in_days: 11
+  wants_children: false

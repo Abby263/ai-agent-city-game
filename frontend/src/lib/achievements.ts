@@ -11,7 +11,7 @@ export type Achievement = {
   id: string;
   icon: string;
   title: string;
-  /** How to earn it, written for a 10-15 year old player. */
+  /** How to earn it, in one short line. */
   hint: string;
   earned: (context: AchievementContext) => boolean;
 };
@@ -38,25 +38,25 @@ export const achievements: Achievement[] = [
     earned: ({ conversations }) => conversations.length >= 10 },
   { id: "party_planner", icon: "🎉", title: "Party planner", hint: "Start a neighbourhood festival from the City panel.",
     earned: ({ city }) => happened(city, "city_festival") },
-  { id: "exam_season", icon: "📝", title: "Exam season", hint: "Start an exam day and see how everyone copes.",
+  { id: "exam_season", icon: "📝", title: "Exam season", hint: "Start a qualification exam day and see how everyone copes.",
     earned: ({ city }) => happened(city, "school_exam") },
-  { id: "democracy", icon: "🗳️", title: "Democracy in action", hint: "Run a student-council election all the way to the result.",
+  { id: "democracy", icon: "🗳️", title: "Democracy in action", hint: "Run a neighbourhood-council election all the way to the result.",
     earned: ({ city }) => happened(city, "election_result") },
   { id: "birthday", icon: "🎂", title: "Happy birthday!", hint: "Be in Nakameguro when someone celebrates a birthday.",
     earned: ({ city }) => lived(city, "birthday") },
-  { id: "new_life", icon: "👶", title: "Welcome, little one", hint: "See a baby born at Kyosai Hospital.",
-    earned: ({ city }) => lived(city, "birth") },
+  { id: "wedding_bells", icon: "💒", title: "Wedding bells", hint: "See two residents get married in the park.",
+    earned: ({ city }) => lived(city, "wedding") },
   { id: "get_well", icon: "💚", title: "Get well soon", hint: "See someone get sick, get treated and recover.",
     earned: ({ city }) => lived(city, "recovered") },
-  { id: "love", icon: "💕", title: "Love is in the air", hint: "Two grown-ups start dating or get married.",
-    earned: ({ city }) => lived(city, "dating", "engaged", "wedding") },
+  { id: "love", icon: "💕", title: "Love is in the air", hint: "See two residents start dating.",
+    earned: ({ city }) => lived(city, "dating", "engaged") },
   { id: "dream", icon: "🌟", title: "Dream come true", hint: "Help someone achieve their big ambition.",
     earned: ({ city }) => lived(city, "ambition") },
-  { id: "top_marks", icon: "📝", title: "Report card day", hint: "Make it to Saturday's weekly report cards.",
-    earned: ({ city }) => lived(city, "report_cards") },
+  { id: "heartbreak", icon: "💔", title: "It's complicated", hint: "See a couple break up.",
+    earned: ({ city }) => lived(city, "breakup") },
   { id: "night_owl", icon: "🌙", title: "Night owl", hint: "Keep Nakameguro running until 10 pm.",
     earned: ({ city }) => city.clock.day > 1 || city.clock.minute_of_day >= 1320 },
-  { id: "weekend", icon: "☀️", title: "Weekend!", hint: "Reach the first Saturday. No school today!",
+  { id: "weekend", icon: "☀️", title: "Weekend!", hint: "Reach the first Saturday. No work today (for most)!",
     earned: ({ city }) => city.clock.day >= 6 },
   { id: "whole_week", icon: "🏆", title: "A whole week", hint: "Live through a full week in Nakameguro.",
     earned: ({ city }) => city.clock.day >= 8 },

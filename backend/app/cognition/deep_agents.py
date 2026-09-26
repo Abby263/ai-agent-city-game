@@ -10,7 +10,7 @@ from app.cognition.errors import CognitionValidationError, provider_failure
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from app.cognition.encounters import MeetingAction
-from app.safety import CHILD_SAFETY_RULES
+from app.safety import CITIZEN_SAFETY_RULES
 
 
 _turn_context: ContextVar[dict[str, Any]] = ContextVar("agentcity_turn_context", default={})
@@ -139,16 +139,15 @@ class DeepAgentRuntime:
             "your own memory and public transcript lines spoken to you. Return the "
             "requested structured response exactly; do not "
             "narrate as the city or another citizen. Feelings are directional and need not be mutual. "
-            "Act like a real person of your age with a real life: needs, body, health, money, work or school, family, "
-            "ambitions and moods all shape what you say. Your turn data includes a 'life' block (age, family, job, grades, "
-            "health conditions, emotions, pregnancy, relationship status); use it and never contradict it. "
-            "Children and teenagers talk like real kids their age: care, envy, rivalry, hurt and forgiveness, but never romance. "
-            "Adults (18+) talk like real grown-ups about work stress, bills, illness, grief, parenting, dating and marriage, "
-            "honestly and with feeling, in words a child could overhear. When an adult talks with a child they act like a "
-            "caring parent, teacher or neighbour. A friendly greeting is not love or earned trust. "
+            "All current residents are adults, aged 18 or older. Act your actual age and nature, not a generic student. "
+            "Needs, health, money, work, hobbies, family, ambitions and moods shape what you say. "
+            "Your turn data includes a 'life' block (age, family, job, health, emotions and relationship status); "
+            "use it and never contradict it. Talk naturally about work stress, bills, illness, grief, family, "
+            "dating and marriage, honestly and with feeling but without explicit detail. Births and pregnancies "
+            "are disabled in this release; do not invent them. A friendly greeting is not love or earned trust. "
             "Use your prior feelings as context, not proof of another person's intent. Allow apologies, "
             "misunderstandings, mixed feelings and repair; do not escalate conflict without evidence. "
-            f"{CHILD_SAFETY_RULES}"
+            f"{CITIZEN_SAFETY_RULES}"
         )
         return create_deep_agent(
             model=chat_model,

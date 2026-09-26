@@ -20,7 +20,7 @@ import { bondLabel, conversationImpact, emptyFeelings, evolveRelationship } from
 import { acceptMeeting, cityMinute, meetingFor, meetingMinute, sociallyAvailable } from "./encounters";
 import type { DecideSocial, EncounterContext } from "./encounters";
 import { currentElection, liveElection, electionNotice, playerTurn, recordBallot, tallyElection } from "./elections";
-import type { DecideElection, Election, ElectionDecisionRequest } from "./elections";
+import type { DecideElection, Election, ElectionDecision, ElectionDecisionRequest } from "./elections";
 import { assertPlayerTextSafe } from "./safety";
 import { isWeekend, routineStop, weekday, type RoutineContext } from "./routine";
 import { calendarDay, calendarStartFor, realCityTime } from "./calendar";
@@ -34,7 +34,7 @@ import type { LifeNews } from "./life";
 import { bedRest, careNeeded, caregiverFor, ensureLife, gatheringFor, healthCap, lifeDay, lifeTick, recordMeal, relatives, shiftLife } from "./life";
 import type { BondLookup, LifeFactory, LifeSink } from "./life";
 
-const SESSION_VERSION = "v11";
+const SESSION_VERSION = "v12";
 const CITY_KEY = `agentcity.${SESSION_VERSION}.city`;
 const RELATIONSHIPS_KEY = `agentcity.${SESSION_VERSION}.relationships`;
 const CONVERSATIONS_KEY = `agentcity.${SESSION_VERSION}.conversations`;
@@ -209,7 +209,7 @@ export async function sessionStart() {
     addEvent(city, {
       event_type: "manual_mode_waiting",
       description:
-        "Manual mode is waiting for the player to assign a student task.",
+        "Manual mode is waiting for the player to assign a task.",
       priority: 1,
     });
     return saveAndReturn(city);
@@ -377,8 +377,8 @@ export async function sessionSetMode(mode: SimulationMode) {
         mode === "manual" ? "manual_mode_enabled" : "autonomous_mode_enabled",
       description:
         mode === "manual"
-          ? "Manual mode enabled. The city waits until the player assigns a student task."
-          : "Autonomous mode enabled. Students resume daily life, conversations, and city reactions.",
+          ? "Manual mode enabled. The city waits until the player assigns a task."
+          : "Autonomous mode enabled. Residents resume daily life, conversations, and city reactions.",
       priority: 2,
     });
   }
@@ -544,7 +544,7 @@ export async function sessionTick(generateCognition: GenerateCognition, decideEl
     city.clock.day += 1;
     addEvent(city, {
       event_type: "new_day",
-      description: `${weekday(city.clock.day)}, day ${city.clock.day} begins in Nakameguro.${isWeekend(city.clock.day) ? " No school today!" : ""}`,
+      description: `${weekday(city.clock.day)}, day ${city.clock.day} begins in Nakameguro.${isWeekend(city.clock.day) ? " The weekend is here!" : ""}`,
       priority: 2,
     });
     lifeDay(city, lifeSink(city), bondLookup(city), lifeFactory(city));
@@ -670,10 +670,10 @@ export async function sessionStartElection(candidateId: string, rivalId: string,
   assertPlayerTextSafe(platform);
   if (playerTask(rival)?.status === "active") throw new Error("The rival has an active task. Finish it or choose another candidate.");
   const event: Election = {
-    event_id: newId("election"), kind: "student_election", title: "Nakameguro student council",
+    event_id: newId("election"), kind: "council_election", title: "Nakameguro neighbourhood association",
     phase: "campaign", candidates: [{ citizen_id: candidateId, name: candidate.name, platform: platform.trim() }, { citizen_id: rivalId, name: rival.name, platform: "" }],
-    // Student council: only students vote.
-    voter_ids: city.citizens.filter((c) => c.profession === "Student").map((c) => c.citizen_id), campaign_until_tick: city.clock.tick + 32,
+    // Neighbourhood association: every resident votes.
+    voter_ids: city.citizens.filter((c) => c.age >= 18).map((c) => c.citizen_id), campaign_until_tick: city.clock.tick + 32,
     ballots: [], campaign_turn: 0, campaign_log: [],
   };
   city.activities = [...(city.activities ?? []).slice(-4), event];
@@ -691,7 +691,7 @@ export async function sessionStartElection(candidateId: string, rivalId: string,
   city.simulation_mode = "autonomous";
   city.policy.simulation_mode = "autonomous";
   city.clock.running = true;
-  addEvent(city, { event_type: "election_started", actors: [candidateId, rivalId], description: `${candidate.name} and ${rival.name} are running for student council.`, priority: 3 });
+  addEvent(city, { event_type: "election_started", actors: [candidateId, rivalId], description: `${candidate.name} and ${rival.name} are running to chair the neighbourhood association.`, priority: 3 });
   return saveAndReturn(city);
 }
 
@@ -724,8 +724,8 @@ function applyBallot(city: CityState, voterId: string, voteFor: string | null, r
     }
     const first = (name: string) => name.split(" ")[0];
     const description = result.by_lot && result.winner
-      ? `${result.counts.map((c) => first(c.name)).join(" and ")} tied ${result.winner.votes}–${result.winner.votes}. ${result.winner.name} won the student council by drawing lots.`
-      : result.winner ? `${result.winner.name} won the student-council election with ${result.winner.votes} votes.` : result.tied ? "The student-council election ended in a tie. No winner was declared." : "Everyone abstained. No winner was declared.";
+      ? `${result.counts.map((c) => first(c.name)).join(" and ")} tied ${result.winner.votes}–${result.winner.votes}. ${result.winner.name} won the neighbourhood election by drawing lots.`
+      : result.winner ? `${result.winner.name} won the neighbourhood-association election with ${result.winner.votes} votes.` : result.tied ? "The neighbourhood election ended in a tie. No winner was declared." : "Everyone abstained. No winner was declared.";
     const resultEvent = addEvent(city, { event_type: "election_result", description, actors: updated.candidates.map((c) => c.citizen_id), priority: 3 });
     for (const voter of updated.voter_ids) addMemory({ citizen_id: voter, kind: "episodic", content: description, importance: 0.85, salience: 0.85, related_citizen_id: result.winner?.citizen_id ?? null, extra: { election_id: event.event_id, source: "public_result" } });
     if (updated.story_id) {
@@ -744,36 +744,36 @@ export async function sessionStartElectionAuto(firstId: string, secondId: string
   if (liveElection(city)) throw new Error("An election is already running. Wait for the result first.");
   if (firstId === secondId) throw new Error("Choose two different candidates.");
   const [a, b] = [findCitizen(city, firstId), findCitizen(city, secondId)];
-  if (![a, b].every((c) => c.profession === "Student")) throw new Error("Student-council candidates must be students.");
-  const voters = city.citizens.filter((c) => c.profession === "Student").map((c) => c.citizen_id);
+  if (![a, b].every((c) => c.age >= 18)) throw new Error("Candidates must be residents aged 18 or over.");
+  const voters = city.citizens.filter((c) => c.age >= 18).map((c) => c.citizen_id);
   const event: Election = {
-    event_id: newId("election"), kind: "student_election", title: "Nakameguro School student council", phase: "campaign",
+    event_id: newId("election"), kind: "council_election", title: "Nakameguro neighbourhood association (chōnaikai)", phase: "campaign",
     candidates: [{ citizen_id: a.citizen_id, name: a.name, platform: "" }, { citizen_id: b.citizen_id, name: b.name, platform: "" }],
     voter_ids: voters, campaign_until_tick: city.clock.tick + 9999, ballots: [], campaign_turn: 0, campaign_log: [], auto: true,
   };
   city.activities = [...(city.activities ?? []).slice(-4), event];
   const platforms = await Promise.all([a, b].map((c) => decide(electionRequest(city, c, "platform"))));
   if (isStale(city)) return requireSessionCity();
-  platforms.forEach((p, i) => { event.candidates[i].platform = p.platform.trim() || "Make school better for everyone."; [a, b][i].mood = p.mood || [a, b][i].mood; });
+  platforms.forEach((p, i) => { event.candidates[i].platform = p.platform.trim() || "Make Nakameguro better for everyone."; [a, b][i].mood = p.mood || [a, b][i].mood; });
   const story = startStory(city, {
-    id: newId("story"), kind: "election", icon: "🗳️", title: `Student-council election: ${a.name.split(" ")[0]} vs ${b.name.split(" ")[0]}`,
-    actors: [...new Set([a.citizen_id, b.citizen_id, ...voters])], focus_ids: [a.citizen_id, b.citizen_id], location_id: "loc_school",
-    first: { icon: "🗳️", text: `${a.name} and ${b.name} are running for student council.` }, length: 48 * 60,
+    id: newId("story"), kind: "election", icon: "🗳️", title: `Neighbourhood election: ${a.name.split(" ")[0]} vs ${b.name.split(" ")[0]}`,
+    actors: [...new Set([a.citizen_id, b.citizen_id, ...voters])], focus_ids: [a.citizen_id, b.citizen_id], location_id: "loc_city_hall",
+    first: { icon: "🗳️", text: `${a.name} and ${b.name} are running to chair the neighbourhood association.` }, length: 48 * 60,
   });
   event.story_id = story.id;
   for (const c of event.candidates) addBeat(city, story.id, { icon: "📣", text: `${c.name.split(" ")[0]}'s platform: “${c.platform.slice(0, 160)}”` });
-  addEvent(city, { event_type: "election_started", actors: [a.citizen_id, b.citizen_id], description: `${a.name} and ${b.name} are running for student council.`, priority: 3 });
+  addEvent(city, { event_type: "election_started", actors: [a.citizen_id, b.citizen_id], description: `${a.name} and ${b.name} are running to chair the neighbourhood association.`, priority: 3 });
   return saveAndReturn(city);
 }
 
-/** Campaigning ends and every student casts a private ballot (called by the shell, or by a candidate you play). */
+/** Campaigning ends and every resident casts a private ballot (called by the shell, or by a candidate you play). */
 export async function sessionOpenBallots() {
   const city = requireSessionCity();
   const event = liveElection(city);
   if (!event?.auto || event.phase !== "campaign") throw new Error("There is no campaign to close.");
   event.phase = "voting";
-  addBeat(city, event.story_id ?? "", { icon: "🗳️", text: "Campaigning is over. Every student is casting a private ballot." });
-  addEvent(city, { event_type: "election_voting", description: "Campaigning has ended. Students are casting private ballots.", priority: 3 });
+  addBeat(city, event.story_id ?? "", { icon: "🗳️", text: "Campaigning is over. Every resident is casting a private ballot." });
+  addEvent(city, { event_type: "election_voting", description: "Campaigning has ended. Residents are casting private ballots.", priority: 3 });
   return saveAndReturn(city);
 }
 
@@ -835,7 +835,7 @@ export async function sessionAdvanceAutoElection(generate: GenerateCognition, de
     }
     addBeat(city, storyId, { icon: "🚶", text: `${first(candidate)} goes to win over ${first(target)}${decision.target_id === target.citizen_id && decision.intention ? `: ${decision.intention}` : "."}` });
     const response = await generate({ city, actor_id: candidate.citizen_id, target_id: target.citizen_id, require_conversation: true,
-      task: `Ask ${target.name} for their vote in the student-council election.`,
+      task: `Ask ${target.name} for their vote in the neighbourhood election.`,
       observations: [...electionNotice(city), `You are ${candidate.name}, one of the two candidates. Say that you're running, pitch your own platform in your own words and ask ${first(target)} for their vote.`,
         `Your private campaign intention: ${decision.intention || decision.reason}`], memories: [],
       private_memories: { [candidate.citizen_id]: privateMemoryContext(candidate), [target.citizen_id]: privateMemoryContext(target) } });
@@ -843,18 +843,28 @@ export async function sessionAdvanceAutoElection(generate: GenerateCognition, de
     applyAutonomousCognition(city, candidate, target, { event_id: event.event_id, location_id: target.current_location_id } as CityEvent, response);
     return saveAndReturn(city);
   }
-  // Voting: everyone decides privately and at the same time; a failed decision counts as an abstention.
+  // Bound concurrency; failed decisions are missing ballots, never invented abstentions.
   // Your own ballot is yours: everyone else votes, then the election waits for you.
   const voters = event.voter_ids.filter((id) => id !== player && !event.ballots.some((b) => b.voter_id === id));
   if (!voters.length) return city;
-  const decisions = await Promise.all(voters.map((id) => decide(electionRequest(city, findCitizen(city, id), "vote")).catch(() => null)));
+  const decisions: Array<ElectionDecision | null> = [];
+  for (let i = 0; i < voters.length; i += 8) {
+    if (isStale(city)) return requireSessionCity();
+    decisions.push(...await Promise.all(voters.slice(i, i + 8).map((id) => decide(electionRequest(city, findCitizen(city, id), "vote")).catch(() => null))));
+    if (decisions.slice(i).some((d) => !d)) break;
+  }
   if (isStale(city)) return requireSessionCity();
+  let missing = 0;
   voters.forEach((id, i) => {
     const d = decisions[i];
-    applyBallot(city, id, d && event.candidates.some((c) => c.citizen_id === d.vote_for) ? d.vote_for : null, d?.reason ?? "I couldn't make up my mind.", "agent");
-    if (d?.mood) findCitizen(city, id).mood = d.mood;
+    if (!d || (d.vote_for !== null && !event.candidates.some((c) => c.citizen_id === d.vote_for))) { missing++; return; }
+    applyBallot(city, id, d.vote_for, d.reason, "agent");
+    if (d.mood) findCitizen(city, id).mood = d.mood;
   });
-  if (player && liveElection(city)) addBeat(city, storyId, { icon: "🗳️", text: `Everyone else has voted. It's down to your ballot, ${first(findCitizen(city, player))}.` });
+  const pending = liveElection(city);
+  if (pending && missing) {
+    pending.error = `${missing} ballots are still waiting on the AI service. No votes were invented. Retry when the service is ready.`;
+  } else if (player && pending) addBeat(city, storyId, { icon: "🗳️", text: `Everyone else has voted. It's down to your ballot, ${first(findCitizen(city, player))}.` });
   return saveAndReturn(city);
 }
 
@@ -924,7 +934,7 @@ async function advanceElection(city: CityState, generate: GenerateCognition, dec
       return;
     }
     const response = await generate({ city, actor_id: actor.citizen_id, target_id: target.citizen_id, require_conversation: true,
-      task: `Discuss the student council election with ${target.name}.`, observations: [...electionNotice(city), `Your private campaign intention: ${event.agenda.intention}`], memories: [],
+      task: `Discuss the neighbourhood election with ${target.name}.`, observations: [...electionNotice(city), `Your private campaign intention: ${event.agenda.intention}`], memories: [],
       private_memories: { [actor.citizen_id]: privateMemoryContext(actor), [target.citizen_id]: privateMemoryContext(target) } });
     if (isStale(city)) return;
     applyAutonomousCognition(city, actor, target, { event_id: event.event_id, location_id: actor.current_location_id } as CityEvent, response);
@@ -942,11 +952,11 @@ export async function sessionTriggerEvent(payload: TriggerEventPayload) {
     payload.location_id ?? defaultEventLocation(payload.event_type);
   const severity = payload.severity ?? "medium";
   const multiplier = severity === "high" ? 1.45 : severity === "low" ? 0.6 : 1;
-  let description = "A city event changes the students' day.";
+  let description = "A city event changes everyone's day.";
   const actors: string[] = [];
 
   if (payload.event_type === "flu_outbreak") {
-    description = "A flu outbreak starts spreading around the school.";
+    description = "A flu outbreak starts spreading around Nakameguro.";
     for (const citizen of city.citizens) {
       actors.push(citizen.citizen_id);
       citizen.health = clamp(citizen.health - 28 * multiplier);
@@ -955,7 +965,7 @@ export async function sessionTriggerEvent(payload: TriggerEventPayload) {
         citizen_id: citizen.citizen_id,
         kind: "episodic",
         content:
-          "A flu outbreak is spreading around school, and everyone is watching who gets sick.",
+          "A flu outbreak is spreading through the offices and trains, and everyone is watching who gets sick.",
         importance: 0.82,
         salience: 0.86,
         related_citizen_id: null,
@@ -963,14 +973,14 @@ export async function sessionTriggerEvent(payload: TriggerEventPayload) {
       });
     }
   } else if (payload.event_type === "school_exam") {
-    description = "The school starts an important exam day.";
+    description = "Qualification exam day: everyone studying for a certificate sits their test.";
     for (const citizen of city.citizens) {
       actors.push(citizen.citizen_id);
       citizen.stress = clamp(citizen.stress + 10 * multiplier);
     }
   } else if (payload.event_type === "city_festival") {
     description =
-      "A city festival begins at the park and gives the students a reason to meet.";
+      "A city festival begins at the park and gives everyone a reason to meet.";
     for (const citizen of city.citizens) {
       actors.push(citizen.citizen_id);
       citizen.happiness = clamp(citizen.happiness + 12 * multiplier);
@@ -983,7 +993,7 @@ export async function sessionTriggerEvent(payload: TriggerEventPayload) {
     }
   } else if (payload.event_type === "food_shortage") {
     description =
-      "A food shortage hits the market and students talk about bringing lunch from home.";
+      "A food shortage hits the market and people talk about bringing lunch from home.";
     for (const citizen of city.citizens) {
       citizen.hunger = clamp(citizen.hunger + 8 * multiplier);
     }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { createInitialCity } from "../src/lib/initial-city";
-import { getSessionCity, seedSession, sessionAdvanceAutoElection, sessionCastVote, sessionConversations, sessionCreateSituation, sessionStartElectionAuto, sessionTakeControl } from "../src/lib/session-simulation";
+import { getSessionCity, saveSessionCity, seedSession, sessionAdvanceAutoElection, sessionCastVote, sessionConversations, sessionCreateSituation, sessionPause, sessionStartElectionAuto, sessionTakeControl } from "../src/lib/session-simulation";
 import { activeStories } from "../src/lib/stories";
 import type { SessionCognitionRequest, SessionCognitionResponse } from "../src/lib/types";
 import { playerTurn, type DecideElection } from "../src/lib/elections";
@@ -14,6 +14,46 @@ Object.defineProperty(globalThis, "window", {
 beforeEach(() => { storage.clear(); seedSession(createInitialCity()); });
 
 let n = 0;
+
+test("26 private ballots use batches of eight; failures remain missing and retry without duplicate votes", async () => {
+  const decide: DecideElection = async () => ({ platform: "A shared garden", target_id: null, intention: "", vote_for: "cit_009", reason: "I like the garden.", mood: "Hopeful" });
+  await sessionStartElectionAuto("cit_009", "cit_021", decide);
+  const city = getSessionCity()!;
+  city.activities!.at(-1)!.phase = "voting";
+  saveSessionCity(city);
+  let active = 0, peak = 0, calls = 0;
+  const next = await sessionAdvanceAutoElection(talk, async (request) => {
+    active++; calls++; peak = Math.max(peak, active);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    active--;
+    if (request.citizen.citizen_id === "cit_009") throw new Error("Rate limited");
+    return decide(request);
+  });
+  assert.equal(peak, 8);
+  assert.equal(calls, 8, "stop new batches when the service fails");
+  assert.equal(next.activities!.at(-1)!.ballots.length, 7);
+  assert.ok(next.activities!.at(-1)!.ballots.every((b) => b.vote_for !== null));
+  assert.match(next.activities!.at(-1)!.error!, /19 ballots/);
+  const done = await sessionAdvanceAutoElection(talk, decide);
+  assert.equal(done.activities!.at(-1)!.phase, "complete");
+  assert.equal(new Set(done.activities!.at(-1)!.ballots.map((b) => b.voter_id)).size, 26);
+});
+
+test("pausing during a ballot batch stops later batches and discards pending votes", async () => {
+  const decide: DecideElection = async () => ({ platform: "A shared garden", target_id: null, intention: "", vote_for: "cit_009", reason: "Garden", mood: "Hopeful" });
+  await sessionStartElectionAuto("cit_009", "cit_021", decide);
+  const city = getSessionCity()!;
+  city.activities!.at(-1)!.phase = "voting";
+  saveSessionCity(city);
+  let calls = 0;
+  const next = await sessionAdvanceAutoElection(talk, async (request) => {
+    calls++;
+    if (calls === 1) await sessionPause();
+    return decide(request);
+  });
+  assert.equal(calls, 8);
+  assert.equal(next.activities!.at(-1)!.ballots.length, 0);
+});
 const talk = async (request: SessionCognitionRequest): Promise<SessionCognitionResponse> => ({
   thought: "", mood: "Surprised", memory: "We talked.", reflection: "", importance: 0.6,
   conversation: { conversation_id: `c${++n}`, game_day: 1, game_minute: 360, location_id: null, actor_ids: [request.actor_id, request.target_id!], summary: "They talked it over.",
@@ -56,11 +96,12 @@ test("an election from Create runs its campaign and ends with a winner in the st
 test("a tied election is settled by drawing lots", async () => {
   const city = getSessionCity()!;
   const [ava, noah] = ["Ava", "Noah"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
-  const students = city.citizens.filter((c) => c.profession === "Student").map((c) => c.citizen_id);
+  const voters = city.citizens.map((c) => c.citizen_id);
+  assert.equal(voters.length, 26);
   const decide: DecideElection = async (request) => ({
     platform: "More clubs.", target_id: null, intention: "", reason: "Close call.", mood: "Calm",
     // Alternate so the ballots split evenly.
-    vote_for: request.purpose === "vote" ? (students.indexOf(request.citizen.citizen_id) % 2 ? ava : noah) : null,
+    vote_for: request.purpose === "vote" ? (voters.indexOf(request.citizen.citizen_id) % 2 ? ava : noah) : null,
   });
   await sessionStartElectionAuto(ava, noah, decide);
   for (let i = 0; i < 4; i++) await sessionAdvanceAutoElection(talk, decide);
@@ -68,7 +109,7 @@ test("a tied election is settled by drawing lots", async () => {
   assert.equal(done.activities!.at(-1)!.phase, "complete");
   const beat = (done.stories ?? []).find((s) => s.kind === "election")!.beats.at(-1)!;
   assert.equal(beat.icon, "🏆");
-  assert.match(beat.text, /won the student council by drawing lots/);
+  assert.match(beat.text, /won the neighbourhood election by drawing lots/);
   assert.equal((done.life_log ?? []).filter((e) => e.kind === "election").length, 1, "the result is in the news once");
 });
 

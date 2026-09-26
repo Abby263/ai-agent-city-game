@@ -8,7 +8,7 @@ from app.schemas import CitizenAgent
 
 
 def request(purpose="vote"):
-    citizen = CitizenAgent(citizen_id="ava", name="Ava", age=13, profession="Student", home_location_id="homes", current_location_id="homes", x=1, y=1,
+    citizen = CitizenAgent(citizen_id="ava", name="Ava", age=20, profession="Lab assistant", home_location_id="homes", current_location_id="homes", x=1, y=1,
         money=100, health=90, hunger=20, energy=80, stress=20, happiness=70, reputation=50,
         work_location_id="school", target_x=1, target_y=1, mood="Calm",
         current_activity="Studying", current_thought="Art matters", memory_summary="I enjoy art.")
@@ -31,6 +31,8 @@ def test_agent_may_vote_for_rival_from_own_memory():
     assert output.vote_for == "noah"
     assert prompts[0]["private_memories_for_speaker_only"] == ["I like art. Noah listened to my concerns."]
     assert "ballots" not in prompts[0]
+    assert "neighbourhood-association" in prompts[0]["public_event"]
+    assert "student-council" not in str(prompts[0])
 
 
 def test_invalid_vote_or_campaign_target_is_rejected():

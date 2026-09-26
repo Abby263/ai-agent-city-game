@@ -96,6 +96,7 @@ export function lifeFromProfile(profile: { citizen_id: string; age?: number; pro
     loneliness: raw.loneliness ?? 25,
     household_id: raw.household_id ?? "home_a",
     parent_ids: raw.parent_ids ?? [],
+    family_roles: raw.family_roles,
     partner_id: raw.partner_id ?? null,
     children_ids: raw.children_ids ?? [],
     relationship_status: raw.relationship_status ?? "single",

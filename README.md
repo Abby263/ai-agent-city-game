@@ -1,17 +1,19 @@
 # AgentCity
 
-AgentCity is a playable 3D AI city simulation where citizens are autonomous agents with daily routines, needs, money, relationships, memory, and goals. Explore a cel-shaded neighborhood with animated citizens, blossom trees, shopfronts, a market, a schoolyard, and a riverside. The current MVP has eight active student agents, including newcomers Sophie Laurent, Zara Ali, and Eliot Chen. Other citizen profiles remain inactive in the codebase.
+AgentCity is a playable 3D AI city simulation where citizens are autonomous agents with daily routines, needs, money, relationships, memory, and goals. Explore a cel-shaded neighborhood with animated citizens, blossom trees, shopfronts, a market, a schoolyard, and a riverside. The current cast has 26 active residents, all aged 18 or older, from young workers to seniors. Other citizen profiles remain inactive in the codebase.
 
 **Follow what you start.** Every situation, action or election you create becomes a
 **Happening now** story: the reaction plays straight away, and the card on the map
 collects each beat (who went to whom, what they said, what changed) with **Watch** and
-**Replay talk**. News lists all running stories. A student-council election is one of
+**Replay talk**. News lists all running stories. A neighbourhood-association election is one of
 these situations: pick two candidates in Create and watch them campaign, or play a
-student to question the candidates and cast your own secret ballot. See [event gameplay and architecture](docs/events.md).
+resident to question the candidates and cast your own secret ballot. See [event gameplay and architecture](docs/events.md).
 
 This repo is `ai-agent-city-game`. The visible product name is `AgentCity`.
 
-Deployment URL: [ai-agent-city-game.vercel.app](https://ai-agent-city-game.vercel.app). Hosting remains paused; use local setup to play this revision.
+Deployment URL: [ai-agent-city-game.vercel.app](https://ai-agent-city-game.vercel.app).
+
+**Adult-cast release:** saves now use `agentcity.v12`. Opening this version starts a fresh world, without importing old conversations, memories or under-18 residents from `v11`. Old browser data is left untouched. Pregnancy and births are disabled; their implementation remains behind `BIRTHS_ENABLED` in the life engine.
 
 ## Play This Version
 
@@ -23,15 +25,15 @@ Deployment URL: [ai-agent-city-game.vercel.app](https://ai-agent-city-game.verce
 - **Auto:** routines and occasional conversations run while the tab is visible. Pause always remains available, including during an AI request.
 - **Talk:** chronological dialogue with speaker/recipient names and task separators. Scroll back without being dragged to the latest message. Use the citizen filter to follow one person's story.
 - **Bonds:** directional trust and warmth, with reasons and a history of changes. Repeated greetings do not automatically create friendship.
-- **A real week:** day 1 is a Monday. Students go to school on weekdays, eat breakfast and dinner at home and lunch at school, join hobby clubs on Tuesday and Thursday afternoons (lab, library, farm, cafe kitchen or park, depending on their skills) and follow their hobbies at the weekend. Everyone gets $15 pocket money each Monday.
+- **A real week:** day 1 is a Monday. Residents follow their own work shifts and days off. Under-30s make time for hobbies after work and on days off; Sakura practises piano at the cafe. Adults share household bills each Monday, earn wages at work, and seniors receive pensions.
 - **Badges:** 14 goals reward trying every part of the game, such as your first conversation, playing as someone, exploring five places, seeing a friendship form or finishing an election. Open Badges to see how to earn them.
 - **New players:** a short guide appears on the first visit and reopens from the ? button.
 - **A real Tokyo neighbourhood:** Nakameguro, on real Tokyo time, date and weather, with the cherry-lined Meguro River, the elevated Tōyoko line and trains, buses driving on the left, shops, offices, a shrine and a clinic. See [Nakameguro](docs/nakameguro.md).
 - **Natural conversations:** every resident has their own natural AI voice, lips that move with the audio, and gestures that fit what they say. Chats as a resident are continuous and happen where you stand, and plans you agree on can be saved. See [conversations, voices and body language](docs/conversations.md).
-- **Play god and take action:** Create changes the weather or sets up situations (dropped money, fires, accidents, love, rivalries, a school election) and shows the reaction right away. Act lets any resident hug, help, argue with, slap or ask out any other, and everyone reacts in character.
-- **Real lives:** 18 residents in eight families: students, working parents, a grandfather and, soon, a baby. Everyone ages a day per city day and has a body, feelings, a job or school grades, money, ambitions, health problems, family and love. Babies are born, people get sick and recover, and people can die of old age. See [life simulation](docs/life-simulation.md).
+- **Play god and take action:** Create changes the weather or sets up situations (dropped money, fires, accidents, love, rivalries, a neighbourhood election) and shows the reaction right away. Act lets residents interact, with family boundaries and individual reactions.
+- **Real lives:** 26 adults have jobs, hobbies, bodies, feelings, money, ambitions, health problems, family and love. Everyone ages a day per city day; residents get sick, recover, celebrate birthdays, marry and may die of old age. No pregnancies or births in this release. See [life simulation](docs/life-simulation.md).
 - **One game for everyone:** adults, kids and families play the same game. Romance is only between adults; conflict is non-graphic and never between adults and children.
-- **Safety:** player-written text is checked before it reaches the AI. Phone numbers, emails, addresses, passwords, links and unkind language are blocked with a friendly explanation, and messages about self-harm point to a trusted adult. Every model prompt carries child-safety rules. See [releasing for kids](docs/kids-release.md).
+- **Safety:** player-written text is checked before it reaches the AI. Phone numbers, emails, addresses, passwords, links and unkind language are blocked. Every model prompt carries non-explicit citizen-safety rules, including safeguards if minors are reintroduced. See [safety and release gates](docs/kids-release.md).
 
 Your world resumes in the same browser through localStorage. Save downloads a JSON snapshot for inspection/backup; importing snapshots and cross-device saves are not implemented. Closing or hiding the tab stops new simulation work. An already-sent provider request may still finish and incur charges; interrupted results are discarded.
 
@@ -59,7 +61,7 @@ The task/conversation path uses LangGraph private exchange nodes and a cached De
 
 AI exchanges can continue beyond a single reply and end naturally, with a six-line limit. Player-led exchanges generate one reply and then return control to the player. A companion journey requires explicit acceptance; unresolved requests are not reported as completed. Each Deep Agent turn has a three-model-call run limit and provider timeout. This is not an account-wide spending cap.
 
-Manual Mode is the easiest way to follow the game: the city waits, the player assigns one student task, the task runs, conversations/memories are written, and the city pauses when the task completes. Autonomous Mode starts the living-city loop: students follow routines, meet naturally, LLM cognition can generate conversations, and relationships shift from strangers to acquaintances to friends over time.
+Manual Mode is the easiest way to follow the game: the city waits, the player assigns one resident a task, the task runs, conversations/memories are written, and the city pauses when the task completes. Autonomous Mode starts the living-city loop: residents follow routines, meet naturally, LLM cognition can generate conversations, and relationships shift from strangers to acquaintances to friends over time.
 
 ## How Agents Interact
 
@@ -261,7 +263,7 @@ For durable memory, set `MEMORY_STORAGE=postgres` and provide Supabase, Neon, or
 3. Use `Give [name] a task`, type what you want, and click `Assign Task`; the citizen chooses the target and route.
 4. Open `Talk` to read the latest conversation as a transcript.
 5. Let the task finish automatically, or use `Pause` / `Close Task`.
-6. Switch to `Auto` when you want the students to move, meet, talk, and react without direct player instructions.
+6. Switch to `Auto` when you want residents to move, meet, talk, and react without direct player instructions.
 
 ## Verification
 

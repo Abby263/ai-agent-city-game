@@ -17,7 +17,7 @@ export const scenarioCatalog: Array<{ kind: ScenarioKind; icon: string; title: s
   { kind: "accident", icon: "🚲", title: "Bicycle accident", blurb: "Someone gets knocked down. Who stops to help?", needs: ["place"] },
   { kind: "fire", icon: "🔥", title: "Fire in a building", blurb: "Everyone evacuates; the building closes for the day.", needs: ["place"] },
   { kind: "lottery", icon: "🎟️", title: "Lottery win", blurb: "A big win. Do they share it? Who gets jealous?", needs: ["person"] },
-  { kind: "love_spark", icon: "💘", title: "Spark of love", blurb: "Two grown-ups feel a spark. Children get a friendship spark instead.", needs: ["pair"] },
+  { kind: "love_spark", icon: "💘", title: "Spark of love", blurb: "An unexpected connection. Will they act on it or keep their distance?", needs: ["pair"] },
   { kind: "rivalry", icon: "😠", title: "A misunderstanding", blurb: "Two people fall out. Will they make up?", needs: ["pair"] },
   { kind: "lost_puppy", icon: "🐶", title: "Lost puppy", blurb: "A shiba puppy is lost. Who looks after it?", needs: ["place"] },
   { kind: "act_of_kindness", icon: "🎁", title: "Secret gift", blurb: "Someone finds an anonymous gift and thank-you note.", needs: ["person"] },
@@ -168,8 +168,8 @@ export function applyScenario(city: CityState, request: ScenarioRequest, tools: 
     const jealous = city.citizens.filter((c) => c !== winner && !family.includes(c) && c.money < 300 && isAdult(c)).slice(0, 3);
     adjustBonds(jealous.map((c) => ({ from: c.citizen_id, to: winner.citizen_id, feelings: { jealousy: 15 }, reason: `${first(winner)} won the lottery and I'm struggling to pay bills.` })));
     const friend = city.citizens.filter((c) => c !== winner && c.age >= 5).sort((a, b) => Number(family.includes(b)) - Number(family.includes(a)))[0];
-    if (friend) meet(city, winner, friend, `${winner.name} just won $${prize} in the ${winner.age < 18 ? "school raffle" : "lottery"} and can't wait to share the news.`, "the lottery win", now);
-    sink({ kind: "lottery", icon: "🎟️", headline: `${winner.name} won $${prize} in the ${winner.age < 18 ? "school raffle" : "lottery"}!${generous && family.length ? ` ${first(winner)} shared some with family.` : ""}${jealous.length ? ` Not everyone is happy for them.` : ""}`,
+    if (friend) meet(city, winner, friend, `${winner.name} just won $${prize} in the neighbourhood raffle and can't wait to share the news.`, "the raffle win", now);
+    sink({ kind: "lottery", icon: "🎟️", headline: `${winner.name} won $${prize} in the neighbourhood raffle!${generous && family.length ? ` ${first(winner)} shared some with family.` : ""}${jealous.length ? ` Not everyone is happy for them.` : ""}`,
       actors: [winner.citizen_id], priority: 2, memories: [{ citizen_id: winner.citizen_id, content: `I won $${prize}! I still can't believe it.`, importance: 0.9 }] });
     return { headline: `${first(winner)} is rich!`, focus_id: winner.citizen_id };
   }

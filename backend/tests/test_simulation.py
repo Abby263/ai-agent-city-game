@@ -89,7 +89,8 @@ def test_tick_progresses_clock_and_moves_citizens():
     assert after.clock.minute_of_day == before.clock.minute_of_day + 15
     assert len(after.citizens) == 26
     assert db.query(CitizenORM).count() >= 26
-    assert {"Student", "Doctor", "Teacher", "Retired farmer"} <= {citizen.profession for citizen in after.citizens}
+    assert {"Lab assistant", "Doctor", "Teacher", "Retired farmer"} <= {citizen.profession for citizen in after.citizens}
+    assert all(citizen.age >= 18 for citizen in after.citizens)
     assert any(citizen.current_activity for citizen in after.citizens)
 
 

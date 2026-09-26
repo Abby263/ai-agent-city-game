@@ -87,8 +87,8 @@ explanation. **Read the exchange** opens and highlights the conversation behind 
 of the feelings. The arrow is directional: Ava's affection for Leo is not Leo's
 affection for Ava. Turn off **Changes only** to include unchanged encounters.
 
-The four tracked feelings are affection (platonic care), admiration, jealousy,
-and resentment. These students are minors: there is no sexual content, forced
+The four tracked feelings are affection, admiration, jealousy,
+and resentment. All 26 current residents are adults: there is no explicit content, forced
 romance, or automatic "love" from greetings. Resentment tracks hurt and dislike
 without declaring someone hateful based on one remark. Mixed feelings and repair
 are possible. The values are fictional game state, not psychological measurements.

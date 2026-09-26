@@ -106,9 +106,16 @@ uv run pytest -q
 Browser mode uses an eight-second normal tick cadence (four seconds at 2x) and at most one cognition candidate per tick. Walking a player-controlled citizen does not call an LLM. Hiding the tab pauses new work. A paused or replaced world revision discards late model results. Provider requests already in flight cannot be unbilled by pausing. The backend `MAX_LLM_CALLS_PER_TICK` settings apply to the server simulation, not as a global API quota. Add authentication and server-side quotas before reopening public hosting.
 
 Memory is isolated per citizen in browser mode. The browser stores each citizen's
-short-term memories under `agentcity.v11.memory.<citizen_id>`, and the backend
+short-term memories under `agentcity.v12.memory.<citizen_id>`, and the backend
 conversation workflow only passes a citizen the memories for the current speaking
 agent. Spoken transcript lines are public; private memory is not.
+
+The adult-only cast uses save namespace `agentcity.v12`. The first visit after this
+release starts a new world with 26 adults; v11 saves, conversations and memories
+are not imported or deleted. No local runtime data is included in deployment.
+There are no new environment variables for this change. `BIRTHS_ENABLED = false`
+in `frontend/src/lib/life.ts` disables conception and births; enabling it is a code
+change that requires revisiting the adult-only prompts and save policy too.
 
 Frontend env:
 
@@ -350,7 +357,7 @@ http://localhost:3000
 4. Use `Give [name] a task`, type a natural-language task, and click `Assign Task`. The citizen decides who to approach and where to go.
 5. Open `Talk` to follow the latest conversation transcript, relationship stage, task context, and recent city moments.
 6. Let the task finish automatically, click `Pause`, or use `Close Task` in the student profile.
-7. Switch to `Auto` when you want students to move, meet, talk, remember, and react autonomously.
+7. Switch to `Auto` when you want residents to move, meet, talk, remember, and react autonomously.
 8. In `Auto`, use `Make Something Happen` to trigger an event, then open `Talk` when you want the feed.
 9. Use the right panel tabs:
    - `Life`: current task, needs, money, goals, and schedule.

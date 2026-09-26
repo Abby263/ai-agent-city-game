@@ -48,6 +48,22 @@ beforeEach(() => {
   }
   seedSession(city);
 });
+
+test("v12 starts fresh without importing a v11 world, conversations or private memories", () => {
+  storage.clear();
+  const old = createInitialCity();
+  old.citizens[0].age = 13;
+  storage.set("agentcity.v11.city", JSON.stringify(old));
+  storage.set("agentcity.v11.conversations", JSON.stringify([{ conversation_id: "old-chat" }]));
+  storage.set("agentcity.v11.memory.cit_009", JSON.stringify([{ content: "OLD PRIVATE MEMORY" }]));
+  assert.equal(getSessionCity(), null);
+  seedSession(createInitialCity());
+  assert.ok(storage.has("agentcity.v12.city"));
+  assert.ok(getSessionCity()!.citizens.every((c) => c.age >= 18));
+  assert.equal(sessionConversations().length, 0);
+  assert.ok(!sessionMemories("cit_009").some((m) => m.content.includes("OLD PRIVATE MEMORY")));
+  assert.ok(storage.has("agentcity.v11.city"), "old data is left untouched, not migrated or deleted");
+});
 const plan: SessionTaskPlanResponse = {
   task_kind: "go_with_citizen",
   target_citizen_ids: [targetId],
@@ -251,7 +267,13 @@ test("autonomous emotions persist for each speaker with evidence and private con
     assert.ok(!firstContext.includes("They helped repair my sketch."));
     assert.ok(secondContext.includes("They helped repair my sketch."));
     assert.ok(!secondContext.includes("They thanked me for helping."));
-    return reply();
+    const result = reply();
+    result.conversation!.actor_ids = [request.actor_id, request.target_id!];
+    result.conversation!.transcript = [
+      { speaker_id: request.actor_id, text: "How are you feeling?" },
+      { speaker_id: request.target_id!, text: "Grateful you helped with my sketch." },
+    ];
+    return result;
   });
 });
 

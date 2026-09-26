@@ -18,7 +18,7 @@ test("every resident gets a distinct natural voice that fits their sex and age",
   const city = createInitialCity();
   const ava = cast.get("cit_009")!, walter = cast.get("cit_032")!, tom = cast.get("cit_030")!;
   assert.equal(ava.sex, "female");
-  assert.match(ava.describe, /14-year-old teenage girl|13-year-old teenage girl/);
+  assert.match(ava.describe, /20-year-old woman/);
   assert.match(walter.describe, /older man/);
   assert.ok(walter.pitch < tom.pitch && walter.rate < tom.rate, "seniors speak lower and slower");
   const adults = city.citizens.filter((c) => c.age >= 18 && c.age < 62).map((c) => cast.get(c.citizen_id)!.natural);
@@ -35,7 +35,7 @@ test("stage directions and emojis are not read aloud; delivery follows the words
   assert.equal(spokenText("*Ava hugs Leo* Missed you! 🤗"), "Missed you!");
   assert.match(deliveryStyle(casting, "I'm so sorry, I miss her."), /sad/);
   assert.match(deliveryStyle(casting, "That's amazing!"), /excited/);
-  assert.match(deliveryStyle(casting, "Hi"), /year-old teenage girl$/);
+  assert.match(deliveryStyle(casting, "Hi"), /20-year-old woman$/);
 });
 test("chunking retains the complete dialogue without inventing words", () => {
   const text = "A sentence that is fairly long. ".repeat(18).trim();

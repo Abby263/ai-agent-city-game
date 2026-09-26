@@ -1,7 +1,7 @@
 import type { CitizenAgent } from "./types";
 import type { WeatherNow } from "./weather";
 
-/** What the calendar and the sky allow today. Defaults describe an ordinary dry school day. */
+/** What the calendar and the sky allow today. Defaults describe a dry working day. */
 export type RoutineContext = {
   schoolOpen?: boolean;
   publicHoliday?: boolean;
@@ -15,7 +15,7 @@ export type RoutineContext = {
 const officeLocations = new Set(["loc_bank", "loc_lab", "loc_school", "loc_office"]);
 const essentialLocations = new Set(["loc_hospital", "loc_clinic", "loc_police", "loc_station", "loc_konbini"]);
 
-// Day 1 is a Monday, so the first session always starts with a school day.
+// Day 1 is a Monday.
 export const weekdayNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 export const weekday = (day: number) => weekdayNames[(((day - 1) % 7) + 7) % 7];
 export const isWeekend = (day: number) => (((day - 1) % 7) + 7) % 7 >= 5;
@@ -24,7 +24,7 @@ export const weekdayIndex = (day: number) => (((day - 1) % 7) + 7) % 7;
 
 export type RoutineStop = { location_id: string; activity: string };
 
-// First matching skill decides where a resident spends club afternoons and weekend mornings.
+// First matching skill decides where a resident spends their hobby time.
 const hobbies: Array<[skills: string[], stop: RoutineStop]> = [
   [["science", "chemistry", "robotics"], { location_id: "loc_lab", activity: "Building experiments at the Meguro Science Lab" }],
   [["writing", "storytelling"], { location_id: "loc_library", activity: "Writing stories at the library" }],
@@ -32,7 +32,7 @@ const hobbies: Array<[skills: string[], stop: RoutineStop]> = [
   [["gardening"], { location_id: "loc_farm", activity: "Helping with the crops at Meguro Community Garden" }],
   [["cooking"], { location_id: "loc_restaurant", activity: "Helping in the Sunny Side Cafe kitchen" }],
   [["baseball"], { location_id: "loc_park", activity: "Baseball practice in the park" }],
-  [["piano"], { location_id: "loc_school", activity: "Piano practice in the school music room" }],
+  [["piano"], { location_id: "loc_restaurant", activity: "Piano practice at Sunny Side Cafe" }],
   [["manga"], { location_id: "loc_library", activity: "Drawing manga at the library" }],
   [["music"], { location_id: "loc_park", activity: "Practising music in the park" }],
   [["sports"], { location_id: "loc_park", activity: "Playing football in the park" }],
@@ -134,6 +134,7 @@ function grownUpStop(citizen: CitizenAgent, day: number, minute: number, context
     if (minute < job.end) return { location_id: job.location_id, activity: `Working as ${job.title.toLowerCase()}` };
     if (life.gym_days?.includes(wd) && minute < job.end + 75) return { location_id: "loc_gym", activity: "Working out at the gym" };
     if (wd === 2 && minute < job.end + 60) return { location_id: "loc_market", activity: "Grocery shopping at the market" };
+    if (citizen.age < 30 && minute < Math.min(job.end + 150, 1320)) return hobbyStop(citizen);
     if (minute < 1230) return { location_id: home, activity: "Family dinner at home" };
     return { location_id: home, activity: "Relaxing at home" };
   }
@@ -148,10 +149,15 @@ function grownUpStop(citizen: CitizenAgent, day: number, minute: number, context
     return { location_id: home, activity: "Dinner at home" };
   }
   if (minute < 540) return { location_id: home, activity: "Slow breakfast at home" };
+  if (citizen.age < 30 && minute < 720) {
+    if (life.gym_days?.includes(wd) && minute < 600) return { location_id: "loc_gym", activity: "Working out at the gym" };
+    return hobbyStop(citizen);
+  }
   if (minute < 630) return { location_id: "loc_market", activity: "Weekly shopping at the market" };
   if (life.gym_days?.includes(wd) && minute < 720) return { location_id: "loc_gym", activity: "Working out at the gym" };
   if (minute < 780) return { location_id: isWeekend(day) ? "loc_restaurant" : home, activity: isWeekend(day) ? "Weekend lunch at Sunny Side Cafe" : "Lunch at home" };
   if (minute < 1020) {
+    if (citizen.age < 30) return hobbyStop(citizen);
     if (wd === 5) return { location_id: "loc_mall", activity: "Weekend shopping at Kokashita Arcade" };
     return isWeekend(day) || context.publicHoliday ? { location_id: "loc_park", activity: "Family time in the park" } : { location_id: home, activity: "Chores and errands at home" };
   }

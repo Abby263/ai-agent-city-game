@@ -86,10 +86,10 @@ const time = (minute: number) =>
 const shortName = (citizen?: CitizenAgent) =>
   citizen?.name.split(" ")[0] ?? "Citizen";
 function chapterLine(day: number, minute: number) {
-  if (isWeekend(day)) return minute < 720 ? "No school today. Everyone follows their own hobbies." : "A lazy weekend afternoon. Who will meet whom?";
-  if (minute < 450) return "Morning at home. School ahead. Plans still unwritten.";
-  if (minute < 900) return "School is in. Friendships are tested in the corridors.";
-  if (minute < 1080) return "After school. Parks, clubs and chance meetings.";
+  if (isWeekend(day)) return minute < 720 ? "The weekend. Everyone follows their own hobbies." : "A lazy weekend afternoon. Who will meet whom?";
+  if (minute < 450) return "Morning at home. Work ahead. Plans still unwritten.";
+  if (minute < 900) return "The working day. Friendships are tested over coffee breaks.";
+  if (minute < 1080) return "Late afternoon. Errands, gyms and chance meetings.";
   return "Evening settles over Nakameguro. Windows glow one by one.";
 }
 
@@ -671,6 +671,7 @@ export function AgentCityShell() {
               onDismiss={() => useGameStore.getState().clearLastScene()} />
           )}
           {city && !personCitizen && !sceneChoices.length && !playbackQueue.length && <StoryTracker city={city} onOpenAll={() => setPanel("news")} busy={busy}
+            onRetryElection={() => void act(api.advanceElection)}
             onOpenBallots={() => void act(api.openBallots)} onVote={(id) => void act(() => api.castBallot(id))}
             onAsk={(id) => void act(() => api.callCandidate(id)).then((ok) => { if (ok) openChat(id); })}
             onChoose={pickChoice} />}
@@ -1304,7 +1305,7 @@ export function AgentCityShell() {
                   <BookOpen />
                   <span>
                     <strong>Exam day</strong>
-                    <small>A reason to study together</small>
+                    <small>Qualification tests for everyone studying</small>
                   </span>
                   <ArrowRight size={16} />
                 </button>

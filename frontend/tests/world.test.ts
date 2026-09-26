@@ -44,11 +44,12 @@ test("player weather overrides and real Tokyo codes map to conditions", () => {
 
 test("weather changes where people go", () => {
   const city = createInitialCity();
-  const kid = city.citizens.find((c) => c.name.startsWith("Noah"))!; // pond creatures in the park on Saturday
-  const dry = routineStop(kid, 6, 600, {});
+  const resident = city.citizens.find((c) => c.name.startsWith("Eliot"))!;
+  resident.skills = ["biology"];
+  const dry = routineStop(resident, 2, 660, {}); // Tuesday is Eliot's day off.
   assert.equal(dry.location_id, "loc_park");
-  assert.equal(routineStop(kid, 6, 600, { weather: { condition: "rain", heatwave: false } }).location_id, "loc_mall");
-  assert.match(routineStop(kid, 6, 600, { weather: { condition: "snow", heatwave: false } }).activity, /snowman/);
+  assert.equal(routineStop(resident, 2, 660, { weather: { condition: "rain", heatwave: false } }).location_id, "loc_mall");
+  assert.match(routineStop(resident, 2, 660, { weather: { condition: "snow", heatwave: false } }).activity, /warm at home/);
   const priya = city.citizens.find((c) => c.name.startsWith("Priya"))!;
   assert.equal(routineStop(priya, 1, 600, { weather: { condition: "typhoon", heatwave: false } }).location_id, "loc_hospital");
   const wei = city.citizens.find((c) => c.name.startsWith("Wei"))!;
@@ -78,6 +79,10 @@ test("playing god: fires close buildings, love sparks only between adults", () =
   applyScenario(city, { kind: "fire", location_id: "loc_mall" }, tools);
   assert.equal(city.incidents?.[0].kind, "fire");
   const [ava, noah] = ["Ava", "Noah"].map((n) => city.citizens.find((c) => c.name.startsWith(n))!.citizen_id);
+  applyScenario(city, { kind: "love_spark", citizen_ids: [ava, noah] }, tools);
+  assert.equal(news.at(-1)?.kind, "spark");
+  // Keep the safety guard covered with an explicit hypothetical minor, not the shipped cast.
+  city.citizens.find((c) => c.citizen_id === ava)!.age = 17;
   applyScenario(city, { kind: "love_spark", citizen_ids: [ava, noah] }, tools);
   assert.equal(news.at(-1)?.kind, "friendship");
   const [yui, daichi] = ["Yui", "Daichi"].map((n) => city.citizens.find((c) => c.name.startsWith(n))!.citizen_id);

@@ -91,6 +91,8 @@ export type LifeState = {
   loneliness: number;
   household_id: string;
   parent_ids: string[];
+  /** Explicit kinship for relatives whose parents are not in the city. */
+  family_roles?: Record<string, string>;
   partner_id: string | null;
   children_ids: string[];
   relationship_status: "single" | "dating" | "partnered" | "married" | "widowed";

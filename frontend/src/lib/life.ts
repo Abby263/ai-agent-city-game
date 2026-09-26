@@ -107,7 +107,7 @@ export type BondLookup = (from: string, to: string) => Relationship | undefined;
 export function relatives(city: CityState, citizen: CitizenAgent) {
   const life = citizen.life;
   if (!life) return [];
-  const ids = new Set([...life.parent_ids, ...life.children_ids, ...(life.partner_id ? [life.partner_id] : [])]);
+  const ids = new Set([...life.parent_ids, ...life.children_ids, ...Object.keys(life.family_roles ?? {}), ...(life.partner_id ? [life.partner_id] : [])]);
   for (const other of city.citizens) {
     const o = other.life;
     if (!o || other === citizen) continue;
@@ -135,11 +135,8 @@ export function relationName(city: CityState, citizen: CitizenAgent, other: Pick
   const partner = city.citizens.find((c) => c.citizen_id === life.partner_id)?.life;
   if (partner?.parent_ids.includes(other.citizen_id)) return female ? "mother-in-law" : "father-in-law";
   if (other.life?.partner_id && life.children_ids.includes(other.life.partner_id)) return female ? "daughter-in-law" : "son-in-law";
+  if (life.family_roles?.[other.citizen_id]) return life.family_roles[other.citizen_id];
   if (other.life?.household_id === life.household_id) {
-    const otherAge = city.citizens.find((c) => c.citizen_id === other.citizen_id)?.age ?? 0;
-    const myAge = city.citizens.find((c) => c.citizen_id === citizen.citizen_id)?.age ?? 0;
-    if (otherAge >= 18 && myAge < 18) return female ? "aunt" : "uncle";
-    if (myAge >= 18 && otherAge < 18) return female ? "niece" : "nephew";
     return "family";
   }
   return null;
@@ -350,14 +347,19 @@ export function recordMeal(citizen: CitizenAgent, tick: number) {
 
 export type LifeFactory = { newCitizen: (template: CitizenAgent) => void; departed: (citizen: DepartedCitizen) => void };
 
+/** Adult-only release: disable conception and births while retaining the life-system implementation. */
+export const BIRTHS_ENABLED = false;
+
 export function lifeDay(city: CityState, sink: LifeSink, bond: BondLookup, factory: LifeFactory) {
   const day = city.clock.day;
   const people = [...city.citizens];
   for (const citizen of people) if (citizen.life) dailyBody(city, citizen, sink);
   spreadIllness(city, sink);
   for (const citizen of people) if (citizen.life && city.citizens.includes(citizen)) mortality(city, citizen, sink, factory);
-  for (const citizen of [...city.citizens]) if (citizen.life?.pregnancy && day >= citizen.life.pregnancy.due_day) giveBirth(city, citizen, sink, factory);
-  conception(city, sink);
+  if (BIRTHS_ENABLED) {
+    for (const citizen of [...city.citizens]) if (citizen.life?.pregnancy && day >= citizen.life.pregnancy.due_day) giveBirth(city, citizen, sink, factory);
+    conception(city, sink);
+  } else for (const citizen of city.citizens) if (citizen.life?.pregnancy) citizen.life.pregnancy = null;
   romance(city, sink, bond);
   weddings(city, sink);
   if (day % 7 === 1 && day > 1) weeklyMoney(city, sink);
@@ -655,7 +657,7 @@ function weeklyMoney(city: CityState, sink: LifeSink) {
       kid.money = round(kid.money + ALLOWANCE, 2);
     }
   }
-  sink({ kind: "payday", icon: "🗓️", headline: `A new week in Nakameguro: rent and groceries paid, and pocket money handed out.`, actors: [], priority: 1 });
+  sink({ kind: "payday", icon: "🗓️", headline: `A new week in Nakameguro: households paid their share of rent and groceries.`, actors: [], priority: 1 });
 }
 
 const letter = (grade: number) => grade >= 90 ? "A" : grade >= 80 ? "B" : grade >= 70 ? "C" : grade >= 60 ? "D" : "E";

@@ -1,46 +1,66 @@
 citizen_id: cit_027
 name: Sophie Laurent
-age: 13
-profession: Student
+age: 20
+profession: Library assistant
 active: true
-work_location_id: loc_school
-position: [5, 6]
-skills: [illustration, storytelling]
+work_location_id: loc_library
+position:
+- 5
+- 6
+skills:
+- illustration
+- storytelling
 mood: Hopeful
 personality:
   nature:
-    traits: ["Imaginative","Reserved","Sensitive"]
-    values: "Kindness toward unfinished work and room for quieter voices."
-    voice: "Uses concrete images and small observations; opens up when someone listens."
-    sensitivity: "Public teasing of her drawings and louder people speaking for her."
-    repair: "Prefers a quiet specific apology and a chance to decide when to share again."
+    traits:
+    - Imaginative
+    - Reserved
+    - Sensitive
+    values: Kindness toward unfinished work and room for quieter voices.
+    voice: Uses concrete images and small observations; opens up when someone listens.
+    sensitivity: Public teasing of her drawings and louder people speaking for her.
+    repair: Prefers a quiet specific apology and a chance to decide when to share again.
   playable: true
-  student_arc: true
   openness: 88
   warmth: 70
   conscientiousness: 58
-current_thought: Maybe someone would like to draw a comic with me.
+current_thought: Maybe someone would like to make a comic with me.
 short_term_goals:
-  - Find someone to illustrate a comic with
-  - Learn one new neighbor's interests
+- Find someone to illustrate a comic with
+- Learn one new neighbour's interests
 long_term_goals:
-  - Share my art without fearing criticism
-memory_summary: I draw comics and notice small acts of kindness. I am shy about showing unfinished work. Being left out can sting, but I try to ask what happened instead of assuming the worst.
+- Share my art without fearing criticism
+memory_summary: I'm twenty and work as a library assistant at Nakameguro Library. I draw comics and notice small acts of kindness. I live with my big sister Maya while our parents work abroad. I'm shy about unfinished work, and being left out can sting, but I try to ask what happened instead of assuming the worst.
 seed_memories:
-  - memory_id: mem_seed_cit_027
-    content: I brought my sketchbook to Nakameguro. I hope to find a patient collaborator, but I have not met one yet.
+- memory_id: mem_seed_cit_027
+  content: I always carry my sketchbook. I hope to find a patient collaborator, but I have not met one yet.
 life:
   sex: female
   birthday_in_days: 17
-  height_cm: 154
-  weight_kg: 43
+  height_cm: 158
+  weight_kg: 50
   fitness: 52
   household_id: home_h
   parent_ids:
   - ext_laurent_parents
-  grade: 80
   ambition:
     goal: Publish her own comic
     kind: creative
     progress: 25
   conditions: []
+  job:
+    title: Library assistant
+    location_id: loc_library
+    hourly_wage: 14
+    start: 600
+    end: 1080
+    workdays:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  relationship_status: single
+  wants_children: false
+money: 420

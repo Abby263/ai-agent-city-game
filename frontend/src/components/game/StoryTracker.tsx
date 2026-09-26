@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Eye, Play, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, Play, RotateCcw, X } from "lucide-react";
 import { activeStories, type Story } from "@/lib/stories";
 import { liveElection, playerTurn } from "@/lib/elections";
 import { nextChoices, type Choice } from "@/lib/choices";
@@ -16,10 +16,11 @@ export function watchStory(story: Story) {
 }
 
 /** "Happening now": the latest storyline you set in motion, beat by beat, with a button to watch it. */
-export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onVote, onAsk, onChoose }: {
+export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onVote, onAsk, onChoose, onRetryElection }: {
   city: CityState; onOpenAll: () => void; busy?: boolean; onOpenBallots?: () => void;
   onVote?: (candidateId: string | null) => void; onAsk?: (candidateId: string) => void;
   onChoose?: (choice: Choice, storyId: string) => void;
+  onRetryElection?: () => void;
 }) {
   const stories = activeStories(city);
   const [hidden, setHidden] = useState<string[]>([]);
@@ -50,7 +51,13 @@ export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onV
           </li>
         ))}
       </ol>
-      {election && !turn?.waiting && (
+      {election?.error && (
+        <div className="story-ballot" role="alert">
+          <p>{election.error}</p>
+          <button className="outline-action" disabled={busy} onClick={onRetryElection}><RotateCcw size={14} /> Retry missing ballots</button>
+        </div>
+      )}
+      {election && !election.error && !turn?.waiting && (
         <p className="story-status">
           {election.phase === "voting" ? "🗳️ Counting private ballots…" : `📣 Campaigning (${Math.min(election.campaign_turn, 2)}/2)…`}
           {turn && election.phase === "campaign" && ` You're ${me}: ${turn.candidate ? "make your case to voters in Talk." : "your ballot waits for you, so talk to the candidates first if you like."}`}

@@ -38,12 +38,12 @@ short_term_goals:
 - Put money aside for the truck
 long_term_goals:
 - Own a food truck by next summer
-memory_summary: I run the Sunny Side Cafe. Mateo is my son; his mum and I split up years ago but we're friendly. I'm saving for a food truck.
+memory_summary: I run the Sunny Side Cafe. My son Mateo makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.
 relationship_scores:
   cit_010: 88
 seed_memories:
 - memory_id: mem_seed_cit_034
-  content: I run the Sunny Side Cafe. Mateo is my son; his mum and I split up years ago but we're friendly. I'm saving for a food truck.
+  content: I run the Sunny Side Cafe. My son Mateo makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.
   importance: 0.8
 life:
   sex: male

@@ -1,6 +1,6 @@
 citizen_id: cit_030
 name: Tom Brooks
-age: 38
+age: 46
 profession: Farmer
 active: true
 work_location_id: loc_farm
@@ -35,17 +35,17 @@ personality:
 current_thought: If the weather holds, the tomatoes will be ready by the weekend.
 short_term_goals:
 - Get the tomatoes to the market
-- Help Hannah get ready for the baby
+- Teach Leo to run the garden's irrigation
 long_term_goals:
 - Keep the farm going for the next generation
-memory_summary: I run Meguro Community Garden like my father did. Hannah and I have a son, Leo, and a baby on the way. Dad lives with us now and his heart worries me.
+memory_summary: I run Meguro Community Garden like my father did. Hannah and I have a grown son, Leo, who just started as an apprentice at the substation. Dad lives with us now and his heart worries me.
 relationship_scores:
   cit_031: 88
   cit_032: 85
   cit_026: 88
 seed_memories:
 - memory_id: mem_seed_cit_030
-  content: I run Meguro Community Garden like my father did. Hannah and I have a son, Leo, and a baby on the way. Dad lives with us now and his heart worries me.
+  content: I run Meguro Community Garden like my father did. Hannah and I have a grown son, Leo, who just started as an apprentice at the substation. Dad lives with us now and his heart worries me.
   importance: 0.8
 life:
   sex: male
@@ -78,4 +78,4 @@ life:
     kind: career
     progress: 35
   conditions: []
-  wants_children: true
+  wants_children: false

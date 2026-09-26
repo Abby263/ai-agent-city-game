@@ -22,7 +22,7 @@ personality:
     - Patient
     - Funny
     - Demanding
-    values: Every child being seen, and fairness in the classroom.
+    values: Every student being seen, and fairness in the classroom.
     voice: Teacher voice with a wink; turns things into questions.
     sensitivity: Parents who blame teachers; her own son thinking she's harder on him.
     repair: Admits a mistake in front of the class and laughs about it.
@@ -38,12 +38,12 @@ short_term_goals:
 - Spend a proper evening with Noah
 long_term_goals:
 - Help run the school one day
-memory_summary: I teach at Nakameguro School, which means I teach my own son Noah, and he hates that. I'm raising him on my own.
+memory_summary: I teach at Nakameguro School. My son Noah is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.
 relationship_scores:
   cit_021: 88
 seed_memories:
 - memory_id: mem_seed_cit_035
-  content: I teach at Nakameguro School, which means I teach my own son Noah, and he hates that. I'm raising him on my own.
+  content: I teach at Nakameguro School. My son Noah is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.
   importance: 0.8
 life:
   sex: female

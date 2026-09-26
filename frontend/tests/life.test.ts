@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialCity } from "../src/lib/initial-city";
 import {
-  ageInYears, careNeeded, catchCondition, daysUntilBirthday, giveBirth, lifeDay, lifeStage, lifeTick, passAway, relationName, relatives,
+  ageInYears, BIRTHS_ENABLED, careNeeded, catchCondition, daysUntilBirthday, DAYS_PER_YEAR, lifeDay, lifeStage, lifeTick, passAway, relationName, relatives,
 } from "../src/lib/life";
 import type { LifeFactory, LifeNews } from "../src/lib/life";
 import type { CityState, DepartedCitizen, Relationship } from "../src/lib/types";
@@ -16,6 +16,31 @@ function world() {
 }
 const find = (city: CityState, name: string) => city.citizens.find((c) => c.name.startsWith(name))!;
 const noBonds = () => undefined;
+
+test("the shipped cast is 26 adults with consistent ages, jobs and families", () => {
+  const { city } = world();
+  assert.equal(city.citizens.length, 26);
+  const jobs: Record<string, string> = {
+    Ava: "Lab assistant", Mateo: "Barista", Noah: "Trainee fitness instructor", Iris: "Pharmacy technician",
+    Leo: "Apprentice technician", Sophie: "Library assistant", Zara: "Junior software engineer",
+    Eliot: "Food-court cook", Haruto: "Station staff", Sakura: "Konbini clerk",
+  };
+  for (const resident of city.citizens) {
+    assert.ok(resident.age >= 18, resident.name);
+    assert.equal(ageInYears(resident.life!, 1), resident.age);
+    assert.equal(resident.life!.pregnancy, null);
+    for (const id of resident.life!.parent_ids) {
+      const parent = city.citizens.find((c) => c.citizen_id === id);
+      if (!parent) { assert.match(id, /^ext_/, "only explicitly external parents may be absent"); continue; }
+      assert.ok(parent.age - resident.age >= 20, `${parent.name} and ${resident.name}`);
+    }
+  }
+  for (const [name, job] of Object.entries(jobs)) {
+    const resident = find(city, name);
+    assert.equal(resident.life!.job!.title, job);
+    assert.equal(resident.work_location_id, resident.life!.job!.location_id);
+  }
+});
 
 test("families are wired together from the profiles", () => {
   const { city } = world();
@@ -33,26 +58,26 @@ test("everyone ages one day per day and birthdays throw a party", () => {
   assert.equal(daysUntilBirthday(eliot.life!, 1), 2);
   city.clock.day = 3;
   lifeDay(city, sink, noBonds, factory);
-  assert.equal(eliot.age, 14);
-  assert.equal(ageInYears(eliot.life!, 3), 14);
+  assert.equal(eliot.age, 21);
+  assert.equal(ageInYears(eliot.life!, 3), 21);
   assert.ok(news.some((n) => n.kind === "birthday" && n.actors.includes(eliot.citizen_id)));
   assert.ok(city.gatherings?.some((g) => g.kind === "birthday" && g.host_ids.includes(eliot.citizen_id)));
 });
 
-test("a pregnancy ends with a baby born into the family", () => {
+test("the adult-only cast never conceives or gives birth, even with a stale pregnancy", () => {
   const { city, news, factory, sink } = world();
   const hannah = find(city, "Hannah");
-  assert.equal(hannah.life!.pregnancy?.due_day, 12);
+  assert.equal(BIRTHS_ENABLED, false);
+  assert.equal(hannah.life!.pregnancy, null);
+  assert.doesNotMatch(hannah.current_thought, /due date|cot|pregnan|baby/i);
+  const population = city.citizens.length;
+  hannah.life!.pregnancy = { partner_id: find(city, "Tom").citizen_id, due_day: 12 };
   city.clock.day = 12;
   lifeDay(city, sink, noBonds, factory);
-  const baby = city.citizens.find((c) => c.profession === "Baby")!;
-  assert.ok(baby, "baby joins the city");
-  assert.equal(baby.age, 0);
-  assert.ok(baby.name.endsWith("Brooks"));
-  assert.ok(hannah.life!.children_ids.includes(baby.citizen_id));
-  assert.equal(relationName(city, find(city, "Leo"), baby), baby.life!.sex === "female" ? "sister" : "brother");
+  assert.equal(city.citizens.length, population);
+  assert.ok(city.citizens.every((c) => c.age >= 18 && !c.life?.pregnancy));
   assert.equal(hannah.life!.pregnancy, null);
-  assert.ok(news.some((n) => n.kind === "birth"));
+  assert.ok(!news.some((n) => ["birth", "pregnancy"].includes(n.kind)));
 });
 
 test("death removes a resident, leaves grief and schedules a memorial", () => {
@@ -72,6 +97,9 @@ test("death removes a resident, leaves grief and schedules a memorial", () => {
 test("children never die, even when very ill", () => {
   const { city, factory, sink } = world();
   const ava = find(city, "Ava");
+  // A synthetic minor preserves the guard if a future cast reintroduces children.
+  ava.age = 12;
+  ava.life!.birth_day = 1 - 12 * DAYS_PER_YEAR;
   ava.health = 1;
   for (let day = 2; day < 60; day++) { city.clock.day = day; ava.health = 1; lifeDay(city, sink, noBonds, factory); }
   assert.ok(city.citizens.includes(ava));
@@ -94,6 +122,9 @@ test("sick residents seek care, and the doctor treats them at the hospital", () 
 
 test("adults who grow close start dating; children never do", () => {
   const { city, news, factory, sink } = world();
+  const minor = find(city, "Ava");
+  minor.age = 12;
+  minor.life!.birth_day = 1 - 12 * DAYS_PER_YEAR;
   const bond = (from: string, to: string) => ({ trust: 75, warmth: 80, familiarity: 60 }) as Relationship;
   lifeDay(city, sink, bond, factory);
   const samir = find(city, "Samir"), elena = find(city, "Elena");

@@ -1,6 +1,6 @@
 citizen_id: cit_037
 name: Elena Novak
-age: 33
+age: 38
 profession: Librarian
 active: true
 work_location_id: loc_library
@@ -38,13 +38,13 @@ short_term_goals:
 - Help Iris feel at home
 long_term_goals:
 - Build a life here
-memory_summary: I'm the town librarian. My niece Iris lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Samir Ali, the police officer, is kind to me.
+memory_summary: I'm the town librarian. My niece Iris, who is twenty-one, lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Samir Ali, the police officer, keeps borrowing books he has already read.
 relationship_scores:
   cit_022: 82
   cit_038: 62
 seed_memories:
 - memory_id: mem_seed_cit_037
-  content: I'm the town librarian. My niece Iris lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Samir Ali, the police officer, is kind to me.
+  content: I'm the town librarian. My niece Iris, who is twenty-one, lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Samir Ali, the police officer, keeps borrowing books he has already read.
   importance: 0.8
 life:
   sex: female
@@ -54,6 +54,8 @@ life:
   fitness: 48
   household_id: home_f
   parent_ids: []
+  family_roles:
+    cit_022: niece
   partner_id: null
   children_ids: []
   relationship_status: single

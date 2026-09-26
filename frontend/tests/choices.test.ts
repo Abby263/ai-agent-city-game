@@ -29,15 +29,19 @@ test("next choices are allowed moves that fit what just happened", () => {
   const romance = nextChoices(city, [yui, daichi], "love_spark");
   assert.equal(romance.length, 3);
   assert.ok(romance.some((c) => ["ask_out", "flirt", "confess"].includes(c.action)));
-  const kids = nextChoices(city, [ava, leo], "love_spark");
+  // If children ever lived here again, they would never be offered romance.
+  const young = structuredClone(city);
+  for (const c of young.citizens) if ([ava, leo].includes(c.citizen_id)) c.age = 13;
+  const kids = nextChoices(young, [ava, leo], "love_spark");
   assert.equal(kids.length, 3);
   assert.ok(kids.every((c) => !["ask_out", "flirt", "confess", "kiss", "propose"].includes(c.action)), "children never get romance choices");
   const hurt = nextChoices(city, [ava, leo], "action_slap");
   assert.equal(hurt[0].action, "apologize");
-  for (const c of [...romance, ...kids, ...hurt]) {
-    const [a, b] = [c.actor_id, c.target_id].map((x) => city.citizens.find((p) => p.citizen_id === x)!);
-    assert.equal(actionBlocked(city, a, b, c.action), null);
-  }
+  for (const [world, list] of [[city, [...romance, ...hurt]], [young, kids]] as const)
+    for (const c of list) {
+      const [a, b] = [c.actor_id, c.target_id].map((x) => world.citizens.find((p) => p.citizen_id === x)!);
+      assert.equal(actionBlocked(world, a, b, c.action), null);
+    }
 });
 
 test("the AI never acts on the resident you play", async () => {

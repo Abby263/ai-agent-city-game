@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.safety import CHILD_SAFETY_RULES, check_player_text
+from app.safety import CITIZEN_SAFETY_RULES, check_player_text
 
 
 def test_friendly_text_is_allowed():
@@ -39,8 +39,8 @@ def test_wellbeing_messages_are_redirected_to_trusted_adults():
 
 
 def test_child_safety_rules_cover_core_topics():
-    for phrase in ["10 to 15", "romance", "under 18", "violence", "personal details", "trusted adult", "grief", "never glorify violence", "Adults never hurt children"]:
-        assert phrase in CHILD_SAFETY_RULES
+    for phrase in ["adults aged 18", "romance", "under 18", "violence", "personal details", "trusted adult", "grief", "never glorify violence", "Adults never hurt children"]:
+        assert phrase in CITIZEN_SAFETY_RULES
 
 
 def test_api_rejects_unsafe_player_speech_before_calling_a_model():

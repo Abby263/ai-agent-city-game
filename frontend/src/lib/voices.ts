@@ -12,7 +12,7 @@ const naturalVoices: Record<"female" | "male", Pools> = {
 export type Casting = { natural: string; sex: "female" | "male"; age: number; describe: string; voiceTag: string; pitch: number; rate: number };
 
 const hash = (text: string) => [...text].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 7);
-const band = (age: number): keyof Pools => (age < 18 ? "young" : age >= 62 ? "elder" : "adult");
+const band = (age: number): keyof Pools => (age < 25 ? "young" : age >= 62 ? "elder" : "adult");
 
 /** Assigns voices across the whole town so two people in the same age band rarely sound alike. */
 export function castVoices(citizens: Array<Pick<CitizenAgent, "citizen_id" | "name" | "age" | "profession" | "personality" | "life">>) {
@@ -20,7 +20,9 @@ export function castVoices(citizens: Array<Pick<CitizenAgent, "citizen_id" | "na
   const cast = new Map<string, Casting>();
   for (const c of [...citizens].sort((a, b) => a.citizen_id.localeCompare(b.citizen_id))) {
     const sex = c.life?.sex ?? (hash(c.citizen_id) % 2 ? "female" : "male");
-    const pool = naturalVoices[sex][band(c.age)];
+    const preferred = naturalVoices[sex][band(c.age)];
+    // Use another adult-compatible voice before repeating one in a large cast.
+    const pool = [...preferred, ...naturalVoices[sex].adult.filter((v) => !preferred.includes(v))];
     const start = hash(c.citizen_id) % pool.length;
     const natural = pool.map((_, i) => pool[(start + i) % pool.length]).find((v) => !used.has(v)) ?? pool[start];
     used.add(natural);

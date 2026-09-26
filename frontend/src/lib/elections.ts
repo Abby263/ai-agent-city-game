@@ -4,7 +4,7 @@ export type Candidate = { citizen_id: string; name: string; platform: string };
 export type Ballot = { voter_id: string; vote_for: string | null; reason: string; source: "agent" | "player" };
 export type Election = {
   event_id: string;
-  kind: "student_election";
+  kind: "council_election";
   title: string;
   phase: "campaign" | "voting" | "complete" | "cancelled";
   candidates: Candidate[];

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any, TypedDict
 
 from app.cognition.deep_agents import DeepAgentRuntime
-from app.safety import CHILD_SAFETY_RULES
+from app.safety import CITIZEN_SAFETY_RULES
 from app.cognition.encounters import MeetingAction
 from app.cognition.errors import CognitionUnavailableError, CognitionValidationError, provider_failure
 from app.config import Settings
@@ -146,7 +146,7 @@ class CitizenCognitionClient:
     def _generate_json(self, system: str, prompt: dict[str, Any], schema: dict[str, Any], name: str) -> dict[str, Any]:
         if not self.client:
             raise CognitionUnavailableError(f"Configure the backend API key for {self.settings.llm_provider}.")
-        system = f"{system} {CHILD_SAFETY_RULES}"
+        system = f"{system} {CITIZEN_SAFETY_RULES}"
         try:
             if self.settings.llm_provider == "gemini":
                 response = self.client.models.generate_content(

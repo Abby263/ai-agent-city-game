@@ -1,8 +1,8 @@
 # Playable City Events
 
-Student council is the first complete event with participation, competing agents,
-private decisions, and a resolved outcome. The residents are students, so this is
-a fictional school election, not a simulation of real-world political targeting.
+The neighbourhood-association (chonaikai) election is the first complete event with participation,
+competing agents, private decisions, and a resolved outcome. All 26 residents are adults;
+any two can run and every resident gets one secret ballot. This is a fictional local event.
 
 ## Follow What You Start: "Happening Now"
 
@@ -31,16 +31,16 @@ actions, 48 for elections); switch on **Auto** to see how the rest of town react
 
 There is no separate Vote tab: an election is a situation like any other.
 
-1. Open **Create** and pick two students under **Student-council election**.
+1. Open **Create** and pick two residents under **Neighbourhood election**.
 2. Each candidate's Deep Agent writes its own platform; they appear in the story.
 3. Each candidate walks to a voter of their choice (never the rival) and campaigns in a
    real conversation: they say they're running, pitch their platform and ask for the vote.
    If the agent would rather take a break, it still goes to see a voter it hasn't met.
-4. Every student then votes privately and in parallel. A failed ballot counts as an abstention.
+4. Every resident votes privately in batches of up to eight concurrent decisions. A failed ballot stays missing, never becomes an abstention, and can be retried using **Retry missing ballots**. Successful votes are retained.
 5. The winner and the count appear in the story and in News. A tie is settled by drawing
    lots, as Japanese elections do, so a created election always ends with a winner.
 
-**Playing a part.** If you're playing as a student, the election treats you as one:
+**Playing a part.** If you're playing as a resident, the election keeps you in control:
 
 - As a **voter**, your ballot is yours. Everyone else votes, then the Happening now card
   waits for you: **Ask Zara first** brings that candidate over and opens Talk with them,
@@ -104,7 +104,7 @@ are retained. Current event participation is available in browser-local mode onl
 One event decision OR one campaign conversation is scheduled per eligible tick,
 not one call per resident. Conversations retain their existing bounded turn budget.
 The shell advances an election one step at a time, pausing while a cutscene plays;
-all ballots are then decided in parallel. Vercel remains paused; no hosting change is required.
+ballots are then decided in batches of up to eight. Pausing during a batch invalidates its results and prevents later batches from starting.
 
 Exams and festivals still use the earlier simple event triggers. They are not yet
 full participation quests. Further event types should add their own typed state,

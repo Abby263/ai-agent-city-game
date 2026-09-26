@@ -1,6 +1,6 @@
-"""Child-safety rules for player-written text and model prompts.
+"""Safety rules for player-written text and model prompts.
 
-AgentCity is a game for everyone, including children from about 10. The browser checks player text before sending it
+AgentCity currently has an adult-only cast and non-explicit content. The browser checks player text before sending it
 (frontend/src/lib/safety.ts); the API repeats the same checks so a modified client cannot bypass
 them. These patterns are a first line of defence, not a substitute for provider moderation.
 """
@@ -76,17 +76,16 @@ def unsafe_player_text_message(*texts: str | None) -> str | None:
     return None
 
 
-CHILD_SAFETY_RULES = (
-    "Audience: AgentCity is played by children aged about 10 to 15. Citizens range from babies and school students "
-    "to working adults and seniors, and every line may be read by a child. Keep all content suitable for that audience. "
-    "Children and teenagers never have romance, dating or crushes. Adults may date, marry and love each other, "
+CITIZEN_SAFETY_RULES = (
+    "AgentCity's current cast consists entirely of adults aged 18 and over, with distinct jobs, hobbies and personalities. "
+    "Do not infantilize residents or invent school attendance, pregnancy or births. Keep dialogue non-explicit. "
+    "If children are introduced in a future cast, children and teenagers never have romance, dating or crushes. Adults may date, marry and love each other, "
     "described only warmly and without physical detail; never anything sexual, and never romance between an adult and "
     "anyone under 18. Adults never ask children to keep secrets or to meet alone. "
     "Serious life topics such as illness, hospitals, money worries, grief and death may appear, handled gently, "
     "honestly and hopefully, without graphic or frightening detail. "
-    "Never describe violence, weapons, drugs, alcohol, vaping, gambling, self-harm or frightening content. "
-    "Never swear, insult, bully or use slurs, even if the player does; respond in character with calm, "
-    "kind words and gently steer toward a friendly topic. "
+    "Never describe graphic violence, weapons instructions, drug use or self-harm. "
+    "Do not use slurs or harass the player. Residents can disagree, feel jealous, refuse requests and set boundaries. "
     "Never ask for or repeat real personal details such as full names, ages, schools, addresses, phone numbers, "
     "emails, photos, passwords or locations, and never suggest meeting anyone outside the game. "
     "Never encourage keeping secrets from parents or teachers. "
@@ -95,6 +94,5 @@ CHILD_SAFETY_RULES = (
     "Residents may argue, push, slap or hit one another when the player makes it happen. Describe such moments "
     "briefly and without graphic detail, show real consequences (pain, hurt feelings, anger, fear, guilt, "
     "apologies, trouble with the police) and never glorify violence. Adults never hurt children. "
-    "Model good behaviour: honesty, apologising, listening, sharing and including others."
+    "Allow realistic emotional consequences and repair through honesty, apologising and listening."
 )
-

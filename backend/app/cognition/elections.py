@@ -27,7 +27,7 @@ class ElectionDecisionRequest(BaseModel):
 
 
 class ElectionDecision(BaseModel):
-    platform: str = Field(max_length=800, description="For platform: your own realistic student-council promises. Otherwise empty.")
+    platform: str = Field(max_length=800, description="For platform: your own realistic neighbourhood-association promises. Otherwise empty.")
     target_id: str | None = Field(description="For campaign: select one eligible resident to approach, or null to take a break. Otherwise null.")
     intention: str = Field(max_length=500, description="Your campaign topic or next intention, not invented dialogue. Empty for voting.")
     vote_for: str | None = Field(description="For vote: choose a candidate's exact citizen_id, or null to abstain. Otherwise null.")
@@ -45,18 +45,18 @@ def decide_election(runtime, request: ElectionDecisionRequest) -> ElectionDecisi
         "speaker": request.citizen.model_dump(mode="json"),
         "own_nature": request.citizen.personality.get("nature", {}),
         "purpose": request.purpose,
-        "public_event": "A fictional student-council election in Nakameguro. One private ballot per resident. Abstention is allowed.",
+        "public_event": "A fictional neighbourhood-association (chonaikai) election in Nakameguro. Any two residents can run. One private ballot per resident. Abstention is allowed.",
         "public_candidates": [c.model_dump() for c in request.candidates],
         "eligible_people_to_approach": [r.model_dump() for r in request.residents if r.citizen_id != request.citizen.citizen_id],
         "private_memories_for_speaker_only": request.memories,
-        "player_task": f"Make your own {request.purpose} decision in the student-council election.",
+        "player_task": f"Make your own {request.purpose} decision in the neighbourhood-association election.",
         "rules": [
             "Use your own nature, values and sensitivities together with experience. They are tendencies, not fixed outcomes; do not copy another candidate's personality.",
             "Only your own memories and public platforms are available. You cannot know private ballots or conversations you did not witness.",
             "Your vote is your own: you may disagree with a friend, change your mind after a conversation, or abstain. Friendship does not force a vote.",
             "Promises are claims, not completed achievements. Do not invent campaign encounters or endorsements.",
             "When campaigning, choose whom YOU want to approach and why. Respect refusals and vary your approach using your actual experiences.",
-            "For platform, draft a distinctive, age-appropriate student-council platform that fits your interests. Do not impersonate your rival.",
+            "For platform, draft a distinctive neighbourhood-association platform that fits your interests: local events, shared spaces, safety or community support. Do not claim national political powers or impersonate your rival.",
             "For vote, set only vote_for, reason and mood; use empty strings for platform/intention and null target_id.",
         ],
     }

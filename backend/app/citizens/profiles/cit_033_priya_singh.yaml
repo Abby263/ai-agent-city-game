@@ -32,18 +32,18 @@ personality:
     shirt: '#5f9fb3'
     background: '#d9ebf0'
   playable: true
-current_thought: Three flu cases this week already. I hope it doesn't spread through the school.
+current_thought: Three flu cases this week already. I hope it doesn't spread through the offices.
 short_term_goals:
 - Get home in time for dinner with Ava
 - Keep an eye on the flu season
 long_term_goals:
 - Lead the hospital one day
-memory_summary: I'm a doctor at Kyosai Hospital and Ava's mum. I raise her on my own and I worry that I work too much.
+memory_summary: I'm a doctor at Kyosai Hospital and Ava's mum. Ava is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.
 relationship_scores:
   cit_009: 90
 seed_memories:
 - memory_id: mem_seed_cit_033
-  content: I'm a doctor at Kyosai Hospital and Ava's mum. I raise her on my own and I worry that I work too much.
+  content: I'm a doctor at Kyosai Hospital and Ava's mum. Ava is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.
   importance: 0.8
 life:
   sex: female

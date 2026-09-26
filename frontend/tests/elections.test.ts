@@ -10,7 +10,7 @@ Object.defineProperty(globalThis, "window", { configurable: true, value: { local
   getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value),
 } } });
 beforeEach(() => { storage.clear(); seedSession(createInitialCity()); });
-const decision: ElectionDecision = { platform: "A quiet art club and a student garden.", target_id: null, intention: "", vote_for: "cit_010", reason: "I care about creative spaces.", mood: "Thoughtful" };
+const decision: ElectionDecision = { platform: "A quiet reading room and a shared garden.", target_id: null, intention: "", vote_for: "cit_010", reason: "I care about creative spaces.", mood: "Thoughtful" };
 const start = () => sessionStartElection("cit_009", "cit_010", "More science clubs.", async () => decision);
 
 test("an election has two distinct candidates and an independently generated rival platform", async () => {
@@ -18,7 +18,7 @@ test("an election has two distinct candidates and an independently generated riv
   assert.equal(city.policy.player_citizen_id, "cit_009");
   assert.equal(city.simulation_mode, "autonomous");
   assert.equal(currentElection(city)?.candidates[1].platform, decision.platform);
-  assert.equal(currentElection(city)?.voter_ids.length, 10); // students only
+  assert.equal(currentElection(city)?.voter_ids.length, city.citizens.length); // every resident is 18+ and votes
   await assert.rejects(start(), /current election/);
 });
 
@@ -27,7 +27,8 @@ test("private agent ballots never include other ballots and all votes are counte
   await sessionCastVote("cit_009");
   await assert.rejects(sessionCastVote("cit_009"), /already voted/);
   let calls = 0;
-  for (let i = 0; i < 9; i++) await sessionNextBallot(async (request) => {
+  const others = getSessionCity()!.citizens.length - 1;
+  for (let i = 0; i < others; i++) await sessionNextBallot(async (request) => {
     calls++;
     assert.equal(request.purpose, "vote");
     assert.equal("ballots" in request, false);
@@ -35,11 +36,11 @@ test("private agent ballots never include other ballots and all votes are counte
     return decision;
   });
   const event = currentElection(getSessionCity()!)!;
-  assert.equal(calls, 9);
+  assert.equal(calls, others);
   assert.equal(event.phase, "complete");
   assert.equal(tallyElection(event)?.winner?.citizen_id, "cit_010");
-  assert.equal(tallyElection(event)?.winner?.votes, 9);
-  assert.ok(sessionMemories("cit_009").some((m) => m.content.includes("won the student-council election")));
+  assert.equal(tallyElection(event)?.winner?.votes, others);
+  assert.ok(sessionMemories("cit_009").some((m) => m.content.includes("won the neighbourhood-association election")));
 });
 
 test("no partial tally leaks, failed votes remain retryable, and pause invalidates pending decisions", async () => {
@@ -57,7 +58,7 @@ test("no partial tally leaks, failed votes remain retryable, and pause invalidat
 });
 
 test("ties and abstention produce no fabricated winner; invalid ballots are rejected", () => {
-  const event: Election = { event_id: "test", kind: "student_election", title: "Council", phase: "voting", candidates: [{ citizen_id: "a", name: "A", platform: "Art" }, { citizen_id: "b", name: "B", platform: "Science" }], voter_ids: ["a", "b"], campaign_until_tick: 32, ballots: [], campaign_turn: 0, campaign_log: [] };
+  const event: Election = { event_id: "test", kind: "council_election", title: "Council", phase: "voting", candidates: [{ citizen_id: "a", name: "A", platform: "Art" }, { citizen_id: "b", name: "B", platform: "Science" }], voter_ids: ["a", "b"], campaign_until_tick: 32, ballots: [], campaign_turn: 0, campaign_log: [] };
   assert.throws(() => recordBallot(event, { voter_id: "a", vote_for: "bad", reason: "", source: "agent" }));
   assert.throws(() => recordBallot(event, { voter_id: "bad", vote_for: "a", reason: "", source: "agent" }));
   const tied = recordBallot(recordBallot(event, { voter_id: "a", vote_for: "a", reason: "", source: "agent" }), { voter_id: "b", vote_for: "b", reason: "", source: "agent" });

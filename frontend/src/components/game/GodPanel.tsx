@@ -63,12 +63,14 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
       return next;
     });
   };
-  const students = city.citizens.filter((c) => c.profession === "Student");
-  const [candidateA, setCandidateA] = useState(students[0]?.citizen_id ?? "");
-  const [candidateB, setCandidateB] = useState(students[1]?.citizen_id ?? "");
+  const candidates = city.citizens;
+  const [candidateA, setCandidateA] = useState(candidates[0]?.citizen_id ?? "");
+  const [candidateB, setCandidateB] = useState(candidates[1]?.citizen_id ?? "");
+  const validCandidates = candidateA !== candidateB && [candidateA, candidateB].every((id) => candidates.some((c) => c.citizen_id === id));
   const running = liveElection(city);
   const election = () => {
-    onStarted([candidateA, candidateB], "loc_school");
+    if (!validCandidates) return;
+    onStarted([candidateA, candidateB], "loc_city_hall");
     void act(async () => {
       const next = await api.startElection(candidateA, candidateB);
       onMessage("🗳️ The election has started. Watch the campaign in “Happening now”.");
@@ -137,18 +139,18 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
       <div className="scenario-card" data-open={open === ("election" as ScenarioKind)}>
         <button className="scenario-head" onClick={() => setOpen(open === ("election" as ScenarioKind) ? null : ("election" as ScenarioKind))}>
           <span aria-hidden="true">🗳️</span>
-          <span><strong>Student-council election</strong><small>Two students campaign, everyone votes in secret. Who wins?</small></span>
+          <span><strong>Neighbourhood election</strong><small>Two residents campaign for the neighbourhood association. Everyone gets a secret ballot.</small></span>
         </button>
         {open === ("election" as ScenarioKind) && (
           <div className="scenario-form">
             {running ? <p className="muted-copy">An election is already running. Follow it in “Happening now”.</p> : <>
               <label>First candidate<select value={candidateA} onChange={(e) => setCandidateA(e.target.value)}>
-                {students.map((c) => <option key={c.citizen_id} value={c.citizen_id}>{c.name} ({c.age})</option>)}
+                {candidates.map((c) => <option key={c.citizen_id} value={c.citizen_id}>{c.name} ({c.age})</option>)}
               </select></label>
               <label>Second candidate<select value={candidateB} onChange={(e) => setCandidateB(e.target.value)}>
-                {students.map((c) => <option key={c.citizen_id} value={c.citizen_id}>{c.name} ({c.age})</option>)}
+                {candidates.map((c) => <option key={c.citizen_id} value={c.citizen_id}>{c.name} ({c.age})</option>)}
               </select></label>
-              <button className="primary-action full-width" disabled={busy || candidateA === candidateB} onClick={election}>🗳️ Start the election</button>
+              <button className="primary-action full-width" disabled={busy || !validCandidates} onClick={election}>🗳️ Start the election</button>
             </>}
           </div>
         )}
