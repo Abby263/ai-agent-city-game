@@ -28,7 +28,6 @@ import {
   Users,
   Volume2,
   VolumeX,
-  Vote,
   X,
 } from "lucide-react";
 import { GameCanvas } from "./GameCanvas";
@@ -38,13 +37,14 @@ import { BondNetwork } from "./BondNetwork";
 import { ConversationImpact } from "./ConversationImpact";
 import { CitizenNature } from "./CitizenNature";
 import { AutonomyStatus, type PendingExchange } from "./AutonomyStatus";
-import { CityEventsPanel } from "./CityEventsPanel";
 import { BadgesPanel } from "./BadgesPanel";
 import { LifeDetails } from "./LifeDetails";
 import { NewsPanel } from "./NewsPanel";
 import { WelcomeGuide, WELCOME_KEY } from "./WelcomeGuide";
 import { WorldClock } from "./WorldClock";
 import { GodPanel } from "./GodPanel";
+import { StoryTracker } from "./StoryTracker";
+import { liveElection } from "@/lib/elections";
 import { ActionPanel } from "./ActionPanel";
 import { minutesBehindRealTime } from "@/lib/session-simulation";
 import { calendarDay, calendarStartFor } from "@/lib/calendar";
@@ -66,7 +66,7 @@ import type {
   Relationship,
 } from "@/lib/types";
 
-type Panel = "citizens" | "journal" | "city" | "social" | "events" | "news" | "create" | "badges" | null;
+type Panel = "citizens" | "journal" | "city" | "social" | "news" | "create" | "badges" | null;
 type Page = "act" | "life" | "memories" | "bonds";
 type OutgoingSpeech = {
   id: string;
@@ -262,6 +262,13 @@ export function AgentCityShell() {
     },
     [setCity],
   );
+  // Elections created from Create play out step by step, pausing while a campaign conversation is on screen.
+  useEffect(() => {
+    const election = city ? liveElection(city) : undefined;
+    if (!election?.auto || busy || playbackQueue.length || election.error) return;
+    const timer = window.setTimeout(() => void act(api.advanceElection), 2500);
+    return () => window.clearTimeout(timer);
+  }, [city, busy, playbackQueue.length, act]);
 
   const live = city?.policy.time_mode === "live";
   const lastBeat = useRef(0);
@@ -566,6 +573,7 @@ export function AgentCityShell() {
               </button>
             </div>
           )}
+          {city && !playbackQueue.length && <StoryTracker city={city} onOpenAll={() => setPanel("news")} />}
           {!city && (
             <div className="world-loading">{error || "Opening Nakameguro..."}</div>
           )}
@@ -606,7 +614,6 @@ export function AgentCityShell() {
               { id: "journal", icon: MessageCircle, label: "Talk" },
               { id: "news", icon: Newspaper, label: "News" },
               { id: "social", icon: Heart, label: "Bonds" },
-              { id: "events", icon: Vote, label: "Vote" },
               { id: "badges", icon: Trophy, label: "Badges" },
             ] as const
           ).map(({ id, icon: Icon, label }) => (
@@ -644,7 +651,7 @@ export function AgentCityShell() {
           <aside
             className="game-panel"
             aria-label={
-              panel === "create" ? "Create a situation" : panel === "news" ? "Town news" : panel === "badges" ? "Badges" : panel === "events" ? "City events" : panel === "social" ? "Relationships" : panel === "journal"
+              panel === "create" ? "Create a situation" : panel === "news" ? "Town news" : panel === "badges" ? "Badges" : panel === "social" ? "Relationships" : panel === "journal"
                 ? "Conversations"
                 : panel === "city"
                   ? "City"
@@ -654,14 +661,14 @@ export function AgentCityShell() {
             <header className="panel-header">
               <div>
                 <small>
-                  {panel === "create" ? "YOU CONTROL THE WORLD" : panel === "news" ? "LIFE IN NAKAMEGURO" : panel === "badges" ? "TRY SOMETHING NEW" : panel === "events" ? "A NEIGHBORHOOD WITH SOMETHING AT STAKE" : panel === "social" ? "FEELINGS ARE NOT ALWAYS MUTUAL" : panel === "journal"
+                  {panel === "create" ? "YOU CONTROL THE WORLD" : panel === "news" ? "LIFE IN NAKAMEGURO" : panel === "badges" ? "TRY SOMETHING NEW" : panel === "social" ? "FEELINGS ARE NOT ALWAYS MUTUAL" : panel === "journal"
                     ? "THE THREADS BETWEEN US"
                     : panel === "city"
                       ? "YOUR NEIGHBORHOOD"
                       : "EVERYONE HAS A STORY"}
                 </small>
                 <h2>
-                  {panel === "create" ? "Create" : panel === "news" ? "Town news" : panel === "badges" ? "Your badges" : panel === "events" ? "City events" : panel === "social" ? "Bonds & feelings" : panel === "journal"
+                  {panel === "create" ? "Create" : panel === "news" ? "Town news" : panel === "badges" ? "Your badges" : panel === "social" ? "Bonds & feelings" : panel === "journal"
                     ? "Conversations"
                     : panel === "city"
                       ? "Around town"
@@ -681,14 +688,8 @@ export function AgentCityShell() {
 
             {panel === "news" && city && <NewsPanel city={city} onSelect={choose} />}
 
-            {panel === "create" && city && <GodPanel city={city} busy={busy} act={act} onMessage={setMessage} onFocus={(id) => void selectCitizen(id)} />}
-
-            {panel === "events" && city && <CityEventsPanel city={city} busy={busy} act={act} onTalk={(id) => {
-              setRecipient(id);
-              setFilter(id);
-              setFocusedConversation(null);
-              setPanel("journal");
-            }} />}
+            {panel === "create" && city && <GodPanel city={city} busy={busy} act={act} onMessage={setMessage}
+              onStarted={(ids, locationId) => { setPanel(null); useGameStore.getState().focusOn(ids.filter(Boolean), false, locationId); }} />}
 
             {panel === "social" && city && <SocialPanel city={city} relationships={cityBonds} conversations={cityConversations} onConversation={(id) => {
               setFocusedConversation(id);

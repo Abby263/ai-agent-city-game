@@ -388,6 +388,16 @@ export class CityRenderer {
       }
     }
   }
+  /** Flies to a place, e.g. a building on fire. */
+  focusPlace(locationId: string) {
+    const spot = arrivals[locationId];
+    if (!spot) return;
+    this.mode = "orbit";
+    this.focusTarget = new THREE.Vector3(spot.x, this.height > this.width * 1.05 ? -2.5 : 0.8, spot.z - 1.5);
+    const offset = this.camera.position.clone().sub(this.controls.target).setLength(16);
+    offset.y = Math.max(offset.y, 7);
+    this.shotPosition = this.focusTarget.clone().add(offset.setLength(16));
+  }
   /** Frames two people talking, leaving room below for the chat panel on narrow screens. */
   focusPair(ids: string[], onlyIfHidden = false) {
     const models = ids.map((id) => this.people.get(id)).filter((m) => m !== undefined);

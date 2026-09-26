@@ -4,26 +4,37 @@ Student council is the first complete event with participation, competing agents
 private decisions, and a resolved outcome. The residents are students, so this is
 a fictional school election, not a simulation of real-world political targeting.
 
-## Play an Election
+## Follow What You Start: "Happening Now"
 
-1. Open **Events** in the right navigation.
-2. Choose the character to play, an opposing candidate, and write your platform.
-3. Select **Enter & start campaigning**. The rival's Deep Agent drafts its own
-   platform. You control your candidate's spoken words; the rival acts in Auto.
-4. Use the voter list to meet residents. At the same location, open **Talk** and
-   ask what matters to them, explain your ideas, answer questions, and make promises.
-   Pause the clock whenever you need time to think or talk.
-5. Campaigning lasts 32 ticks (eight city hours). **Open ballots early** ends it
-   immediately and pauses the world for voting. Auto opens voting at the deadline.
-6. Cast the ballot of the character you currently control. Other residents vote
-   automatically while Auto is running, or one at a time with **Next AI ballot**.
-7. Results appear only when every resident has voted or abstained. Inspect
-   **Residents' decisions** for the agents' explanations. A tie has no winner.
+Anything you set in motion from **Create** or **Act** starts a *story*
+(`frontend/src/lib/stories.ts`). The Create panel closes, the camera flies to the
+people involved and their first reaction conversation plays immediately, without
+waiting for Auto. The **Happening now** card on the map then collects each beat:
 
-You can switch characters or return to observer using Citizens. Switching changes
-which character is player-controlled, not which ballots have already been cast.
+- the situation itself ("Kenji found $100 near Kokashita Arcade and kept it"),
+- who goes to whom and why,
+- every later conversation between the people in the story, quoted, with **Replay talk**,
+- life news about them (an injury healing, a new couple, a police warning, an election result).
+
+**Watch** moves the camera back to them. **All stories** (the News panel) lists every
+running story with its full timeline. Stories stay open for 36 city hours (24 for
+actions, 48 for elections); switch on **Auto** to see how the rest of town reacts.
+
+## Run an Election
+
+There is no separate Vote tab: an election is a situation like any other.
+
+1. Open **Create** and pick two students under **Student-council election**.
+2. Each candidate's Deep Agent writes its own platform; they appear in the story.
+3. Each candidate walks to a resident of their choice and campaigns in a real
+   conversation (two campaign talks, played as cutscenes).
+4. Every student then votes privately and in parallel. A failed ballot counts as an
+   abstention; a tie has no winner.
+5. The winner (or tie) and the count appear in the story and in News. The clock is
+   not stopped, so the town carries on.
+
 Candidates can vote, including for themselves; one ballot per resident is enforced.
-The player cannot overwrite a ballot after it is sealed.
+You can still talk to candidates yourself while they campaign by playing as a resident.
 
 ## Agent Decisions and Game Rules
 
@@ -72,13 +83,13 @@ are retained. Current event participation is available in browser-local mode onl
   structured response validation.
 - `backend/app/cognition/deep_agents.py`: citizen-owned, provider-configured agents
   and private memory tools, also used by the dialogue system.
-- `frontend/src/components/game/CityEventsPanel.tsx`: participation, campaign
-  progress, voting and results.
+- `frontend/src/lib/stories.ts` and `frontend/src/components/game/StoryTracker.tsx`:
+  the story timeline and the Happening now card; Create and News start and show them.
 
 One event decision OR one campaign conversation is scheduled per eligible tick,
 not one call per resident. Conversations retain their existing bounded turn budget.
-Voting resolves one resident per tick/request so failures are visible and retryable.
-The game pauses after results. Vercel remains paused; no hosting change is required.
+The shell advances an election one step at a time, pausing while a cutscene plays;
+all ballots are then decided in parallel. Vercel remains paused; no hosting change is required.
 
 Exams and festivals still use the earlier simple event triggers. They are not yet
 full participation quests. Further event types should add their own typed state,

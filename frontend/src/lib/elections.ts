@@ -16,6 +16,9 @@ export type Election = {
   campaign_turn: number;
   campaign_log: Array<{ candidate_id: string; target_id: string; conversation_id: string }>;
   error?: string;
+  /** Created from Create: both candidates are AI-run and the election plays out as a quick story. */
+  auto?: boolean;
+  story_id?: string;
 };
 export type ElectionDecision = { platform: string; target_id: string | null; intention: string; vote_for: string | null; reason: string; mood: string };
 export type ElectionDecisionRequest = {

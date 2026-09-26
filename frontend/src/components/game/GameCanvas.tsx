@@ -40,7 +40,9 @@ export function GameCanvas({
   const inlineTalk = useGameStore((state) => state.inlineTalk);
   const focusRequest = useGameStore((state) => state.focusRequest);
   useEffect(() => {
-    if (focusRequest) renderer.current?.focusPair(focusRequest.ids, focusRequest.onlyIfHidden);
+    if (!focusRequest) return;
+    if (focusRequest.ids.length) renderer.current?.focusPair(focusRequest.ids, focusRequest.onlyIfHidden);
+    else if (focusRequest.locationId) renderer.current?.focusPlace(focusRequest.locationId);
   }, [focusRequest, ready]);
   useEffect(() => {
     renderer.current?.setInlineTalk(inlineTalk);

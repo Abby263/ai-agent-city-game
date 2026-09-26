@@ -117,7 +117,7 @@ export function LiveConversation({ conversation, citizens, location, dateLabel, 
         <button aria-label="Focus on speakers" title="Focus on speakers" onClick={onFocus}><Focus size={18} /></button>
         <button aria-label="Skip conversation playback" title="Skip playback; keep conversation in history" onClick={() => { audio.current?.stop(); onFinish(conversation.conversation_id); }}><SkipForward size={18} /></button>
       </div>
-      {arrived && !introduced ? <div className="encounter-introduction"><small>{conversation.encounter?.kind === "planned" ? "A promise kept" : "How they met"}</small><p>{conversation.encounter?.reason}</p>
+      {arrived && !introduced ? <div className="encounter-introduction"><small>{conversation.encounter?.kind === "planned" ? "A promise kept" : "What's going on"}</small><p>{conversation.encounter?.reason}</p>
         <div className="live-dialogue-controls"><button aria-label={paused ? "Resume introduction" : "Pause introduction"} title="Pause or resume" onClick={togglePause}>{paused ? <Play size={18} /> : <Pause size={18} />}</button><button aria-label="Begin conversation" title="Begin conversation" onClick={() => setIntroduced(true)}><ArrowRight size={19} /></button></div></div> : arrived && line ? (
         <>
           <div className="live-subtitle" aria-live="polite" aria-atomic="true">

@@ -174,6 +174,8 @@ export type CityState = {
   evacuation_until?: number;
   /** Fires and accidents the player created; fires close the building until they end. */
   incidents?: import("./scenarios").Incident[];
+  /** Storylines the player set in motion, with every beat that followed. */
+  stories?: import("./stories").Story[];
   departed?: DepartedCitizen[];
   gatherings?: Gathering[];
   life_log?: LifeLogEntry[];

@@ -27,7 +27,10 @@ import { calendarDay, calendarStartFor, realCityTime } from "./calendar";
 import { dayWeather, weatherAt, type WeatherOverride } from "./weather";
 import { weatherEffects } from "./life";
 import { activeIncidents, applyScenario, type BondChange, type ScenarioRequest } from "./scenarios";
-import { actionBlocked, performAction, type ActionId, type ActionOutcome } from "./actions";
+import { actionBlocked, actions as actionCatalog, performAction, type ActionId, type ActionOutcome } from "./actions";
+import { addBeat, beatForConversation, beatForNews, startStory } from "./stories";
+import { scenarioCatalog } from "./scenarios";
+import type { LifeNews } from "./life";
 import { bedRest, careNeeded, caregiverFor, ensureLife, gatheringFor, healthCap, lifeDay, lifeTick, recordMeal, relatives, shiftLife } from "./life";
 import type { BondLookup, LifeFactory, LifeSink } from "./life";
 
@@ -714,8 +717,86 @@ function applyBallot(city: CityState, voterId: string, voteFor: string | null, r
     const description = result.winner ? `${result.winner.name} won the student-council election with ${result.winner.votes} votes.` : result.tied ? "The student-council election ended in a tie. No winner was declared." : "Everyone abstained. No winner was declared.";
     addEvent(city, { event_type: "election_result", description, actors: updated.candidates.map((c) => c.citizen_id), priority: 3 });
     for (const voter of updated.voter_ids) addMemory({ citizen_id: voter, kind: "episodic", content: description, importance: 0.85, salience: 0.85, related_citizen_id: result.winner?.citizen_id ?? null, extra: { election_id: event.event_id, source: "public_result" } });
-    city.clock.running = false;
+    if (updated.story_id) {
+      const score = result.counts.map((c) => `${c.name.split(" ")[0]} ${c.votes}`).join(" – ");
+      addBeat(city, updated.story_id, { icon: result.winner ? "🏆" : "🤝", text: `${description} Final count: ${score}${result.abstentions ? `, ${result.abstentions} abstained` : ""}.` });
+      lifeSink(city)({ kind: "election", icon: "🗳️", headline: description, actors: updated.candidates.map((c) => c.citizen_id), priority: 3 });
+    }
+    if (!updated.auto) city.clock.running = false;
   }
+}
+
+/** Create → election: two AI-run candidates, a short campaign you can watch, private ballots, a winner. */
+export async function sessionStartElectionAuto(firstId: string, secondId: string, decide: DecideElection) {
+  const city = requireSessionCity();
+  if (liveElection(city)) throw new Error("An election is already running. Wait for the result first.");
+  if (firstId === secondId) throw new Error("Choose two different candidates.");
+  const [a, b] = [findCitizen(city, firstId), findCitizen(city, secondId)];
+  if (![a, b].every((c) => c.profession === "Student")) throw new Error("Student-council candidates must be students.");
+  const voters = city.citizens.filter((c) => c.profession === "Student").map((c) => c.citizen_id);
+  const event: Election = {
+    event_id: newId("election"), kind: "student_election", title: "Nakameguro School student council", phase: "campaign",
+    candidates: [{ citizen_id: a.citizen_id, name: a.name, platform: "" }, { citizen_id: b.citizen_id, name: b.name, platform: "" }],
+    voter_ids: voters, campaign_until_tick: city.clock.tick + 9999, ballots: [], campaign_turn: 0, campaign_log: [], auto: true,
+  };
+  city.activities = [...(city.activities ?? []).slice(-4), event];
+  const platforms = await Promise.all([a, b].map((c) => decide(electionRequest(city, c, "platform"))));
+  if (isStale(city)) return requireSessionCity();
+  platforms.forEach((p, i) => { event.candidates[i].platform = p.platform.trim() || "Make school better for everyone."; [a, b][i].mood = p.mood || [a, b][i].mood; });
+  const story = startStory(city, {
+    id: newId("story"), kind: "election", icon: "🗳️", title: `Student-council election: ${a.name.split(" ")[0]} vs ${b.name.split(" ")[0]}`,
+    actors: [...new Set([a.citizen_id, b.citizen_id, ...voters])], focus_ids: [a.citizen_id, b.citizen_id], location_id: "loc_school",
+    first: { icon: "🗳️", text: `${a.name} and ${b.name} are running for student council.` }, length: 48 * 60,
+  });
+  event.story_id = story.id;
+  for (const c of event.candidates) addBeat(city, story.id, { icon: "📣", text: `${c.name.split(" ")[0]}'s platform: “${c.platform.slice(0, 160)}”` });
+  addEvent(city, { event_type: "election_started", actors: [a.citizen_id, b.citizen_id], description: `${a.name} and ${b.name} are running for student council.`, priority: 3 });
+  return saveAndReturn(city);
+}
+
+/** One step of an election created from Create: a campaign conversation, or everyone's private vote. */
+export async function sessionAdvanceAutoElection(generate: GenerateCognition, decide: DecideElection) {
+  const city = requireSessionCity();
+  const event = liveElection(city);
+  if (!event?.auto) return city;
+  const storyId = event.story_id ?? "";
+  if (event.phase === "campaign" && event.campaign_turn >= 2) {
+    event.phase = "voting";
+    addBeat(city, storyId, { icon: "🗳️", text: "Campaigning is over. Every student is casting a private ballot." });
+    addEvent(city, { event_type: "election_voting", description: "Campaigning has ended. Students are casting private ballots.", priority: 3 });
+    return saveAndReturn(city);
+  }
+  if (event.phase === "campaign") {
+    const candidate = findCitizen(city, event.candidates[event.campaign_turn % event.candidates.length].citizen_id);
+    const decision = await decide(electionRequest(city, candidate, "campaign"));
+    if (isStale(city)) return requireSessionCity();
+    event.campaign_turn++;
+    const target = decision.target_id ? city.citizens.find((c) => c.citizen_id === decision.target_id && c !== candidate) : undefined;
+    if (!target) {
+      addBeat(city, storyId, { icon: "📝", text: `${candidate.name.split(" ")[0]} spent the time polishing their speech instead of campaigning.` });
+      return saveAndReturn(city);
+    }
+    addBeat(city, storyId, { icon: "🚶", text: `${candidate.name.split(" ")[0]} goes to win over ${target.name.split(" ")[0]}: ${decision.intention || decision.reason}` });
+    candidate.current_location_id = target.current_location_id;
+    candidate.x = candidate.target_x = target.x;
+    candidate.y = candidate.target_y = target.y;
+    const response = await generate({ city, actor_id: candidate.citizen_id, target_id: target.citizen_id, require_conversation: true,
+      task: `Ask ${target.name} for their vote in the student-council election.`, observations: [...electionNotice(city), `Your private campaign intention: ${decision.intention || decision.reason}`], memories: [],
+      private_memories: { [candidate.citizen_id]: privateMemoryContext(candidate), [target.citizen_id]: privateMemoryContext(target) } });
+    if (isStale(city)) return requireSessionCity();
+    applyAutonomousCognition(city, candidate, target, { event_id: event.event_id, location_id: target.current_location_id } as CityEvent, response);
+    return saveAndReturn(city);
+  }
+  // Voting: everyone decides privately and at the same time; a failed decision counts as an abstention.
+  const voters = event.voter_ids.filter((id) => !event.ballots.some((b) => b.voter_id === id));
+  const decisions = await Promise.all(voters.map((id) => decide(electionRequest(city, findCitizen(city, id), "vote")).catch(() => null)));
+  if (isStale(city)) return requireSessionCity();
+  voters.forEach((id, i) => {
+    const d = decisions[i];
+    applyBallot(city, id, d && event.candidates.some((c) => c.citizen_id === d.vote_for) ? d.vote_for : null, d?.reason ?? "I couldn't make up my mind.", "agent");
+    if (d?.mood) findCitizen(city, id).mood = d.mood;
+  });
+  return saveAndReturn(city);
 }
 
 export async function sessionCastVote(voteFor: string | null) {
@@ -963,8 +1044,13 @@ async function planManualTask(
   };
 }
 
+function firstNames(city: CityState) {
+  return Object.fromEntries(city.citizens.map((c) => [c.citizen_id, c.name.split(" ")[0]]));
+}
+
 function lifeSink(city: CityState): LifeSink {
   return (news) => {
+    beatForNews(city, news);
     const event = addEvent(city, { event_type: `life_${news.kind}`, description: news.headline, actors: news.actors,
       location_id: news.location_id ?? null, priority: news.priority ?? 2 });
     for (const memory of news.memories ?? [])
@@ -1094,11 +1180,40 @@ export function routineContext(city: CityState): RoutineContext {
 }
 
 /** Player-created situations: the world changes now, and residents talk it through in Auto. */
-export async function sessionCreateSituation(request: ScenarioRequest) {
+export async function sessionCreateSituation(request: ScenarioRequest, generate?: GenerateCognition) {
   const city = requireSessionCity();
   city.incidents = activeIncidents(city, cityMinute(city));
-  const result = applyScenario(city, request, { sink: lifeSink(city), adjustBonds: (changes) => adjustBonds(city, changes), cityMinute: cityMinute(city) });
-  return { city: saveAndReturn(city), result };
+  const news: LifeNews[] = [];
+  const sink = lifeSink(city);
+  const result = applyScenario(city, request, { sink: (item) => { news.push(item); sink(item); }, adjustBonds: (changes) => adjustBonds(city, changes), cityMinute: cityMinute(city) });
+  const spec = scenarioCatalog.find((s) => s.kind === request.kind);
+  const encounter = city.encounter;
+  const actors = [...new Set([...news.flatMap((n) => n.actors), ...(encounter ? [encounter.actor_id, encounter.target_id] : []), ...(request.citizen_ids ?? []).slice(0, spec?.needs.includes("pair") ? 2 : spec?.needs.includes("person") ? 1 : 0)])];
+  const story = startStory(city, {
+    id: newId("story"), kind: request.kind, icon: spec?.icon ?? "✨", title: result.headline, actors: actors.slice(0, 12),
+    focus_ids: [result.focus_id, encounter?.actor_id, encounter?.target_id].filter((id): id is string => Boolean(id)),
+    location_id: request.location_id ?? encounter?.location_id ?? null,
+    first: { icon: spec?.icon ?? "✨", text: news[0]?.headline ?? result.headline },
+  });
+  city.encounter = null;
+  const saved = saveAndReturn(city);
+  if (!encounter || !generate) return { city: saved, result, story_id: story.id, talked: false };
+  // The people involved react right away instead of waiting for the next tick.
+  const live = requireSessionCity();
+  try {
+    const actor = findCitizen(live, encounter.actor_id), target = findCitizen(live, encounter.target_id);
+    actor.current_location_id = target.current_location_id;
+    actor.x = actor.target_x = target.x;
+    actor.y = actor.target_y = target.y;
+    const event = addEvent(live, { event_type: "social_opportunity", actors: [actor.citizen_id, target.citizen_id], location_id: target.current_location_id,
+      description: encounter.reason, payload: { topic: encounter.topic, kind: "chance" }, priority: 2 });
+    addBeat(live, story.id, { icon: "🚶", text: `${actor.name.split(" ")[0]} goes to ${target.name.split(" ")[0]} to talk about ${encounter.topic}.` });
+    await runAutonomousCognition(live, event, generate);
+    if (isStale(live)) return { city: requireSessionCity(), result, story_id: story.id, talked: false };
+    return { city: saveAndReturn(live), result, story_id: story.id, talked: true };
+  } catch (error) {
+    return { city: isStale(live) ? requireSessionCity() : saved, result, story_id: story.id, talked: false, error: error instanceof Error ? error.message : "They could not talk right now." };
+  }
 }
 
 /**
@@ -1120,6 +1235,12 @@ export async function sessionPerformAction(actorId: string, targetId: string, ac
   if (actorId === city.policy.player_citizen_id) city.policy.player_destination = null;
   if (city.encounter && [actorId, targetId].some((id) => [city.encounter!.actor_id, city.encounter!.target_id].includes(id))) city.encounter = null;
   const outcome = performAction(city, actor, target, actionId, { sink: lifeSink(city), adjustBonds: (changes) => adjustBonds(city, changes), bond: bondLookup(city) }, text);
+  const spec = actionCatalog.find((a) => a.id === actionId)!;
+  if (spec.group === "love" || spec.group === "conflict" || actionId === "gift") {
+    const onlookers = city.citizens.filter((c) => c !== actor && c !== target && c.current_location_id === target.current_location_id).map((c) => c.citizen_id);
+    startStory(city, { id: newId("story"), kind: `action_${actionId}`, icon: spec.icon, title: outcome.headline, actors: [actorId, targetId, ...onlookers].slice(0, 10),
+      focus_ids: [actorId, targetId], location_id: target.current_location_id, first: { icon: spec.icon, text: outcome.headline }, length: 24 * 60 });
+  }
   const saved = saveAndReturn(city);
   if (actor.age < 3 || target.age < 3) return { city: saved, outcome, talked: false };
   const live = requireSessionCity();
@@ -1863,6 +1984,7 @@ function applyAutonomousCognition(
     actor.relationship_scores[target.citizen_id] ?? 38,
   );
   savedConversation.summary = `${savedConversation.summary} Relationship: ${before} -> ${after}.`;
+  beatForConversation(city, savedConversation, firstNames(city));
   writeJson(
     CONVERSATIONS_KEY,
     [savedConversation, ...sessionConversations()].slice(0, 80),
@@ -2071,6 +2193,7 @@ function applyCognition(
       citizen.relationship_scores[target.citizen_id] ?? 38,
     );
     savedConversation.summary = `${savedConversation.summary} Relationship: ${before} -> ${after}.`;
+    beatForConversation(city, savedConversation, firstNames(city));
     writeJson(
       CONVERSATIONS_KEY,
       [savedConversation, ...sessionConversations()].slice(0, 80),

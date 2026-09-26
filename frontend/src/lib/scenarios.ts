@@ -37,7 +37,7 @@ const nature = (c: CitizenAgent) => JSON.stringify(c.personality.nature ?? {}).t
 export function honesty(c: CitizenAgent) {
   const text = nature(c);
   let score = 68; // Japan returns most lost wallets; start high.
-  if (/honest|principled|reliable|fair|trust|promise|kind|warm|loyal|care/.test(text)) score += 18;
+  if (/honest|principled|reliable|dutiful|responsible|fair|trust|promise|kind|warm|loyal|care/.test(text)) score += 18;
   if (/impulsive|proud|restless|ambitious|stubborn/.test(text)) score -= 12;
   if (c.money < 80) score -= 18;
   if (c.stress > 70) score -= 8;
@@ -96,6 +96,12 @@ export function applyScenario(city: CityState, request: ScenarioRequest, tools: 
       if (witness) {
         adjustBonds([{ from: witness.citizen_id, to: finder.citizen_id, trust: -18, warmth: -8, feelings: { resentment: 10 }, reason: `I saw ${first(finder)} pocket money they found on the street.` }]);
         meet(city, witness, finder, `${witness.name} saw ${finder.name} pick up money from the street near ${where} and keep it.`, "the money that was kept", now);
+      } else {
+        // Nobody saw, but a secret shows: they're a little off with whoever they meet next.
+        const companion = city.citizens.filter((c) => c !== finder && c.age >= 5 && !/sleep/i.test(c.current_activity))
+          .sort((a, b) => Number(relatives(city, finder).includes(b.citizen_id)) - Number(relatives(city, finder).includes(a.citizen_id))
+            || Number(b.current_location_id === finder.current_location_id) - Number(a.current_location_id === finder.current_location_id))[0];
+        if (companion) meet(city, finder, companion, `${finder.name} secretly pocketed $${amount} found on the street near ${where}${guilty ? " and feels guilty about it" : " and is in a suspiciously good mood"}. ${companion.name} knows nothing about it.`, guilty ? "something weighing on their mind" : "their unexpectedly good day", now);
       }
       sink({ kind: "temptation", icon: "🤫", headline: `${finder.name} found $${amount} near ${where} and kept it${witness ? `, but ${witness.name} saw everything` : ""}.`, actors: [finder.citizen_id, ...(witness ? [witness.citizen_id] : [])], priority: 2, location_id: location,
         memories: [{ citizen_id: finder.citizen_id, content: `I found $${amount} on the street near ${where} and kept it.${guilty ? " I feel bad about it." : " Lucky day."}`, importance: 0.7 },
@@ -117,6 +123,9 @@ export function applyScenario(city: CityState, request: ScenarioRequest, tools: 
     if (helper) {
       adjustBonds([{ from: victim.citizen_id, to: helper.citizen_id, trust: 12, warmth: 12, feelings: { admiration: 12 }, reason: `${first(helper)} stopped to help me after the accident.` }]);
       meet(city, helper, victim, `${helper.name} rushed over to help ${victim.name}, who was knocked down by a bicycle near ${placeName(city, victim.current_location_id)}.`, "the bicycle accident", now);
+    } else {
+      const officer = police(city);
+      if (officer && officer !== victim) meet(city, officer, victim, `Officer ${officer.name} arrived after ${victim.name} was knocked down by a bicycle near ${placeName(city, victim.current_location_id)} and nobody stopped to help.`, "what happened in the accident", now);
     }
     sink({ kind: "accident", icon: "🚲", headline: `${victim.name} was knocked down by a speeding bicycle near ${placeName(city, victim.current_location_id)}.${helper ? ` ${helper.name} stopped to help and called an ambulance.` : helpers.length ? " People stared, but nobody stepped in." : ""}`,
       actors: [victim.citizen_id, ...(helper ? [helper.citizen_id] : [])], priority: 3, location_id: victim.current_location_id,
@@ -137,7 +146,13 @@ export function applyScenario(city: CityState, request: ScenarioRequest, tools: 
       actors: [...inside, ...workers].map((c) => c.citizen_id), priority: 3, location_id: location,
       memories: [...new Set([...inside, ...workers])].map((c) => ({ citizen_id: c.citizen_id, content: inside.includes(c) ? `There was a fire at ${where} while I was inside. We all got out, but I was scared.` : `There was a fire at ${where}, where I work. I hope everything is okay.`, importance: 0.85 })) });
     const [a, b] = inside.length >= 2 ? inside : [workers[0], inside[0] ?? workers[1]];
+    const officer = police(city);
     if (a && b && a !== b) meet(city, a, b, `A fire broke out at ${where} and they just evacuated together.`, "the fire", now);
+    else if (officer && (a ?? b) && (a ?? b) !== officer) meet(city, officer, (a ?? b)!, `Officer ${officer.name} is asking ${(a ?? b)!.name} about the fire that broke out at ${where}.`, "the fire", now);
+    else {
+      const nearby = nearest(city, location, officer ? [officer.citizen_id] : []);
+      if (officer && nearby) meet(city, officer, nearby, `Officer ${officer.name} is asking ${nearby.name}, who was close by, whether they saw how the fire at ${where} started.`, "the fire", now);
+    }
     return { headline: `${where} is on fire.`, focus_id: inside[0]?.citizen_id ?? null };
   }
 
@@ -193,7 +208,9 @@ export function applyScenario(city: CityState, request: ScenarioRequest, tools: 
     const keeps = finder.age < 18 && r("keep") < 0.3;
     const officer = police(city);
     if (finder.life) finder.life.emotions.joy = clamp(finder.life.emotions.joy + 30);
+    const parent = city.citizens.find((c) => finder.life?.parent_ids.includes(c.citizen_id) || (c.age >= 18 && c.life?.household_id === finder.life?.household_id && c !== finder));
     if (officer && officer !== finder && !keeps) meet(city, finder, officer, `${finder.name} found a lost shiba puppy near ${where} and wants help finding its owner.`, "the lost puppy", now);
+    else if (keeps && parent) meet(city, finder, parent, `${finder.name} found a lost shiba puppy near ${where} and is desperate to keep it.`, "keeping the puppy", now);
     sink({ kind: "puppy", icon: "🐶", headline: keeps ? `${finder.name} found a lost shiba puppy near ${where} and is begging to keep it!` : `${finder.name} found a lost shiba puppy near ${where} and took it to the police box to find its owner.`,
       actors: [finder.citizen_id], priority: 2, memories: [{ citizen_id: finder.citizen_id, content: `I found a tiny lost shiba puppy near ${where} today. It licked my hand!`, importance: 0.75 }] });
     return { headline: `${first(finder)} found a puppy.`, focus_id: finder.citizen_id };
@@ -205,7 +222,8 @@ export function applyScenario(city: CityState, request: ScenarioRequest, tools: 
   person.life.loneliness = clamp(person.life.loneliness - 25);
   sink({ kind: "kindness", icon: "🎁", headline: `${person.name} found an anonymous gift and a note: "Thank you for being you."`, actors: [person.citizen_id], priority: 2,
     memories: [{ citizen_id: person.citizen_id, content: "Someone left me a gift and a kind note, with no name. It made my whole day.", importance: 0.7 }] });
-  const friend = city.citizens.find((c) => c !== person && c.current_location_id === person.current_location_id && c.age >= 5);
+  const friend = city.citizens.find((c) => c !== person && c.current_location_id === person.current_location_id && c.age >= 5)
+    ?? city.citizens.find((c) => c !== person && c.age >= 5 && relatives(city, person).includes(c.citizen_id));
   if (friend) meet(city, person, friend, `${person.name} just found an anonymous gift with a kind note and wonders who sent it.`, "the secret gift", now);
   return { headline: `${first(person)} got a surprise.`, focus_id: person.citizen_id };
 }

@@ -2,10 +2,12 @@
 
 AgentCity is a playable 3D AI city simulation where citizens are autonomous agents with daily routines, needs, money, relationships, memory, and goals. Explore a cel-shaded neighborhood with animated citizens, blossom trees, shopfronts, a market, a schoolyard, and a riverside. The current MVP has eight active student agents, including newcomers Sophie Laurent, Zara Ali, and Eliot Chen. Other citizen profiles remain inactive in the codebase.
 
-**Playable event: student-council election.** Open Events, enter as any resident,
-publish a platform, and campaign against another resident's Deep Agent. Voters
-decide independently from their own experience; private ballots produce a winner,
-tie, or abstention result. See [event gameplay and architecture](docs/events.md).
+**Follow what you start.** Every situation, action or election you create becomes a
+**Happening now** story: the reaction plays straight away, and the card on the map
+collects each beat (who went to whom, what they said, what changed) with **Watch** and
+**Replay talk**. News lists all running stories. A student-council election is one of
+these situations: pick two candidates in Create and watch them campaign until private
+ballots produce a winner. See [event gameplay and architecture](docs/events.md).
 
 This repo is `ai-agent-city-game`. The visible product name is `AgentCity`.
 
@@ -25,7 +27,7 @@ Deployment URL: [ai-agent-city-game.vercel.app](https://ai-agent-city-game.verce
 - **New players:** a short guide appears on the first visit and reopens from the ? button.
 - **A real Tokyo neighbourhood:** Nakameguro, on real Tokyo time, date and weather, with the cherry-lined Meguro River, the elevated Tōyoko line and trains, buses driving on the left, shops, offices, a shrine and a clinic. See [Nakameguro](docs/nakameguro.md).
 - **Natural conversations:** every resident has their own natural AI voice, lips that move with the audio, and gestures that fit what they say. Chats as a resident are continuous and happen where you stand, and plans you agree on can be saved. See [conversations, voices and body language](docs/conversations.md).
-- **Play god and take action:** Create changes the weather or sets up situations (dropped money, fires, accidents, love, rivalries). Act lets any resident hug, help, argue with, slap or ask out any other, and everyone reacts in character.
+- **Play god and take action:** Create changes the weather or sets up situations (dropped money, fires, accidents, love, rivalries, a school election) and shows the reaction right away. Act lets any resident hug, help, argue with, slap or ask out any other, and everyone reacts in character.
 - **Real lives:** 18 residents in eight families: students, working parents, a grandfather and, soon, a baby. Everyone ages a day per city day and has a body, feelings, a job or school grades, money, ambitions, health problems, family and love. Babies are born, people get sick and recover, and people can die of old age. See [life simulation](docs/life-simulation.md).
 - **One game for everyone:** adults, kids and families play the same game. Romance is only between adults; conflict is non-graphic and never between adults and children.
 - **Safety:** player-written text is checked before it reaches the AI. Phone numbers, emails, addresses, passwords, links and unkind language are blocked with a friendly explanation, and messages about self-harm point to a trusted adult. Every model prompt carries child-safety rules. See [releasing for kids](docs/kids-release.md).

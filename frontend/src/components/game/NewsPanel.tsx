@@ -2,6 +2,9 @@
 
 import { CitizenPortrait } from "./CitizenPortrait";
 import { weekday } from "@/lib/routine";
+import { activeStories } from "@/lib/stories";
+import { watchStory } from "./StoryTracker";
+import { useGameStore } from "@/lib/store";
 import type { CityState, LifeLogEntry } from "@/lib/types";
 
 const time = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
@@ -18,6 +21,28 @@ export function NewsPanel({ city, onSelect }: { city: CityState; onSelect: (id: 
         <strong>The Nakameguro Daily</strong>
         <span>{weekday(city.clock.day)}, day {city.clock.day} · population {city.citizens.length}</span>
       </div>
+      {activeStories(city).length > 0 && (
+        <>
+          <h4>Happening now</h4>
+          {activeStories(city).map((story) => (
+            <article className="story-card" key={story.id}>
+              <header>
+                <strong><span aria-hidden="true">{story.icon}</span> {story.title}</strong>
+                <button className="outline-action" onClick={() => watchStory(story)}>👀 Watch</button>
+              </header>
+              <ol className="story-beats">
+                {story.beats.map((beat, i) => (
+                  <li key={i}>
+                    <span aria-hidden="true">{beat.icon}</span>
+                    <p>{beat.text}{beat.conversation_id && <button className="text-action" onClick={() => useGameStore.getState().replayConversation(beat.conversation_id!)}> ▶ replay</button>}</p>
+                    <time>{time(beat.minute)}</time>
+                  </li>
+                ))}
+              </ol>
+            </article>
+          ))}
+        </>
+      )}
       {(upcoming.length > 0 || expecting.length > 0) && (
         <>
           <h4>Coming up</h4>

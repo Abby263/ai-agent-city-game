@@ -41,7 +41,8 @@ The AI residents know the date, time, weather and any alerts, so they talk about
 ## Playing God And Taking Action
 
 - **Create:** change the weather, trigger an earthquake, or set up situations: drop money (who hands it in at the kōban?),
-  a bicycle accident, a fire, a lottery win, a spark of love, a misunderstanding, a lost puppy, a secret gift.
+  a bicycle accident, a fire, a lottery win, a spark of love, a misunderstanding, a lost puppy, a secret gift or a
+  student-council election. The first reaction plays at once and the **Happening now** card tracks what follows.
 - **Act (on any profile):** make anyone do something to anyone: talk, hug, high-five, compliment, gift, comfort,
   apologise, flirt, ask out, confess, kiss, propose, tease, argue, insult, push, slap or hit. Feelings, relationships,
   memories and onlookers change; the target reacts in their own AI-generated words.

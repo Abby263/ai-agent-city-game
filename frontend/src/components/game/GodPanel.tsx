@@ -5,6 +5,8 @@ import { Play } from "lucide-react";
 import { api } from "@/lib/api";
 import { scenarioCatalog, type ScenarioKind } from "@/lib/scenarios";
 import { conditionFromWmo, type WeatherOverride } from "@/lib/weather";
+import { liveElection } from "@/lib/elections";
+import { useGameStore } from "@/lib/store";
 import type { CityState } from "@/lib/types";
 
 const skies: Array<{ condition: WeatherOverride["condition"]; icon: string; label: string }> = [
@@ -19,12 +21,13 @@ const skies: Array<{ condition: WeatherOverride["condition"]; icon: string; labe
 ];
 
 /** Play god: change the weather or set up a situation, then watch the residents react. */
-export function GodPanel({ city, busy, act, onMessage, onFocus }: {
+export function GodPanel({ city, busy, act, onMessage, onStarted }: {
   city: CityState;
   busy: boolean;
   act: (action: () => Promise<CityState>) => Promise<void>;
   onMessage: (text: string) => void;
-  onFocus: (citizenId: string) => void;
+  /** Close the panel and fly the camera to where it's happening. */
+  onStarted: (ids: string[], locationId?: string) => void;
 }) {
   const [open, setOpen] = useState<ScenarioKind | null>(null);
   const [place, setPlace] = useState("loc_park");
@@ -43,13 +46,31 @@ export function GodPanel({ city, busy, act, onMessage, onFocus }: {
     onMessage(`Live from Tokyo: ${Math.round(data.current.temperature_2m)}°C, ${condition.replace("_", " ")}. Nakameguro has the same sky for the next six hours.`);
     return api.setWeather(condition, { temp_c: data.current.temperature_2m, source: "tokyo" });
   });
-  const create = (kind: ScenarioKind) => act(async () => {
-    const { city: next, result } = await api.createSituation({ kind, location_id: place, citizen_ids: [first, second], amount });
-    onMessage(`${result.headline} ${watching ? "Watch what happens next." : "Press “Watch how they react” to see them talk it through."}`);
-    if (result.focus_id) onFocus(result.focus_id);
+  const create = (kind: ScenarioKind) => {
+    const spec = scenarioCatalog.find((s) => s.kind === kind)!;
+    const people = spec.needs.includes("pair") ? [first, second] : spec.needs.includes("person") ? [first] : [];
     setOpen(null);
-    return next;
-  });
+    // Go there straight away; the reaction plays as soon as it's ready and the story card keeps track.
+    onStarted(people, spec.needs.includes("place") ? place : undefined);
+    void act(async () => {
+      const { city: next, result, talked, error } = await api.createSituation({ kind, location_id: place, citizen_ids: [first, second], amount });
+      onMessage(`${spec.icon} ${result.headline} ${talked ? "Watch their reaction." : error ? `(${error})` : "Follow it in “Happening now”."}`);
+      if (result.focus_id) useGameStore.getState().focusOn([result.focus_id]);
+      return next;
+    });
+  };
+  const students = city.citizens.filter((c) => c.profession === "Student");
+  const [candidateA, setCandidateA] = useState(students[0]?.citizen_id ?? "");
+  const [candidateB, setCandidateB] = useState(students[1]?.citizen_id ?? "");
+  const running = liveElection(city);
+  const election = () => {
+    onStarted([candidateA, candidateB], "loc_school");
+    void act(async () => {
+      const next = await api.startElection(candidateA, candidateB);
+      onMessage("🗳️ The election has started. Watch the campaign in “Happening now”.");
+      return next;
+    });
+  };
   const watch = () => act(async () => {
     await api.setMode("autonomous");
     return api.start();
@@ -109,7 +130,26 @@ export function GodPanel({ city, busy, act, onMessage, onFocus }: {
           </div>
         ))}
       </div>
-      <p className="news-footnote">Reactions depend on each person&apos;s character, money, mood and friendships. Follow what happens in News and Talk.</p>
+      <div className="scenario-card" data-open={open === ("election" as ScenarioKind)}>
+        <button className="scenario-head" onClick={() => setOpen(open === ("election" as ScenarioKind) ? null : ("election" as ScenarioKind))}>
+          <span aria-hidden="true">🗳️</span>
+          <span><strong>Student-council election</strong><small>Two students campaign, everyone votes in secret. Who wins?</small></span>
+        </button>
+        {open === ("election" as ScenarioKind) && (
+          <div className="scenario-form">
+            {running ? <p className="muted-copy">An election is already running. Follow it in “Happening now”.</p> : <>
+              <label>First candidate<select value={candidateA} onChange={(e) => setCandidateA(e.target.value)}>
+                {students.map((c) => <option key={c.citizen_id} value={c.citizen_id}>{c.name} ({c.age})</option>)}
+              </select></label>
+              <label>Second candidate<select value={candidateB} onChange={(e) => setCandidateB(e.target.value)}>
+                {students.map((c) => <option key={c.citizen_id} value={c.citizen_id}>{c.name} ({c.age})</option>)}
+              </select></label>
+              <button className="primary-action full-width" disabled={busy || candidateA === candidateB} onClick={election}>🗳️ Start the election</button>
+            </>}
+          </div>
+        )}
+      </div>
+      <p className="news-footnote">Reactions depend on each person&apos;s character, money, mood and friendships. Everything that follows is tracked in “Happening now”.</p>
     </div>
   );
 }

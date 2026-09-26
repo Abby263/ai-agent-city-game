@@ -33,7 +33,6 @@ import {
   sessionTakeControl,
   sessionWalkTo,
   sessionSpeak,
-  sessionStartElection,
   sessionSetWeather,
   sessionCreateSituation,
   sessionSetTimeMode,
@@ -41,9 +40,8 @@ import {
   sessionSocialBeat,
   sessionPerformAction,
   sessionAddPlan,
-  sessionElectionPhase,
-  sessionCastVote,
-  sessionNextBallot,
+  sessionStartElectionAuto,
+  sessionAdvanceAutoElection,
 } from "@/lib/session-simulation";
 
 import { API_URL } from "./api-url";
@@ -72,7 +70,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   // Play-god tools run in the browser world only.
   setWeather: (condition: Parameters<typeof sessionSetWeather>[0], options?: Parameters<typeof sessionSetWeather>[1]) => sessionSetWeather(condition, options),
-  createSituation: (request: import("./scenarios").ScenarioRequest) => sessionCreateSituation(request),
+  createSituation: (request: import("./scenarios").ScenarioRequest) => sessionCreateSituation(request, generateSessionCognition),
+  startElection: (firstId: string, secondId: string) => sessionStartElectionAuto(firstId, secondId, generateElectionDecision),
+  advanceElection: () => sessionAdvanceAutoElection(generateSessionCognition, generateElectionDecision),
   setTimeMode: (mode: "live" | "fast") => sessionSetTimeMode(mode),
   addPlan: (a: string, b: string, plan: { day: number; minute: number; location_id: string }, topic: string) => sessionAddPlan(a, b, plan, topic),
   performAction: (actorId: string, targetId: string, action: import("./actions").ActionId, note = "") =>
@@ -82,10 +82,6 @@ export const api = {
     onCognitionStart?.(request);
     return generateSessionCognition(request);
   }, generateSocialDecision),
-  startElection: (candidateId: string, rivalId: string, platform: string) => sessionStartElection(candidateId, rivalId, platform, generateElectionDecision),
-  electionPhase: sessionElectionPhase,
-  castVote: sessionCastVote,
-  nextBallot: () => sessionNextBallot(generateElectionDecision),
   takeControl: sessionTakeControl,
   walkTo: sessionWalkTo,
   speak: (targetId: string, text: string) =>

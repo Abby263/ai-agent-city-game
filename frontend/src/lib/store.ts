@@ -45,8 +45,8 @@ type GameStore = {
   inlineTalk: InlineTalk | null;
   setInlineTalk: (talk: InlineTalk | null) => void;
   /** Ask the camera to frame these residents; `onlyIfHidden` leaves the view alone if they're visible. */
-  focusRequest: { ids: string[]; onlyIfHidden: boolean; at: number } | null;
-  focusOn: (ids: string[], onlyIfHidden?: boolean) => void;
+  focusRequest: { ids: string[]; onlyIfHidden: boolean; at: number; locationId?: string } | null;
+  focusOn: (ids: string[], onlyIfHidden?: boolean, locationId?: string) => void;
   finishPlayback: (id: string) => void;
   replayConversation: (id: string) => void;
   connectionStatus: "idle" | "connecting" | "connected" | "offline";
@@ -116,7 +116,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   inlineTalk: null,
   setInlineTalk: (inlineTalk) => set({ inlineTalk }),
   focusRequest: null,
-  focusOn: (ids, onlyIfHidden = false) => set({ focusRequest: { ids, onlyIfHidden, at: Date.now() } }),
+  focusOn: (ids, onlyIfHidden = false, locationId) => set({ focusRequest: { ids, onlyIfHidden, at: Date.now(), locationId } }),
   finishPlayback: (id) => set((state) => ({
     playbackQueue: state.playbackQueue.filter((c) => c.conversation_id !== id),
   })),
