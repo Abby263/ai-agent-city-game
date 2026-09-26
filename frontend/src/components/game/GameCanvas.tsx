@@ -16,6 +16,8 @@ import type { CameraMode, CityRenderer } from "@/game/three/renderer";
 import type { ConversationFrame } from "@/lib/conversation-playback";
 import { useGameStore } from "@/lib/store";
 import { LiveConversation } from "./LiveConversation";
+import { calendarDay, formatDate } from "@/lib/calendar";
+import { weekday } from "@/lib/routine";
 
 export function GameCanvas({
   city,
@@ -35,6 +37,14 @@ export function GameCanvas({
   const [mode, setMode] = useState<CameraMode>("orbit");
   const conversation = useGameStore((state) => state.playbackQueue[0]);
   const finishPlayback = useGameStore((state) => state.finishPlayback);
+  const inlineTalk = useGameStore((state) => state.inlineTalk);
+  const focusRequest = useGameStore((state) => state.focusRequest);
+  useEffect(() => {
+    if (focusRequest) renderer.current?.focusPair(focusRequest.ids, focusRequest.onlyIfHidden);
+  }, [focusRequest, ready]);
+  useEffect(() => {
+    renderer.current?.setInlineTalk(inlineTalk);
+  }, [inlineTalk, ready]);
   const stageConversation = useCallback((frame: ConversationFrame | null, onReady?: () => void) => {
     renderer.current?.setConversation(frame, onReady);
   }, []);
@@ -86,7 +96,8 @@ export function GameCanvas({
       {ready && conversation && city && (
         <LiveConversation key={conversation.conversation_id} conversation={conversation}
           citizens={city.citizens} onFrame={stageConversation} onFinish={finishPlayback}
-          location={city.locations.find((p) => p.location_id === conversation.location_id)?.name ?? "Nakameguro"}
+          location={city.locations.find((p) => p.location_id === conversation.location_id)?.name ?? city.city_name}
+          dateLabel={city.calendar_start ? (() => { const d = calendarDay(city.calendar_start, conversation.game_day); return `${weekday(conversation.game_day).slice(0, 3)} ${formatDate(d)}`; })() : undefined}
           onFocus={() => renderer.current?.focusConversation()} />
       )}
       {(!ready || error) && (

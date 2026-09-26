@@ -134,3 +134,13 @@ def test_unaccepted_and_mismatched_offers_do_not_make_shared_plans(monkeypatch):
             {"spoken_line": "I have not agreed to that plan.", "meeting_action": answer, "end_conversation": True},
         ])
         assert exchange(client, meeting_now=1800, meeting_locations=[{"location_id": "park", "name": "Park"}]).meeting_plan is None
+
+
+def test_ongoing_chat_remembers_what_was_just_said(monkeypatch):
+    client, prompts = setup_client(monkeypatch, [{"spoken_line": "Ha, the same answer as last time: curry, obviously."}])
+    prior = [{"speaker_id": "ava", "text": "Hey Noah!"}, {"speaker_id": "noah", "text": "Hi Ava, what's up?"},
+             {"speaker_id": "someone_else", "text": "I should never be shared."}]
+    result = exchange(client, player_utterance="What should we cook tonight?", prior_lines=prior)
+    heard = prompts[0][1]["public_transcript_so_far"]
+    assert [line["text"] for line in heard] == ["Hey Noah!", "Hi Ava, what's up?", "What should we cook tonight?"]
+    assert [line["text"] for line in result.conversation["lines"]] == ["What should we cook tonight?", "Ha, the same answer as last time: curry, obviously."]

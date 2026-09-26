@@ -7,6 +7,15 @@ export function ConversationImpact({ conversation, citizens }: {
 }) {
   if (!conversation.impacts?.length) return null;
   const name = (id: string) => citizens.find((c) => c.citizen_id === id)?.name.split(" ")[0] ?? "Resident";
+  if (conversation.player_chat) {
+    // In a live chat, a one-line feeling summary tucked away keeps the thread readable.
+    const felt = conversation.impacts.filter((impact) => impact.status !== "not_assessed");
+    if (!felt.length) return null;
+    return <details className="exchange-impact compact-impact">
+      <summary>{felt.map((impact) => `${name(impact.citizen_id)}: ${impact.mood_after}`).join(" · ")}</summary>
+      {felt.map((impact) => <p key={impact.citizen_id}>{impact.reason}</p>)}
+    </details>;
+  }
   return <section className="exchange-impact" aria-label="Conversation impact">
     <h4>After this exchange</h4>
     {conversation.impacts.map((impact) => {

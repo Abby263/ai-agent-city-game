@@ -40,12 +40,14 @@ import {
   sessionSyncToRealTime,
   sessionSocialBeat,
   sessionPerformAction,
+  sessionAddPlan,
   sessionElectionPhase,
   sessionCastVote,
   sessionNextBallot,
 } from "@/lib/session-simulation";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+import { API_URL } from "./api-url";
+export { API_URL };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
@@ -72,6 +74,7 @@ export const api = {
   setWeather: (condition: Parameters<typeof sessionSetWeather>[0], options?: Parameters<typeof sessionSetWeather>[1]) => sessionSetWeather(condition, options),
   createSituation: (request: import("./scenarios").ScenarioRequest) => sessionCreateSituation(request),
   setTimeMode: (mode: "live" | "fast") => sessionSetTimeMode(mode),
+  addPlan: (a: string, b: string, plan: { day: number; minute: number; location_id: string }, topic: string) => sessionAddPlan(a, b, plan, topic),
   performAction: (actorId: string, targetId: string, action: import("./actions").ActionId, note = "") =>
     sessionPerformAction(actorId, targetId, action, note, generateSessionCognition),
   syncToRealTime: () => sessionSyncToRealTime(),

@@ -6,7 +6,8 @@ import { CitizenModel } from "./citizen";
 import { InkPass } from "./ink-pass";
 import { arrivals, citizenPoint, walkablePoint, walkingRoute } from "./layout";
 import type { CityState } from "@/lib/types";
-import type { ConversationFrame } from "@/lib/conversation-playback";
+import type { ConversationFrame, InlineTalk } from "@/lib/conversation-playback";
+import { speechLevel } from "@/lib/speech-level";
 import { conversationCameraOffset, conversationStaging } from "./conversation-camera";
 import { skyAt } from "./sky";
 import { makeAtmosphere } from "./atmosphere";
@@ -77,6 +78,7 @@ export class CityRenderer {
   private conversation: ConversationFrame | null = null;
   private conversationReady: (() => void) | undefined;
   private conversationCenter: THREE.Vector3 | null = null;
+  private inline: InlineTalk | null = null;
   private savedCamera: { position: THREE.Vector3; target: THREE.Vector3 } | null = null;
   private latestCity: CityState | null = null;
   private shotPosition: THREE.Vector3 | null = null;
@@ -193,6 +195,8 @@ export class CityRenderer {
     this.intersection.observe(host);
     document.addEventListener("visibilitychange", this.visibility);
     this.resume();
+    // Development-only handle for inspecting the scene from the browser console.
+    if (process.env.NODE_ENV !== "production") (window as unknown as { __agentcityRenderer?: CityRenderer }).__agentcityRenderer = this;
   }
 
   sync(city: CityState, selected: string | null) {
@@ -219,7 +223,11 @@ export class CityRenderer {
         this.scene.add(model.root);
         this.names.appendChild(model.label);
       }
+      // After talking, people stay where they stood until their plans take them somewhere else.
+      const arrivedHere = citizen.x === citizen.target_x && citizen.y === citizen.target_y;
+      if (model.hold && (model.hold.locationId !== citizen.current_location_id || !arrivedHere)) model.hold = null;
       if (
+        !model.hold &&
         !this.conversation?.actorIds.includes(citizen.citizen_id) && (!model.destination ||
         Math.hypot(
           model.destination.x - point.x,
@@ -300,7 +308,8 @@ export class CityRenderer {
     if (!frame) {
       this.conversationReady = undefined;
       this.conversationCenter = null;
-      this.people.forEach((model) => { model.speaking = false; model.listening = false; model.root.visible = true; });
+      for (const id of previous?.actorIds ?? []) this.holdInPlace(id);
+      this.people.forEach((model) => { model.speaking = false; model.listening = false; model.lookAt = null; model.root.visible = true; });
       this.shotPosition = null;
       if (this.savedCamera) {
         this.camera.position.copy(this.savedCamera.position);
@@ -332,6 +341,78 @@ export class CityRenderer {
     this.conversationReady = onReady;
     this.focusConversation();
   }
+  /** Player chats: face each other a step apart, lips and gestures follow the lines; the camera never moves. */
+  setInlineTalk(talk: InlineTalk | null) {
+    const previous = this.inline;
+    this.inline = talk;
+    if (!talk) {
+      for (const id of previous?.actorIds ?? []) {
+        const model = this.people.get(id);
+        if (model && !this.conversation?.actorIds.includes(id)) { model.speaking = false; model.listening = false; model.lookAt = null; }
+      }
+      return;
+    }
+    const [mover, anchor] = talk.actorIds.map((id) => this.people.get(id));
+    if (!mover || !anchor || mover.route.length) return;
+    const dx = mover.root.position.x - anchor.root.position.x, dz = mover.root.position.z - anchor.root.position.z;
+    const distance = Math.hypot(dx, dz);
+    if (distance > 0.7 && distance < 1.7) return this.holdInPlace(mover.citizen.citizen_id);
+    const direction = distance > 0.01 ? { x: dx / distance, z: dz / distance } : { x: 1, z: 0 };
+    const spot = walkablePoint({ x: anchor.root.position.x + direction.x * 1.15, z: anchor.root.position.z + direction.z * 1.15 });
+    mover.route = walkingRoute(mover.root.position, spot);
+    mover.destination = spot;
+    mover.hold = { locationId: mover.citizen.current_location_id, point: spot };
+  }
+  /** Eye contact, lips on the audio and facing each other, for staged and inline conversations. */
+  private animateTalk(dt: number) {
+    const level = speechLevel();
+    const inline = !this.conversation ? this.inline : null;
+    const ids = this.conversation?.actorIds ?? inline?.actorIds ?? [];
+    const speakerId = this.conversation ? this.conversation.speakerId : inline?.speakerId ?? null;
+    for (const [id, model] of this.people) {
+      const participant = ids.includes(id);
+      model.talkLevel = participant && level.speakerId === id ? level.level : 0;
+      if (!participant) { if (!this.conversation && !inline) model.lookAt = null; continue; }
+      const others = ids.filter((other) => other !== id).map((other) => this.people.get(other)).filter((m) => m !== undefined);
+      const focus = speakerId && speakerId !== id ? this.people.get(speakerId) : others[0];
+      model.lookAt = focus ? focus.root.position : null;
+      if (inline) {
+        model.speaking = speakerId === id;
+        model.listening = !model.speaking;
+        model.speechPaused = false;
+        if (model.speaking && inline.line) model.setLine(inline.key, inline.line);
+        if (!model.route.length && focus) {
+          const toward = Math.atan2(focus.root.position.x - model.root.position.x, focus.root.position.z - model.root.position.z);
+          model.body.rotation.y += Math.atan2(Math.sin(toward - model.body.rotation.y), Math.cos(toward - model.body.rotation.y)) * Math.min(1, dt * 6);
+        }
+      }
+    }
+  }
+  /** Frames two people talking, leaving room below for the chat panel on narrow screens. */
+  focusPair(ids: string[], onlyIfHidden = false) {
+    const models = ids.map((id) => this.people.get(id)).filter((m) => m !== undefined);
+    if (!models.length) return;
+    if (onlyIfHidden && models.every((m) => {
+      this.vector.copy(m.root.position).project(this.camera);
+      return Math.abs(this.vector.x) < 0.8 && this.vector.y > -0.1 && this.vector.y < 0.85;
+    })) return;
+    const center = models.reduce((sum, m) => sum.add(m.root.position), new THREE.Vector3()).multiplyScalar(1 / models.length);
+    // On narrow screens the chat sheet covers the lower part, so frame them higher and wider.
+    // Portrait screens show the chat as a bottom sheet, so the pair sits in the top third of the view.
+    const covered = this.width < 761 || this.height > this.width * 1.05;
+    const distance = covered ? 16 : 10;
+    this.mode = "orbit";
+    this.focusTarget = new THREE.Vector3(center.x, covered ? -3.6 : 0.7, center.z);
+    const offset = this.camera.position.clone().sub(this.controls.target).setLength(distance);
+    offset.y = Math.max(offset.y, distance * (covered ? 0.32 : 0.45));
+    this.shotPosition = this.focusTarget.clone().add(offset.setLength(distance));
+  }
+  private holdInPlace(id: string) {
+    const model = this.people.get(id);
+    if (!model) return;
+    const point = model.destination ?? { x: model.root.position.x, z: model.root.position.z };
+    model.hold = { locationId: model.citizen.current_location_id, point };
+  }
   focusConversation() {
     if (!this.conversationCenter) return;
     this.focusTarget = this.conversationCenter.clone();
@@ -342,7 +423,7 @@ export class CityRenderer {
       const model = this.people.get(id);
       return model?.destination ? [new THREE.Vector3(model.destination.x, 1.35, model.destination.z)] : [];
     }) ?? [];
-    const distance = cinematic ? (this.width < 600 ? 8.5 : 7.5) : (this.width < 600 ? 14 : 11);
+    const distance = cinematic ? (this.width < 600 ? 7.4 : 6.4) : (this.width < 600 ? 14 : 11);
     const offset = conversationCameraOffset(this.focusTarget, heads, this.town.root, distance, cinematic);
     this.shotPosition = this.focusTarget.clone().add(offset);
   }
@@ -470,14 +551,30 @@ export class CityRenderer {
         model.speaking = arrived && model.citizen.citizen_id === this.conversation.speakerId;
         model.speechPaused = this.conversation.paused;
         model.listening = !model.speaking;
-        if (!model.route.length) model.body.rotation.y = Math.atan2(this.conversationCenter.x - model.root.position.x, this.conversationCenter.z - model.root.position.z);
+        if (!model.route.length) {
+          // Face each other, "cheated" a little toward the camera so the audience can see their faces.
+          const toPartner = Math.atan2(this.conversationCenter.x - model.root.position.x, this.conversationCenter.z - model.root.position.z);
+          const toCamera = Math.atan2(this.camera.position.x - model.root.position.x, this.camera.position.z - model.root.position.z);
+          const cheat = Math.atan2(Math.sin(toCamera - toPartner), Math.cos(toCamera - toPartner)) * 0.32;
+          model.body.rotation.y += Math.atan2(Math.sin(toPartner + cheat - model.body.rotation.y), Math.cos(toPartner + cheat - model.body.rotation.y)) * Math.min(1, dt * 5);
+        }
       }
+      // A slow push toward whoever is speaking, like a camera operator following the dialogue.
+      const speaker = this.conversation.speakerId ? this.people.get(this.conversation.speakerId) : undefined;
+      if (arrived && speaker && this.conversation.phase === "dialogue" && !this.focusTarget) {
+        const aim = this.conversationCenter.clone().lerp(speaker.root.position, 0.3);
+        aim.y = this.controls.target.y;
+        this.controls.target.lerp(aim, Math.min(1, dt * 0.8));
+      }
+      if (arrived && this.conversation.line && this.conversation.speakerId)
+        this.people.get(this.conversation.speakerId)?.setLine(this.conversation.lineKey ?? this.conversation.line, this.conversation.line);
       if (arrived && this.conversationReady) {
         const ready = this.conversationReady;
         this.conversationReady = undefined;
         ready();
       }
     }
+    this.animateTalk(dt);
     const followed =
       !this.conversation && this.mode === "follow" && this.selected && this.people.get(this.selected);
     if (followed) this.focusTarget = followed.root.position.clone();

@@ -8,8 +8,9 @@ export function conversationStaging(origin: Point, town: THREE.Object3D) {
   // nearby open area before falling back to a high camera above the roofs.
   for (const [x, z] of [[0, 0], [-4, 0], [4, 0], [0, 4], [0, -4], [-6, 0], [6, 0], [0, 6]]) {
     const center = walkablePoint({ x: origin.x + x, z: origin.z + z + 1.5 });
-    const points = [-1, 1].map((side) => walkablePoint({ x: center.x + side * 1.1, z: center.z }));
-    if (Math.hypot(points[0].x - points[1].x, points[0].z - points[1].z) < 1.8) continue;
+    // About a metre and a half apart: close enough to feel like a conversation, far enough to read both faces.
+    const points = [-1, 1].map((side) => walkablePoint({ x: center.x + side * 0.75, z: center.z }));
+    if (Math.hypot(points[0].x - points[1].x, points[0].z - points[1].z) < 1.2) continue;
     const target = new THREE.Vector3(center.x, -0.25, center.z);
     const offset = conversationCameraOffset(target, points.map((p) => new THREE.Vector3(p.x, 1.35, p.z)), town, 7.5, true);
     if (offset.y < height) { best = { center, points }; height = offset.y; }

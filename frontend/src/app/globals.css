@@ -1870,3 +1870,16 @@ select {
   .brand-mark { width: 30px; height: 30px; }
   .clock-date { display: none; }
 }
+
+/* Continuous player chats and the in-chat voice switch. */
+.continued-exchange { margin-top: -10px; padding-top: 0; border-top: 0; }
+.continued-exchange .conversation-impact { margin-top: 4px; }
+.speech-input .voice-toggle { flex-shrink: 0; width: 40px; height: 40px; border-radius: 10px; }
+.speech-input .voice-toggle[aria-pressed="true"] { background: #e6f4ee; border-color: #28675b; color: #28675b; }
+.compact-impact { margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: #f4f5f2; font-size: 12px; color: #5f6b62; }
+.compact-impact summary { cursor: pointer; }
+.compact-impact p { margin: 6px 0 0; line-height: 1.5; }
+.speaking-as .watch-us { width: 32px; height: 32px; min-width: 32px; font-size: 16px; }
+.night-card { background: #25303df2; color: #eef2f8; border-color: #53627a; }
+.night-card .outline-action { color: #fff; border-color: #ffffff60; white-space: nowrap; }
+.plan-button { margin-top: 8px; width: 100%; justify-content: flex-start; border-color: #bfe0cd; background: #f2faf5; color: #28675b; }

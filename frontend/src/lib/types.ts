@@ -244,6 +244,8 @@ export type Conversation = {
   }>;
   summary: string;
   impacts?: ConversationImpact[];
+  /** The player spoke in this exchange; it plays inline in Talk rather than as a cutscene. */
+  player_chat?: boolean;
 };
 
 export type BondSnapshot = Feelings & {
@@ -306,6 +308,8 @@ export type AssignTaskPayload = {
 export type SessionCognitionRequest = {
   conversation_mode?: "task" | "autonomous";
   player_utterance?: string;
+  /** Recent lines between the same two people, so an ongoing chat stays continuous. */
+  prior_lines?: Array<{ speaker_id: string; text: string }>;
   city: CityState;
   actor_id: string;
   target_id?: string | null;

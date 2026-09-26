@@ -8,7 +8,8 @@ export function newExchanges(known: Set<string>, incoming: Conversation[]) {
   for (const conversation of incoming) {
     if (known.has(conversation.conversation_id)) continue;
     known.add(conversation.conversation_id);
-    if (conversation.transcript.length) added.push(conversation);
+    // The player's own chats play inline in the Talk panel, without moving the camera.
+    if (conversation.transcript.length && !conversation.player_chat) added.push(conversation);
   }
   return added.sort((a, b) => a.game_day - b.game_day || a.game_minute - b.game_minute);
 }
@@ -24,4 +25,13 @@ export type ConversationFrame = {
   speakerId: string | null;
   paused: boolean;
   phase: "arrival" | "establishing" | "dialogue";
+  /** The line being spoken, so the speaker's body language fits the words. */
+  line?: string;
+  lineKey?: string;
 };
+
+/** A player's own chat: the two face each other and talk where they stand; the camera stays put. */
+export type InlineTalk = { actorIds: string[]; speakerId: string | null; line: string; key: string };
+
+/** Shows real characters for escapes like "\\u2014" that sometimes slip through from the model. */
+export const displayText = (text: string) => text.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));

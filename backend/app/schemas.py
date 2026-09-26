@@ -200,6 +200,8 @@ class SessionCognitionRequest(BaseModel):
     memories: list[str] = Field(default_factory=list)
     private_memories: dict[str, list[str]] = Field(default_factory=dict)
     player_utterance: str | None = Field(default=None, min_length=1, max_length=600)
+    # Recent lines of an ongoing chat between the same two people, oldest first.
+    prior_lines: list[dict[str, str]] = Field(default_factory=list, max_length=12)
 
 
 class SessionCognitionResponse(BaseModel):

@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import io
+import time
+import wave
+from collections import OrderedDict, defaultdict, deque
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -233,6 +240,7 @@ def session_cognition(request: SessionCognitionRequest) -> SessionCognitionRespo
                 target_memories=request.private_memories.get(target.citizen_id, []),
                 event_context=event_context,
                 player_utterance=request.player_utterance,
+                prior_lines=request.prior_lines,
                 autonomous=request.conversation_mode == "autonomous",
                 meeting_locations=[{"location_id": p.location_id, "name": p.name} for p in request.city.locations],
                 meeting_now=request.city.clock.day * 1440 + request.city.clock.minute_of_day,
@@ -429,3 +437,77 @@ async def mayor_policy(request: MayorPolicyRequest, db: Session = Depends(get_db
     await manager.broadcast("city_state", state.model_dump(mode="json"))
     await manager.broadcast("metrics", state.metrics.model_dump())
     return state
+
+
+# ---------------------------------------------------------------------------------------------
+# Natural character voices (Gemini TTS). Short lines only, cached, and rate limited per visitor.
+
+SPEECH_VOICES = {
+    "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe", "Enceladus", "Iapetus",
+    "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar",
+    "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat",
+}
+_speech_cache: OrderedDict[str, bytes] = OrderedDict()
+_speech_calls: dict[str, deque[float]] = defaultdict(deque)
+
+
+class SpeechRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=420)
+    voice: str
+    style: str = Field(default="", max_length=180)
+
+
+@router.post("/speech")
+def character_speech(request: SpeechRequest, http: Request) -> Response:
+    if settings.llm_provider != "gemini" or not settings.llm_api_key or not settings.gemini_tts_model:
+        raise HTTPException(status_code=503, detail="Natural voices are not configured.")
+    if request.voice not in SPEECH_VOICES:
+        raise HTTPException(status_code=422, detail="Unknown voice.")
+    key = hashlib.sha256(f"{request.voice}|{request.style}|{request.text}".encode()).hexdigest()
+    if key in _speech_cache:
+        _speech_cache.move_to_end(key)
+        return Response(content=_speech_cache[key], media_type="audio/wav", headers={"Cache-Control": "private, max-age=86400"})
+    client_id = http.client.host if http.client else "unknown"
+    calls, now = _speech_calls[client_id], time.monotonic()
+    while calls and now - calls[0] > 60:
+        calls.popleft()
+    if len(calls) >= 40:
+        raise HTTPException(status_code=429, detail="Too many voice requests. Device voices will be used for a moment.")
+    calls.append(now)
+    try:
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=settings.llm_api_key)
+        # A short bracketed tag sets the delivery without being read aloud (longer directions get spoken).
+        style = request.style.strip().strip("[]")
+        prompt = f"[{style}] {request.text.strip()}" if style else request.text.strip()
+        result = client.models.generate_content(
+            model=settings.gemini_tts_model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=types.SpeechConfig(voice_config=types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=request.voice))),
+            ),
+        )
+        audio = result.candidates[0].content.parts[0].inline_data
+    except Exception as error:  # provider errors fall back to device voices in the browser
+        raise HTTPException(status_code=503, detail="The voice service could not answer.") from error
+    if not audio or not audio.data:
+        raise HTTPException(status_code=503, detail="The voice service returned no audio.")
+    data = audio.data if "wav" in (audio.mime_type or "") else _wav(audio.data)
+    _speech_cache[key] = data
+    while len(_speech_cache) > 300:
+        _speech_cache.popitem(last=False)
+    return Response(content=data, media_type="audio/wav", headers={"Cache-Control": "private, max-age=86400"})
+
+
+def _wav(pcm: bytes, rate: int = 24000) -> bytes:
+    """Wraps raw 16-bit mono PCM in a WAV header."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as file:
+        file.setnchannels(1)
+        file.setsampwidth(2)
+        file.setframerate(rate)
+        file.writeframes(pcm)
+    return buffer.getvalue()

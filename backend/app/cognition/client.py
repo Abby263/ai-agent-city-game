@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import json
 from dataclasses import dataclass, field
 from typing import Any, TypedDict
@@ -278,6 +280,7 @@ class CitizenCognitionClient:
         target_memories: list[str],
         event_context: str,
         player_utterance: str | None = None,
+        prior_lines: list[dict[str, str]] | None = None,
         autonomous: bool = False,
         meeting_locations: list[dict[str, str]] | None = None,
         meeting_now: int | None = None,
@@ -347,17 +350,20 @@ class CitizenCognitionClient:
         def continue_exchange(state: PrivateExchangeState) -> str:
             last_id = state["lines"][-1]["speaker_id"]
             last = state["turn_results"][last_id][-1]
-            if player_utterance or last.get("end_conversation") or len(state["lines"]) >= (4 if autonomous else 6):
+            if player_utterance or last.get("end_conversation") or len(state["lines"]) - len(prior) >= (4 if autonomous else 6):
                 return END
             return "target_reply" if last_id == actor["citizen_id"] else "actor_follow_up"
 
         graph_builder.add_conditional_edges("target_reply", continue_exchange)
         graph_builder.add_conditional_edges("actor_follow_up", continue_exchange)
-        initial_lines = [{"speaker_id": str(actor["citizen_id"]), "text": player_utterance}] if player_utterance else []
+        # Lines both people just heard in an ongoing chat are shared context, so replies stay continuous.
+        ids = {str(actor["citizen_id"]), str(target["citizen_id"])}
+        prior = [{"speaker_id": str(line["speaker_id"]), "text": str(line["text"])[:600]} for line in (prior_lines or [])[-10:] if str(line.get("speaker_id")) in ids]
+        initial_lines = prior + ([{"speaker_id": str(actor["citizen_id"]), "text": player_utterance}] if player_utterance else [])
         final_state = graph_builder.compile().invoke({"lines": initial_lines, "turn_results": {}, "meeting_offer": None,
             "meeting_plan": None, "meeting_locations": meeting_locations or [], "meeting_now": meeting_now})
 
-        lines = final_state["lines"]
+        lines = final_state["lines"][len(prior):]
         actor_id = str(actor["citizen_id"])
         target_id = str(target["citizen_id"])
         errors = self._conversation_errors(
@@ -453,7 +459,7 @@ class CitizenCognitionClient:
             except (ValueError, TypeError):
                 pass  # An invalid proposed appointment must not invent a commitment.
         return {
-            "lines": [*state["lines"], {"speaker_id": speaker_id, "text": str(result["spoken_line"])}],
+            "lines": [*state["lines"], {"speaker_id": speaker_id, "text": _clean_line(str(result["spoken_line"]))}],
             "turn_results": {
                 **state["turn_results"],
                 speaker_id: [*state["turn_results"].get(speaker_id, []), result],
@@ -771,3 +777,8 @@ class CitizenCognitionClient:
         if not str(conversation.get("summary") or "").strip():
             errors.append("conversation.summary is required")
         return errors
+
+
+def _clean_line(text: str) -> str:
+    """Models sometimes return escaped characters such as \\u2014 inside the spoken line; show the real characters."""
+    return re.sub(r"\\u([0-9a-fA-F]{4})", lambda match: chr(int(match.group(1), 16)), text).strip()

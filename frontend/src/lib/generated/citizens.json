@@ -47,7 +47,7 @@
       "Finish the science worksheet"
     ],
     "long_term_goals": [
-      "Build a real friendship circle in Navora",
+      "Build a real friendship circle in Nakameguro",
       "Become more confident at school"
     ],
     "memory_summary": "I love science and debate. I want to be someone people can rely on, but I sometimes offer help before listening. I would like a partner for a small science project.",
@@ -170,7 +170,7 @@
       "Help someone with math homework"
     ],
     "long_term_goals": [
-      "Build a real friendship circle in Navora",
+      "Build a real friendship circle in Nakameguro",
       "Become more confident at school"
     ],
     "memory_summary": "I love music and solving math problems. I joke when I am nervous, but I also want people to take my ideas seriously. I would like to write a song with a friend.",
@@ -293,7 +293,7 @@
       "Organize a small game at the park"
     ],
     "long_term_goals": [
-      "Build a real friendship circle in Navora",
+      "Build a real friendship circle in Nakameguro",
       "Become more confident at school"
     ],
     "memory_summary": "I enjoy sports and biology. I like bringing people into a game and making sure everyone gets a turn. Being left out bothers me more than I usually admit.",
@@ -416,7 +416,7 @@
       "Study chemistry at the library"
     ],
     "long_term_goals": [
-      "Build a real friendship circle in Navora",
+      "Build a real friendship circle in Nakameguro",
       "Become more confident at school"
     ],
     "memory_summary": "I love writing and chemistry. I notice little details but need time to get comfortable around people. I value honest answers more than cheerful guesses.",
@@ -548,7 +548,7 @@
       "Show someone my robot sketch"
     ],
     "long_term_goals": [
-      "Build a real friendship circle in Navora",
+      "Build a real friendship circle in Nakameguro",
       "Become more confident at school"
     ],
     "memory_summary": "I like robotics and sketching. I am new to this group and want to show someone my robot ideas, but I worry they will seem silly. Being asked a genuine question helps me open up.",
@@ -670,7 +670,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_027",
-        "content": "I brought my sketchbook to Navora. I hope to find a patient collaborator, but I have not met one yet."
+        "content": "I brought my sketchbook to Nakameguro. I hope to find a patient collaborator, but I have not met one yet."
       }
     ],
     "life": {
@@ -877,7 +877,7 @@
     "long_term_goals": [
       "Keep the farm going for the next generation"
     ],
-    "memory_summary": "I run Meadow Farm like my father did. Hannah and I have a son, Leo, and a baby on the way. Dad lives with us now and his heart worries me.",
+    "memory_summary": "I run Meguro Community Garden like my father did. Hannah and I have a son, Leo, and a baby on the way. Dad lives with us now and his heart worries me.",
     "relationship_scores": {
       "cit_031": 88,
       "cit_032": 85,
@@ -886,7 +886,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_030",
-        "content": "I run Meadow Farm like my father did. Hannah and I have a son, Leo, and a baby on the way. Dad lives with us now and his heart worries me.",
+        "content": "I run Meguro Community Garden like my father did. Hannah and I have a son, Leo, and a baby on the way. Dad lives with us now and his heart worries me.",
         "importance": 0.8
       }
     ],
@@ -921,7 +921,7 @@
         ]
       },
       "ambition": {
-        "goal": "Expand Meadow Farm with a new greenhouse",
+        "goal": "Expand Meguro Community Garden with a new greenhouse",
         "kind": "career",
         "progress": 35
       },
@@ -977,7 +977,7 @@
     "long_term_goals": [
       "Give both kids a calm, happy home"
     ],
-    "memory_summary": "I work at Navora Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.",
+    "memory_summary": "I work at Aobadai Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.",
     "relationship_scores": {
       "cit_030": 88,
       "cit_032": 78,
@@ -986,7 +986,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_031",
-        "content": "I work at Navora Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.",
+        "content": "I work at Aobadai Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.",
         "importance": 0.8
       }
     ],
@@ -1173,14 +1173,14 @@
     "long_term_goals": [
       "Lead the hospital one day"
     ],
-    "memory_summary": "I'm a doctor at Navora Hospital and Ava's mum. I raise her on my own and I worry that I work too much.",
+    "memory_summary": "I'm a doctor at Kyosai Hospital and Ava's mum. I raise her on my own and I worry that I work too much.",
     "relationship_scores": {
       "cit_009": 90
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_033",
-        "content": "I'm a doctor at Navora Hospital and Ava's mum. I raise her on my own and I worry that I work too much.",
+        "content": "I'm a doctor at Kyosai Hospital and Ava's mum. I raise her on my own and I worry that I work too much.",
         "importance": 0.8
       }
     ],
@@ -1212,7 +1212,7 @@
         ]
       },
       "ambition": {
-        "goal": "Become head of Navora Hospital",
+        "goal": "Become head of Kyosai Hospital",
         "kind": "career",
         "progress": 55
       },
@@ -1369,14 +1369,14 @@
     "long_term_goals": [
       "Help run the school one day"
     ],
-    "memory_summary": "I teach at Navora School, which means I teach my own son Noah, and he hates that. I'm raising him on my own.",
+    "memory_summary": "I teach at Nakameguro School, which means I teach my own son Noah, and he hates that. I'm raising him on my own.",
     "relationship_scores": {
       "cit_021": 88
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_035",
-        "content": "I teach at Navora School, which means I teach my own son Noah, and he hates that. I'm raising him on my own.",
+        "content": "I teach at Nakameguro School, which means I teach my own son Noah, and he hates that. I'm raising him on my own.",
         "importance": 0.8
       }
     ],
@@ -1467,14 +1467,14 @@
     "long_term_goals": [
       "Publish my research"
     ],
-    "memory_summary": "I'm a scientist at the Discovery Lab and Eliot's dad. I get lost in my work sometimes, but Eliot comes first.",
+    "memory_summary": "I'm a scientist at the Meguro Science Lab and Eliot's dad. I get lost in my work sometimes, but Eliot comes first.",
     "relationship_scores": {
       "cit_029": 88
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_036",
-        "content": "I'm a scientist at the Discovery Lab and Eliot's dad. I get lost in my work sometimes, but Eliot comes first.",
+        "content": "I'm a scientist at the Meguro Science Lab and Eliot's dad. I get lost in my work sometimes, but Eliot comes first.",
         "importance": 0.8
       }
     ],
@@ -1562,7 +1562,7 @@
     "long_term_goals": [
       "Build a life here"
     ],
-    "memory_summary": "I'm the town librarian. My niece Iris lives with me while her parents work overseas. I moved to Navora last year and I'm still a bit lonely. Samir Ali, the police officer, is kind to me.",
+    "memory_summary": "I'm the town librarian. My niece Iris lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Samir Ali, the police officer, is kind to me.",
     "relationship_scores": {
       "cit_022": 82,
       "cit_038": 62
@@ -1570,7 +1570,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_037",
-        "content": "I'm the town librarian. My niece Iris lives with me while her parents work overseas. I moved to Navora last year and I'm still a bit lonely. Samir Ali, the police officer, is kind to me.",
+        "content": "I'm the town librarian. My niece Iris lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Samir Ali, the police officer, is kind to me.",
         "importance": 0.8
       }
     ],
@@ -1600,7 +1600,7 @@
         ]
       },
       "ambition": {
-        "goal": "Make real friends in Navora",
+        "goal": "Make real friends in Nakameguro",
         "kind": "social",
         "progress": 20
       },
@@ -1696,7 +1696,7 @@
         ]
       },
       "ambition": {
-        "goal": "Run the Navora half-marathon",
+        "goal": "Run the Nakameguro half-marathon",
         "kind": "fitness",
         "progress": 25
       },
@@ -1757,14 +1757,14 @@
     "long_term_goals": [
       "Open my own studio"
     ],
-    "memory_summary": "I coach at Navora Gym. Our parents work abroad, so my little sister Sophie lives with me. I love her, but being a big sister and a parent is hard.",
+    "memory_summary": "I coach at Riverside Gym. Our parents work abroad, so my little sister Sophie lives with me. I love her, but being a big sister and a parent is hard.",
     "relationship_scores": {
       "cit_027": 86
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_039",
-        "content": "I coach at Navora Gym. Our parents work abroad, so my little sister Sophie lives with me. I love her, but being a big sister and a parent is hard.",
+        "content": "I coach at Riverside Gym. Our parents work abroad, so my little sister Sophie lives with me. I love her, but being a big sister and a parent is hard.",
         "importance": 0.8
       }
     ],
@@ -1856,7 +1856,7 @@
     "long_term_goals": [
       "Retire with a perfect record"
     ],
-    "memory_summary": "I have been station master at Navora Station for twenty years. My wife Aiko runs HappyMart 24 and our son Haruto is fourteen and obsessed with baseball.",
+    "memory_summary": "I have been station master at Nakameguro Station for twenty years. My wife Aiko runs HappyMart 24 and our son Haruto is fourteen and obsessed with baseball.",
     "relationship_scores": {
       "cit_041": 88,
       "cit_042": 86
@@ -1864,7 +1864,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_040",
-        "content": "I have been station master at Navora Station for twenty years. My wife Aiko runs HappyMart 24 and our son Haruto is fourteen and obsessed with baseball.",
+        "content": "I have been station master at Nakameguro Station for twenty years. My wife Aiko runs HappyMart 24 and our son Haruto is fourteen and obsessed with baseball.",
         "importance": 0.8
       }
     ],
@@ -2058,7 +2058,7 @@
     "long_term_goals": [
       "Play for the regional team"
     ],
-    "memory_summary": "I just moved schools to Navora School. I love baseball and secretly draw manga. My dad runs the station and expects a lot.",
+    "memory_summary": "I just moved schools to Nakameguro School. I love baseball and secretly draw manga. My dad runs the station and expects a lot.",
     "relationship_scores": {
       "cit_040": 82,
       "cit_041": 86
@@ -2066,7 +2066,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_042",
-        "content": "I just moved schools to Navora School. I love baseball and secretly draw manga. My dad runs the station and expects a lot.",
+        "content": "I just moved schools to Nakameguro School. I love baseball and secretly draw manga. My dad runs the station and expects a lot.",
         "importance": 0.8
       }
     ],
@@ -2146,14 +2146,14 @@
       "Get promoted",
       "Find someone who makes me laugh"
     ],
-    "memory_summary": "I work in marketing on the ninth floor of Harbor Tower. I moved to Navora for the job. I love my work but I'm tired, and a bit lonely.",
+    "memory_summary": "I work in marketing on the ninth floor of GT Tower. I moved to Nakameguro for the job. I love my work but I'm tired, and a bit lonely.",
     "relationship_scores": {
       "cit_044": 55
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_043",
-        "content": "I work in marketing on the ninth floor of Harbor Tower. I moved to Navora for the job. I love my work but I'm tired, and a bit lonely.",
+        "content": "I work in marketing on the ninth floor of GT Tower. I moved to Nakameguro for the job. I love my work but I'm tired, and a bit lonely.",
         "importance": 0.8
       }
     ],
@@ -2183,7 +2183,7 @@
         ]
       },
       "ambition": {
-        "goal": "Lead her first big campaign at Harbor Tower",
+        "goal": "Lead her first big campaign at GT Tower",
         "kind": "career",
         "progress": 35
       },
@@ -2237,7 +2237,7 @@
       },
       "playable": true
     },
-    "current_thought": "The woman from Harbor Tower buys the same matcha latte every day. Should I say hi?",
+    "current_thought": "The woman from GT Tower buys the same matcha latte every day. Should I say hi?",
     "short_term_goals": [
       "Fix the broken escalator",
       "Say hi to Yui properly"
@@ -2245,14 +2245,14 @@
     "long_term_goals": [
       "Travel around the world"
     ],
-    "memory_summary": "I manage Sakura Mall. I'm saving up to travel the world. I keep noticing Yui from Harbor Tower at the food court.",
+    "memory_summary": "I manage Kokashita Arcade. I'm saving up to travel the world. I keep noticing Yui from GT Tower at the food court.",
     "relationship_scores": {
       "cit_043": 55
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_044",
-        "content": "I manage Sakura Mall. I'm saving up to travel the world. I keep noticing Yui from Harbor Tower at the food court.",
+        "content": "I manage Kokashita Arcade. I'm saving up to travel the world. I keep noticing Yui from GT Tower at the food court.",
         "importance": 0.8
       }
     ],
@@ -2342,12 +2342,12 @@
     "long_term_goals": [
       "Not be forgotten"
     ],
-    "memory_summary": "I was a carpenter for fifty years and built half the old houses in Navora. My wife Keiko died last year. My days are quiet now; I tend my bonsai and visit the shrine.",
+    "memory_summary": "I was a carpenter for fifty years and built half the old houses in Nakameguro. My wife Keiko died last year. My days are quiet now; I tend my bonsai and visit the shrine.",
     "relationship_scores": {},
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_045",
-        "content": "I was a carpenter for fifty years and built half the old houses in Navora. My wife Keiko died last year. My days are quiet now; I tend my bonsai and visit the shrine.",
+        "content": "I was a carpenter for fifty years and built half the old houses in Nakameguro. My wife Keiko died last year. My days are quiet now; I tend my bonsai and visit the shrine.",
         "importance": 0.8
       }
     ],
@@ -2364,7 +2364,7 @@
       "relationship_status": "widowed",
       "job": null,
       "ambition": {
-        "goal": "Make a new friend in Navora",
+        "goal": "Make a new friend in Nakameguro",
         "kind": "social",
         "progress": 0
       },

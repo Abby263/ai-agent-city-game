@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     llm_provider: Literal["openai", "gemini"] = "openai"
     gemini_api_key: str | None = Field(default=None, repr=False)
     gemini_model: str = "gemini-3.5-flash-lite"
+    # Natural character voices; empty disables AI speech and the game uses device voices.
+    gemini_tts_model: str = "gemini-3.8-flash-lite-tts"
     openai_api_key: str | None = Field(default=None, repr=False)
     openai_model: str = "gpt-4.1-nano"
     openai_embedding_model: str = "text-embedding-3-small"

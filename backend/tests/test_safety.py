@@ -55,3 +55,12 @@ def test_api_rejects_unsafe_player_speech_before_calling_a_model():
     assert response.status_code == 400
     assert "phone numbers" in response.json()["detail"]
 
+
+
+def test_voice_endpoint_rejects_unknown_voices_and_needs_gemini():
+    from app.api import routes
+    with TestClient(app) as client:
+        unknown = client.post("/speech", json={"text": "Hello", "voice": "Zarvox"})
+        assert unknown.status_code in (422, 503)
+        if routes.settings.llm_provider != "gemini":
+            assert client.post("/speech", json={"text": "Hello", "voice": "Kore"}).status_code == 503

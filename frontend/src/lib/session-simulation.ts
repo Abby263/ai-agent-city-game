@@ -304,6 +304,7 @@ export async function sessionSpeak(
     require_conversation: true,
     task: "Respond to the player's spoken words.",
     player_utterance: utterance,
+    prior_lines: recentChat(city, actor.citizen_id, targetId),
     observations: [],
     memories: [],
     private_memories: {
@@ -317,9 +318,30 @@ export async function sessionSpeak(
     location_id: actor.current_location_id,
   } as CityEvent;
   applyAutonomousCognition(city, actor, target, source, response);
+  markPlayerChat(actor.citizen_id, targetId);
   actor.current_activity = `Talking with ${target.name}`;
   city.policy.player_lines = Number(city.policy.player_lines ?? 0) + 1;
   return saveAndReturn(city);
+}
+
+/** The last lines the two of them exchanged in the past two city hours, oldest first. */
+function recentChat(city: CityState, a: string, b: string) {
+  const now = city.clock.day * 1440 + city.clock.minute_of_day;
+  return sessionConversations(a)
+    .filter((c) => c.actor_ids.includes(b) && now - (c.game_day * 1440 + c.game_minute) <= 120)
+    .sort((x, y) => x.game_day - y.game_day || x.game_minute - y.game_minute)
+    .flatMap((c) => c.transcript)
+    .slice(-10);
+}
+
+/** Tags the newest exchange between the two as the player's own chat. */
+function markPlayerChat(a: string, b: string) {
+  const conversations = readJson<Conversation[]>(CONVERSATIONS_KEY) ?? [];
+  // Stored newest first.
+  const latest = conversations.find((c) => c.actor_ids.includes(a) && c.actor_ids.includes(b));
+  if (!latest) return;
+  latest.player_chat = true;
+  writeJson(CONVERSATIONS_KEY, conversations);
 }
 
 export function exportSession() {
@@ -1105,10 +1127,11 @@ export async function sessionPerformAction(actorId: string, targetId: string, ac
   try {
     if (actorId === live.policy.player_citizen_id) {
       const response = await generate({ city: live, actor_id: actorId, target_id: targetId, require_conversation: true, task: "Respond to the player's action and words.",
-        player_utterance: outcome.utterance, observations: [outcome.reason], memories: [],
+        player_utterance: outcome.utterance, prior_lines: recentChat(live, actorId, targetId), observations: [outcome.reason], memories: [],
         private_memories: { [actorId]: privateMemoryContext(liveActor), [targetId]: privateMemoryContext(liveTarget) } });
       if (isStale(live)) return { city: requireSessionCity(), outcome, talked: false };
       applyAutonomousCognition(live, liveActor, liveTarget, { event_id: newId("action"), location_id: liveTarget.current_location_id } as CityEvent, response);
+      markPlayerChat(actorId, targetId);
       live.policy.player_lines = Number(live.policy.player_lines ?? 0) + 1;
     } else {
       const event = addEvent(live, { event_type: "player_action", actors: [actorId, targetId], location_id: liveTarget.current_location_id,
@@ -1120,6 +1143,24 @@ export async function sessionPerformAction(actorId: string, targetId: string, ac
   } catch (error) {
     return { city: isStale(live) ? requireSessionCity() : saved, outcome, talked: false, error: error instanceof Error ? error.message : "They could not talk right now." };
   }
+}
+
+/** Turns a plan agreed in the player's chat into a real meet-up both residents remember. */
+export async function sessionAddPlan(a: string, b: string, plan: { day: number; minute: number; location_id: string }, topic: string) {
+  const city = requireSessionCity();
+  const [first, second] = [findCitizen(city, a), findCitizen(city, b)];
+  const due = plan.day * 1440 + plan.minute;
+  if (due < cityMinute(city) + 30 || due > cityMinute(city) + 14 * 1440) throw new Error("Plans can be made from half an hour to two weeks ahead.");
+  if ((city.meetings ?? []).some((m) => m.status === "scheduled" && m.actor_ids.includes(a) && m.actor_ids.includes(b) && Math.abs(meetingMinute(m) - due) < 60))
+    throw new Error("That plan is already saved.");
+  const meeting = { actor_ids: [a, b], location_id: plan.location_id, game_day: plan.day, game_minute: plan.minute, topic: topic.slice(0, 240),
+    id: newId("plan"), source_conversation_id: "player_chat", status: "scheduled" as const };
+  city.meetings = [...(city.meetings ?? []).slice(-39), meeting];
+  const at = `${String(Math.floor(plan.minute / 60)).padStart(2, "0")}:${String(plan.minute % 60).padStart(2, "0")}`;
+  const description = `${first.name} and ${second.name} agreed to meet at ${locationName(city, plan.location_id)} on ${weekday(plan.day)} (day ${plan.day}) at ${at}: ${topic}.`;
+  lifeSink(city)({ kind: "plan", icon: "📅", headline: description, actors: [a, b], priority: 2, location_id: plan.location_id,
+    memories: [first, second].map((p) => ({ citizen_id: p.citizen_id, content: description, importance: 0.8, related_citizen_id: p === first ? b : a })) });
+  return saveAndReturn(city);
 }
 
 function adjustBonds(city: CityState, changes: BondChange[]) {

@@ -4,7 +4,7 @@ import { create } from "zustand";
 
 import { API_URL, api } from "@/lib/api";
 import { sessionMemoryEnabled } from "@/lib/session-simulation";
-import { newExchanges, type PlaybackConversation } from "@/lib/conversation-playback";
+import { newExchanges, type InlineTalk, type PlaybackConversation } from "@/lib/conversation-playback";
 import type {
   CityEvent,
   CityState,
@@ -41,6 +41,12 @@ type GameStore = {
   conversations: Conversation[];
   cityConversations: Conversation[];
   playbackQueue: PlaybackConversation[];
+  /** The player's own chat being voiced where they stand. */
+  inlineTalk: InlineTalk | null;
+  setInlineTalk: (talk: InlineTalk | null) => void;
+  /** Ask the camera to frame these residents; `onlyIfHidden` leaves the view alone if they're visible. */
+  focusRequest: { ids: string[]; onlyIfHidden: boolean; at: number } | null;
+  focusOn: (ids: string[], onlyIfHidden?: boolean) => void;
   finishPlayback: (id: string) => void;
   replayConversation: (id: string) => void;
   connectionStatus: "idle" | "connecting" | "connected" | "offline";
@@ -107,6 +113,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   conversations: [],
   cityConversations: [],
   playbackQueue: [],
+  inlineTalk: null,
+  setInlineTalk: (inlineTalk) => set({ inlineTalk }),
+  focusRequest: null,
+  focusOn: (ids, onlyIfHidden = false) => set({ focusRequest: { ids, onlyIfHidden, at: Date.now() } }),
   finishPlayback: (id) => set((state) => ({
     playbackQueue: state.playbackQueue.filter((c) => c.conversation_id !== id),
   })),

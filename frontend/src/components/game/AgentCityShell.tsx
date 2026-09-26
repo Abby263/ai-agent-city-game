@@ -26,6 +26,8 @@ import {
   Sun,
   Trophy,
   Users,
+  Volume2,
+  VolumeX,
   Vote,
   X,
 } from "lucide-react";
@@ -47,6 +49,10 @@ import { ActionPanel } from "./ActionPanel";
 import { minutesBehindRealTime } from "@/lib/session-simulation";
 import { calendarDay, calendarStartFor } from "@/lib/calendar";
 import { dayWeather } from "@/lib/weather";
+import { ConversationAudio, conversationAudioPreference, unlockAudio } from "@/lib/conversation-audio";
+import { displayText, subtitleDuration } from "@/lib/conversation-playback";
+import { castVoices, deliveryStyle } from "@/lib/voices";
+import { parsePlan } from "@/lib/plans";
 import { api } from "@/lib/api";
 import { exportSession, sessionMemoryEnabled, sessionRelationships } from "@/lib/session-simulation";
 import { readUnlocked, unlockNew, type Achievement, type Unlocked } from "@/lib/achievements";
@@ -113,6 +119,54 @@ export function AgentCityShell() {
   const [celebration, setCelebration] = useState<Achievement[]>([]);
   const [welcome, setWelcome] = useState(false);
   const [alertSeen, setAlertSeen] = useState("");
+  const [voiceOn, setVoiceOn] = useState(conversationAudioPreference.enabled);
+  const setInlineTalk = useGameStore((state) => state.setInlineTalk);
+  const inlineTalk = useGameStore((state) => state.inlineTalk);
+  const inlineAudio = useRef<ConversationAudio | null>(null);
+  const inlineRun = useRef(0);
+  const seenChats = useRef<Set<string> | null>(null);
+  const latestCity = useRef(city);
+  useEffect(() => { latestCity.current = city; }, [city]);
+
+  /** Voices the player's chat where they stand: lines, lips and gestures, no cutscene. */
+  const playInline = useCallback((conversation: Pick<Conversation, "conversation_id" | "actor_ids" | "transcript">, start = 0, waitAfter = false) => {
+    const run = ++inlineRun.current;
+    inlineAudio.current?.stop();
+    const people = latestCity.current?.citizens ?? [];
+    const cast = castVoices(people);
+    const lines = conversation.transcript;
+    let index = start;
+    const step = () => {
+      if (run !== inlineRun.current) return;
+      if (index >= lines.length) {
+        setInlineTalk(waitAfter ? { actorIds: conversation.actor_ids, speakerId: null, line: "", key: `${conversation.conversation_id}:wait` } : null);
+        return;
+      }
+      const line = lines[index];
+      const key = `${conversation.conversation_id}:${index}`;
+      setInlineTalk({ actorIds: conversation.actor_ids, speakerId: line.speaker_id, line: line.text, key });
+      const advance = () => { if (run === inlineRun.current) { index++; step(); } };
+      const casting = cast.get(line.speaker_id);
+      if (conversationAudioPreference.enabled && casting) {
+        inlineAudio.current ??= new ConversationAudio(typeof window !== "undefined" && "speechSynthesis" in window ? window.speechSynthesis : null);
+        inlineAudio.current.play({ key, text: line.text, citizenId: line.speaker_id, volume: conversationAudioPreference.volume, casting,
+          style: deliveryStyle(casting, line.text, people.find((c) => c.citizen_id === line.speaker_id)?.mood),
+          onEnd: advance, onError: () => window.setTimeout(advance, subtitleDuration(line.text) * 0.5) });
+      } else window.setTimeout(advance, Math.min(6000, subtitleDuration(line.text) * 0.6));
+    };
+    step();
+  }, [setInlineTalk]);
+
+  // New player chats (typed words or the player's own actions) are voiced inline.
+  useEffect(() => {
+    if (!city) return;
+    if (!seenChats.current) { seenChats.current = new Set(cityConversations.map((c) => c.conversation_id)); return; }
+    const fresh = cityConversations.filter((c) => c.player_chat && !seenChats.current!.has(c.conversation_id));
+    cityConversations.forEach((c) => seenChats.current!.add(c.conversation_id));
+    const newest = fresh[0];
+    // After the reply they stay facing each other, ready for your next line.
+    if (newest) playInline(newest, newest.transcript[0]?.speaker_id === newest.actor_ids[0] ? 1 : 0, true);
+  }, [city, cityConversations, playInline]);
   const flight = useRef(false);
   const player = city?.citizens.find(
     (c) => c.citizen_id === city.policy.player_citizen_id,
@@ -158,6 +212,13 @@ export function AgentCityShell() {
     const timer = window.setTimeout(() => setCelebration([]), 5200);
     return () => window.clearTimeout(timer);
   }, [celebration]);
+  // Leaving the chat (closing Talk, switching person, returning control) ends the conversation stance.
+  useEffect(() => {
+    const talk = useGameStore.getState().inlineTalk;
+    if (!talk) return;
+    const chatting = panel === "journal" && player && talk.actorIds.includes(player.citizen_id) && talk.actorIds.includes(targetId);
+    if (!chatting) { inlineRun.current++; inlineAudio.current?.stop(); setInlineTalk(null); }
+  }, [panel, player, targetId, setInlineTalk]);
   const closeWelcome = useCallback(() => {
     setWelcome(false);
     try { localStorage.setItem(WELCOME_KEY, "1"); } catch { /* the guide can show again next visit */ }
@@ -284,6 +345,10 @@ export function AgentCityShell() {
     const target = nearby.find((citizen) => citizen.citizen_id === targetId);
     if (!player || !target || !draft.trim() || flight.current) return;
     const text = draft.trim();
+    if (/sleep/i.test(target.current_activity)) {
+      setMessage(`${shortName(target)} is asleep 😴. Try again when they're up, or talk to someone who's awake.`);
+      return;
+    }
     const safety = checkPlayerText(text);
     if (!safety.ok) {
       setMessage(safety.message);
@@ -299,6 +364,9 @@ export function AgentCityShell() {
     const existingIds = new Set(
       cityConversations.map((c) => c.conversation_id),
     );
+    playInline({ conversation_id: submission.id, actor_ids: [player.citizen_id, target.citizen_id], transcript: [{ speaker_id: player.citizen_id, text }] }, 0, true);
+    // Starting a chat brings the two of you into view once, only if you can't already see them.
+    useGameStore.getState().focusOn([player.citizen_id, target.citizen_id], true);
     await act(async () => {
       // Only clear an accepted submission, never a draft entered during the request.
       setDraft("");
@@ -456,6 +524,14 @@ export function AgentCityShell() {
               <span>{city ? `Meguro City, Tokyo · ${city.citizens.length} residents` : "Waking up..."}</span>
             </div>
           </div>
+          {live && city && (city.clock.minute_of_day >= 1380 || city.clock.minute_of_day < 330) && alertSeen !== "night" && !playbackQueue.length && !player && (
+            <div className="weather-alert night-card" role="status">
+              <span aria-hidden="true">😴</span>
+              <p>It&apos;s night in Tokyo, so most of Nakameguro is asleep. Come back in daylight, or fast-forward to watch a day unfold.</p>
+              <button className="outline-action" onClick={() => { setSpeed(4); void act(() => api.setTimeMode("fast")); setAlertSeen("night"); }}>⏩ Fast-forward</button>
+              <button className="icon-button" aria-label="Dismiss" onClick={() => setAlertSeen("night")}><X size={15} /></button>
+            </div>
+          )}
           {city?.weather?.alert && alertSeen !== city.weather.alert.text && !playbackQueue.length && (
             <div className="weather-alert" role="alert" data-kind={city.weather.alert.kind}>
               <span aria-hidden="true">{city.weather.alert.kind === "earthquake" ? "🫨" : city.weather.icon}</span>
@@ -465,7 +541,9 @@ export function AgentCityShell() {
           )}
           <div className="world-state">
             <span className={busy ? "thinking-dot" : "state-dot"} />
-            {playbackQueue.length ? playbackQueue[0].replay ? "Replaying conversation" : "In conversation" : busy
+            {playbackQueue.length ? playbackQueue[0].replay ? "Replaying conversation" : "In conversation" : inlineTalk && player
+              ? `💬 Chatting with ${shortName(city?.citizens.find((c) => inlineTalk.actorIds.includes(c.citizen_id) && c.citizen_id !== player.citizen_id))}`
+              : busy
               ? pendingExchange ? `${pendingExchange.names} are talking` : "Thinking..."
               : city?.clock.running
                 ? "City is living"
@@ -952,10 +1030,20 @@ export function AgentCityShell() {
                     speechInput.current?.focus();
                   }}
                   onDismissOutgoing={() => setOutgoing(null)}
+                  onAddPlan={(conversation, plan) => void act(async () => {
+                    const topic = conversation.summary.replace(/[.!?\s]+$/, "");
+                    const next = await api.addPlan(conversation.actor_ids[0], conversation.actor_ids[1], plan, topic);
+                    setMessage(`📅 Saved: ${plan.label}.`);
+                    return next;
+                  })}
                 />
                 {player ? (
                   <form className="speech-form" onSubmit={speak}>
                     <div className="speaking-as">
+                      <button type="button" className="icon-button watch-us" title="Watch the two of you" aria-label="Watch the conversation"
+                        disabled={!targetId} onClick={() => useGameStore.getState().focusOn([player.citizen_id, targetId])}>
+                        <span>👀</span>
+                      </button>
                       <CitizenPortrait citizen={player} size={28} />
                       <strong>{shortName(player)}</strong>
                       <ArrowRight size={13} />
@@ -998,12 +1086,29 @@ export function AgentCityShell() {
                         placeholder={
                           outgoing?.status === "pending"
                             ? "Write your next message..."
-                            : "What do you say?"
+                            : /sleep/i.test(nearby.find((c) => c.citizen_id === targetId)?.current_activity ?? "")
+                              ? `${shortName(nearby.find((c) => c.citizen_id === targetId))} is asleep 😴`
+                              : "What do you say?"
                         }
                         disabled={
                           !targetId || Boolean(city.policy.player_destination)
                         }
                       />
+                      <button
+                        type="button"
+                        className="icon-button voice-toggle"
+                        aria-pressed={voiceOn}
+                        aria-label={voiceOn ? "Mute voices" : "Hear voices"}
+                        title={voiceOn ? "Mute voices" : "Hear voices"}
+                        onClick={() => {
+                          const on = !conversationAudioPreference.enabled;
+                          conversationAudioPreference.enabled = on;
+                          if (on) unlockAudio(); else inlineAudio.current?.stop();
+                          setVoiceOn(on);
+                        }}
+                      >
+                        <span>{voiceOn ? <Volume2 size={17} /> : <VolumeX size={17} />}</span>
+                      </button>
                       <button
                         className="primary-action"
                         aria-label={
@@ -1220,6 +1325,7 @@ function ConversationThread({
   canEditOutgoing,
   onEditOutgoing,
   onDismissOutgoing,
+  onAddPlan,
 }: {
   city: CityState;
   conversations: Conversation[];
@@ -1229,6 +1335,7 @@ function ConversationThread({
   canEditOutgoing: boolean;
   onEditOutgoing: () => void;
   onDismissOutgoing: () => void;
+  onAddPlan: (conversation: Conversation, plan: NonNullable<ReturnType<typeof parsePlan>>) => void;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const [following, setFollowing] = useState(!focusedConversation);
@@ -1312,10 +1419,15 @@ function ConversationThread({
         {visible.length === 0 && !outgoing && (
           <Empty text={city.simulation_mode === "autonomous" ? "No conversations in this view yet." : "The next conversation is still unwritten."} />
         )}
-        {visible.map((entry) =>
-          entry.conversation ? (
-            <div className={`exchange ${focusedConversation === entry.key ? "focused-exchange" : ""}`} data-conversation={entry.key} key={entry.key}>
-              <div className="exchange-time">
+        {visible.map((entry, index) => {
+          // Back-and-forth chat with the same person reads as one thread, not separate scenes.
+          const previous = visible[index - 1];
+          const continued = Boolean(entry.conversation?.player_chat && previous?.conversation?.player_chat
+            && previous.actors.join() === entry.actors.join()
+            && (entry.day * 1440 + entry.minute) - (previous.day * 1440 + previous.minute) <= 60);
+          return entry.conversation ? (
+            <div className={`exchange ${focusedConversation === entry.key ? "focused-exchange" : ""} ${continued ? "continued-exchange" : ""}`} data-conversation={entry.key} key={entry.key}>
+              {!continued && <div className="exchange-time">
                 <button className="replay-exchange" aria-label={`Replay conversation from day ${entry.day} at ${time(entry.minute)}`} title="Watch this conversation in the city" onClick={() => useGameStore.getState().replayConversation(entry.key)}><Play size={14} /></button>
                 <span>
                   Day {entry.day} · {time(entry.minute)}
@@ -1329,7 +1441,7 @@ function ConversationThread({
                     )?.name
                   }
                 </span>
-              </div>
+              </div>}
               {entry.conversation.encounter && <p className="exchange-context">{entry.conversation.encounter.reason}</p>}
               {entry.conversation.transcript.map((line, index) => (
                 <article
@@ -1356,11 +1468,22 @@ function ConversationThread({
                           .join(", ")}
                       </span>
                     </div>
-                    <p>{line.text}</p>
+                    <p>{displayText(line.text)}</p>
                   </div>
                 </article>
               ))}
               <ConversationImpact conversation={entry.conversation} citizens={city.citizens} />
+              {entry.conversation.player_chat && index === visible.length - 1 && (() => {
+                // A day and time agreed in the chat can become a real plan.
+                // Read the whole back-and-forth with this person, not only the last exchange.
+                const thread: string[] = [];
+                for (let i = index; i >= 0 && visible[i].conversation?.player_chat && visible[i].actors.join() === entry.actors.join(); i--)
+                  thread.unshift(...visible[i].conversation!.transcript.map((l) => l.text));
+                const plan = parsePlan(thread.slice(-8).join(" "), city);
+                const saved = plan && (city.meetings ?? []).some((m) => m.status === "scheduled" && entry.actors.every((id) => m.actor_ids.includes(id)) && m.game_day === plan.day && Math.abs(m.game_minute - plan.minute) < 60);
+                const invitation = thread.find((l) => /\b(want to|wanna|let's|grab|meet|join me|come with)\b/i.test(l)) ?? thread[0] ?? "a meet-up";
+                return plan && !saved ? <button className="outline-action plan-button" onClick={() => onAddPlan({ ...entry.conversation!, summary: invitation }, plan)}>📅 Add to plans: {plan.label}</button> : null;
+              })()}
             </div>
           ) : (
             <div className="task-divider" key={entry.key}>
@@ -1376,8 +1499,8 @@ function ConversationThread({
               </span>
               <p>{entry.event.description}</p>
             </div>
-          ),
-        )}
+          );
+        })}
         {outgoing && (
           <div className="outgoing-exchange" aria-label="Outgoing message">
             <article className="dialogue-line">
