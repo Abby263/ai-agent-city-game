@@ -19,6 +19,8 @@ export type Election = {
   /** Created from Create: both candidates are AI-run and the election plays out as a quick story. */
   auto?: boolean;
   story_id?: string;
+  /** A tie settled by drawing lots, as Japanese elections do. */
+  lot_winner?: string;
 };
 export type ElectionDecision = { platform: string; target_id: string | null; intention: string; vote_for: string | null; reason: string; mood: string };
 export type ElectionDecisionRequest = {
@@ -54,6 +56,19 @@ export function tallyElection(election: Election) {
   const counts = election.candidates.map((c) => ({ ...c, votes: election.ballots.filter((b) => b.vote_for === c.citizen_id).length }));
   const high = Math.max(...counts.map((c) => c.votes));
   const leaders = high > 0 ? counts.filter((c) => c.votes === high) : [];
-  return { counts, winner: leaders.length === 1 ? leaders[0] : null, tied: leaders.length > 1,
+  const byLot = leaders.length > 1 ? leaders.find((c) => c.citizen_id === election.lot_winner) : undefined;
+  return { counts, winner: leaders.length === 1 ? leaders[0] : byLot ?? null, tied: leaders.length > 1, by_lot: !!byLot,
     abstentions: election.ballots.filter((b) => b.vote_for === null).length };
+}
+/** What an election created from Create is waiting for from the resident you play, if anything. */
+export function playerTurn(city: CityState) {
+  const election = liveElection(city), player = city.policy.player_citizen_id as string | null | undefined;
+  if (!election?.auto || !player) return undefined;
+  const candidate = election.candidates.some((c) => c.citizen_id === player);
+  const canVote = election.voter_ids.includes(player) && !election.ballots.some((b) => b.voter_id === player);
+  if (!candidate && !canVote) return undefined;
+  // A candidate you play opens the ballots when they're done campaigning; your ballot is always cast by you.
+  const waiting = election.phase === "campaign" ? candidate && election.campaign_turn >= 2
+    : canVote && election.ballots.length === election.voter_ids.length - 1;
+  return { election, voterId: player, candidate, canVote, waiting };
 }

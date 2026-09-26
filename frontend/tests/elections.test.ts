@@ -31,7 +31,7 @@ test("private agent ballots never include other ballots and all votes are counte
     calls++;
     assert.equal(request.purpose, "vote");
     assert.equal("ballots" in request, false);
-    assert.ok(!JSON.stringify(request).includes("I chose this ballot while controlled by the player"));
+    assert.ok(!JSON.stringify(request).includes("I made up my own mind after hearing the candidates"));
     return decision;
   });
   const event = currentElection(getSessionCity()!)!;

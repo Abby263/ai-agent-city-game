@@ -459,7 +459,7 @@ class CitizenCognitionClient:
             except (ValueError, TypeError):
                 pass  # An invalid proposed appointment must not invent a commitment.
         return {
-            "lines": [*state["lines"], {"speaker_id": speaker_id, "text": _clean_line(str(result["spoken_line"]))}],
+            "lines": [*state["lines"], {"speaker_id": speaker_id, "text": _clean_line(str(result["spoken_line"]), (str(result.get("mood") or ""), str(speaker.get("mood") or "")))}],
             "turn_results": {
                 **state["turn_results"],
                 speaker_id: [*state["turn_results"].get(speaker_id, []), result],
@@ -779,6 +779,15 @@ class CitizenCognitionClient:
         return errors
 
 
-def _clean_line(text: str) -> str:
-    """Models sometimes return escaped characters such as \\u2014 inside the spoken line; show the real characters."""
-    return re.sub(r"\\u([0-9a-fA-F]{4})", lambda match: chr(int(match.group(1), 16)), text).strip()
+def _clean_line(text: str, moods: tuple[str, ...] = ()) -> str:
+    """Models sometimes return escaped characters such as \\u2014 inside the spoken line; show the real characters.
+
+    They also sometimes lead with the speaker's mood as a stage direction ("Guarded, you caught me!"); drop it.
+    """
+    line = re.sub(r"\\u([0-9a-fA-F]{4})", lambda match: chr(int(match.group(1), 16)), text).strip()
+    for mood in {m.strip().lower() for m in moods if m and m.strip()}:
+        match = re.match(rf"^(?:[\[(*]\s*{re.escape(mood)}\s*[\])*]|{re.escape(mood)}\s*[,:;.—-])\s*", line, re.IGNORECASE)
+        if match and len(line) > match.end():
+            rest = line[match.end():]
+            return rest[0].upper() + rest[1:]
+    return line

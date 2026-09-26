@@ -6,8 +6,8 @@ AgentCity is a playable 3D AI city simulation where citizens are autonomous agen
 **Happening now** story: the reaction plays straight away, and the card on the map
 collects each beat (who went to whom, what they said, what changed) with **Watch** and
 **Replay talk**. News lists all running stories. A student-council election is one of
-these situations: pick two candidates in Create and watch them campaign until private
-ballots produce a winner. See [event gameplay and architecture](docs/events.md).
+these situations: pick two candidates in Create and watch them campaign, or play a
+student to question the candidates and cast your own secret ballot. See [event gameplay and architecture](docs/events.md).
 
 This repo is `ai-agent-city-game`. The visible product name is `AgentCity`.
 

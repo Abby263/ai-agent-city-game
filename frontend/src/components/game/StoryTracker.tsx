@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Eye, Play, X } from "lucide-react";
 import { activeStories, type Story } from "@/lib/stories";
-import { liveElection } from "@/lib/elections";
+import { liveElection, playerTurn } from "@/lib/elections";
 import { useGameStore } from "@/lib/store";
 import type { CityState } from "@/lib/types";
 
@@ -14,13 +14,18 @@ export function watchStory(story: Story) {
 }
 
 /** "Happening now": the latest storyline you set in motion, beat by beat, with a button to watch it. */
-export function StoryTracker({ city, onOpenAll }: { city: CityState; onOpenAll: () => void }) {
+export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onVote, onAsk }: {
+  city: CityState; onOpenAll: () => void; busy?: boolean; onOpenBallots?: () => void;
+  onVote?: (candidateId: string | null) => void; onAsk?: (candidateId: string) => void;
+}) {
   const stories = activeStories(city);
   const [hidden, setHidden] = useState<string[]>([]);
   const [open, setOpen] = useState(true);
   const story = stories.find((s) => !hidden.includes(s.id));
   if (!story) return null;
   const election = story.kind === "election" ? liveElection(city) : undefined;
+  const turn = election ? playerTurn(city) : undefined;
+  const me = turn && city.citizens.find((c) => c.citizen_id === turn.voterId)?.name.split(" ")[0];
   const latestTalk = [...story.beats].reverse().find((b) => b.conversation_id);
   const beats = story.beats.slice(open ? -3 : -1);
   return (
@@ -40,7 +45,36 @@ export function StoryTracker({ city, onOpenAll }: { city: CityState; onOpenAll: 
           </li>
         ))}
       </ol>
-      {election && <p className="story-status">{election.phase === "voting" ? "🗳️ Counting private ballots…" : `📣 Campaigning (${Math.min(election.campaign_turn, 2)}/2)…`}</p>}
+      {election && !turn?.waiting && (
+        <p className="story-status">
+          {election.phase === "voting" ? "🗳️ Counting private ballots…" : `📣 Campaigning (${Math.min(election.campaign_turn, 2)}/2)…`}
+          {turn && election.phase === "campaign" && ` You're ${me}: ${turn.candidate ? "make your case to voters in Talk." : "your ballot waits for you, so talk to the candidates first if you like."}`}
+        </p>
+      )}
+      {turn?.waiting && election?.phase === "campaign" && (
+        <div className="story-ballot">
+          <p>Done campaigning, {me}? The other candidate has had their turn.</p>
+          <button className="primary-action" disabled={busy} onClick={onOpenBallots}>🗳️ Open the ballots</button>
+        </div>
+      )}
+      {turn?.waiting && election?.phase === "voting" && (
+        <div className="story-ballot">
+          <p>Your secret ballot, {me}. Everyone else has voted.</p>
+          {onAsk && (
+            <div className="story-ask">
+              {election.candidates.filter((c) => c.citizen_id !== turn.voterId).map((c) => (
+                <button key={c.citizen_id} className="text-action" disabled={busy} onClick={() => onAsk(c.citizen_id)}>💬 Ask {c.name.split(" ")[0]} first</button>
+              ))}
+            </div>
+          )}
+          <div>
+            {election.candidates.map((c) => (
+              <button key={c.citizen_id} className="primary-action" disabled={busy} onClick={() => onVote?.(c.citizen_id)}>Vote {c.name.split(" ")[0]}</button>
+            ))}
+            <button className="outline-action" disabled={busy} onClick={() => onVote?.(null)}>Abstain</button>
+          </div>
+        </div>
+      )}
       {city.simulation_mode !== "autonomous" && !election && story.beats.length < 3 && (
         <p className="story-status">Switch on Auto to see how the rest of the town reacts over time.</p>
       )}

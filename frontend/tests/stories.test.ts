@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { createInitialCity } from "../src/lib/initial-city";
-import { getSessionCity, seedSession, sessionAdvanceAutoElection, sessionConversations, sessionCreateSituation, sessionStartElectionAuto } from "../src/lib/session-simulation";
+import { getSessionCity, seedSession, sessionAdvanceAutoElection, sessionCastVote, sessionConversations, sessionCreateSituation, sessionStartElectionAuto, sessionTakeControl } from "../src/lib/session-simulation";
 import { activeStories } from "../src/lib/stories";
 import type { SessionCognitionRequest, SessionCognitionResponse } from "../src/lib/types";
-import type { DecideElection } from "../src/lib/elections";
+import { playerTurn, type DecideElection } from "../src/lib/elections";
 
 const storage = new Map<string, string>();
 Object.defineProperty(globalThis, "window", {
@@ -51,4 +51,43 @@ test("an election from Create runs its campaign and ends with a winner in the st
   assert.ok(story.beats.some((b) => b.icon === "📣"), "platforms are in the story");
   assert.ok(story.beats.some((b) => b.conversation_id), "campaign conversations are in the story");
   assert.ok(story.beats.some((b) => b.icon === "🏆" && /Ava Singh won/.test(b.text)));
+});
+
+test("a tied election is settled by drawing lots", async () => {
+  const city = getSessionCity()!;
+  const [ava, noah] = ["Ava", "Noah"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
+  const students = city.citizens.filter((c) => c.profession === "Student").map((c) => c.citizen_id);
+  const decide: DecideElection = async (request) => ({
+    platform: "More clubs.", target_id: null, intention: "", reason: "Close call.", mood: "Calm",
+    // Alternate so the ballots split evenly.
+    vote_for: request.purpose === "vote" ? (students.indexOf(request.citizen.citizen_id) % 2 ? ava : noah) : null,
+  });
+  await sessionStartElectionAuto(ava, noah, decide);
+  for (let i = 0; i < 4; i++) await sessionAdvanceAutoElection(talk, decide);
+  const done = getSessionCity()!;
+  assert.equal(done.activities!.at(-1)!.phase, "complete");
+  const beat = (done.stories ?? []).find((s) => s.kind === "election")!.beats.at(-1)!;
+  assert.equal(beat.icon, "🏆");
+  assert.match(beat.text, /won the student council by drawing lots/);
+  assert.equal((done.life_log ?? []).filter((e) => e.kind === "election").length, 1, "the result is in the news once");
+});
+
+test("the resident you play casts their own ballot, and the election waits for it", async () => {
+  const city = getSessionCity()!;
+  const [ava, noah, iris] = ["Ava", "Noah", "Iris"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
+  await sessionTakeControl(iris);
+  const decide: DecideElection = async (request) => ({
+    platform: "More clubs.", target_id: request.purpose === "campaign" ? iris : null, intention: "Win Iris over", reason: "Kind.", mood: "Calm",
+    vote_for: request.purpose === "vote" ? (request.citizen.citizen_id === iris ? noah : ava) : null,
+  });
+  await sessionStartElectionAuto(ava, noah, decide);
+  for (let i = 0; i < 6; i++) await sessionAdvanceAutoElection(talk, decide);
+  let now = getSessionCity()!;
+  const story = (now.stories ?? []).find((s) => s.kind === "election")!;
+  assert.ok(story.beats.some((b) => b.icon === "🙋"), "a candidate comes to find the player instead of speaking for them");
+  assert.equal(playerTurn(now)?.waiting, true);
+  assert.equal(now.activities!.at(-1)!.phase, "voting");
+  now = await sessionCastVote(noah);
+  assert.equal(now.activities!.at(-1)!.phase, "complete");
+  assert.ok(now.activities!.at(-1)!.ballots.some((b) => b.voter_id === iris && b.vote_for === noah && b.source === "player"));
 });

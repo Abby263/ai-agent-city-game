@@ -42,6 +42,9 @@ import {
   sessionAddPlan,
   sessionStartElectionAuto,
   sessionAdvanceAutoElection,
+  sessionCallCandidate,
+  sessionCastVote,
+  sessionOpenBallots,
 } from "@/lib/session-simulation";
 
 import { API_URL } from "./api-url";
@@ -73,6 +76,9 @@ export const api = {
   createSituation: (request: import("./scenarios").ScenarioRequest) => sessionCreateSituation(request, generateSessionCognition),
   startElection: (firstId: string, secondId: string) => sessionStartElectionAuto(firstId, secondId, generateElectionDecision),
   advanceElection: () => sessionAdvanceAutoElection(generateSessionCognition, generateElectionDecision),
+  openBallots: () => sessionOpenBallots(),
+  castBallot: (voteFor: string | null) => sessionCastVote(voteFor),
+  callCandidate: (candidateId: string) => sessionCallCandidate(candidateId),
   setTimeMode: (mode: "live" | "fast") => sessionSetTimeMode(mode),
   addPlan: (a: string, b: string, plan: { day: number; minute: number; location_id: string }, topic: string) => sessionAddPlan(a, b, plan, topic),
   performAction: (actorId: string, targetId: string, action: import("./actions").ActionId, note = "") =>

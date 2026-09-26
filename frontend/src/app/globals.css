@@ -1900,6 +1900,13 @@ select {
 .story-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .story-tracker .outline-action { min-height: 32px; padding: 5px 10px; color: #fff; border-color: #ffffff50; }
 .story-tracker .text-action { color: #bfe8d6; }
+.story-ballot { margin-top: 10px; padding: 10px; border-radius: 10px; background: #ffffff14; border: 1px solid #ffe19c66; }
+.story-ballot p { margin: 0 0 8px; font-size: 12.5px; color: #ffe19c; }
+.story-ballot div { display: flex; flex-wrap: wrap; gap: 6px; }
+.story-ask { margin-bottom: 8px; }
+.story-ask .text-action { color: #bfe8d6; padding: 2px 4px; }
+.story-ballot .primary-action { min-height: 34px; padding: 6px 12px; }
+.story-ballot .outline-action { min-height: 34px; padding: 6px 12px; color: #fff; border-color: #ffffff50; }
 .conversation-on-stage .story-tracker { display: none; }
 @media (max-width: 760px) {
   .story-tracker { top: auto; bottom: 150px; left: 12px; width: calc(100% - 24px); max-height: 38%; overflow-y: auto; }

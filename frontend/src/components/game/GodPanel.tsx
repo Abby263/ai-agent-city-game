@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
 import { api } from "@/lib/api";
 import { scenarioCatalog, type ScenarioKind } from "@/lib/scenarios";
@@ -30,6 +30,10 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
   onStarted: (ids: string[], locationId?: string) => void;
 }) {
   const [open, setOpen] = useState<ScenarioKind | null>(null);
+  // An opened card's form can land below the fold; bring all of it into view.
+  useEffect(() => {
+    if (open) document.querySelector(".scenario-card[data-open='true']")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [open]);
   const [place, setPlace] = useState("loc_park");
   const [first, setFirst] = useState(city.citizens[0]?.citizen_id ?? "");
   const [second, setSecond] = useState(city.citizens[1]?.citizen_id ?? "");

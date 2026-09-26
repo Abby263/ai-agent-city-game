@@ -400,8 +400,10 @@ export class CityRenderer {
   }
   /** Frames two people talking, leaving room below for the chat panel on narrow screens. */
   focusPair(ids: string[], onlyIfHidden = false) {
-    const models = ids.map((id) => this.people.get(id)).filter((m) => m !== undefined);
+    let models = ids.map((id) => this.people.get(id)).filter((m) => m !== undefined);
     if (!models.length) return;
+    // People in different parts of town: frame the first one rather than the empty ground between them.
+    if (models.some((m) => m.root.position.distanceTo(models[0].root.position) > 14)) models = [models[0]];
     if (onlyIfHidden && models.every((m) => {
       this.vector.copy(m.root.position).project(this.camera);
       return Math.abs(this.vector.x) < 0.8 && this.vector.y > -0.1 && this.vector.y < 0.85;

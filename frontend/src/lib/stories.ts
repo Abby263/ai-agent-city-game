@@ -1,3 +1,4 @@
+import { calendarStartFor, realCityTime } from "./calendar";
 import type { CityState, Conversation } from "./types";
 
 // A story follows something the player set in motion (a situation, an action, an election)
@@ -22,6 +23,12 @@ export type Story = {
 
 const now = (city: CityState) => city.clock.day * 1440 + city.clock.minute_of_day;
 const DEFAULT_LENGTH = 36 * 60;
+/** When a beat happened, as the clock on screen shows it: real Tokyo time in live mode. */
+function stamp(city: CityState) {
+  if (city.policy.time_mode !== "live") return { day: city.clock.day, minute: city.clock.minute_of_day };
+  const { day, minute } = realCityTime(city.calendar_start ?? calendarStartFor(city.clock.day));
+  return { day, minute };
+}
 
 export function startStory(city: CityState, input: Omit<Story, "started" | "ends" | "beats"> & { first: Omit<StoryBeat, "day" | "minute">; length?: number }) {
   const story: Story = {
@@ -29,7 +36,7 @@ export function startStory(city: CityState, input: Omit<Story, "started" | "ends
     focus_ids: input.focus_ids.length ? input.focus_ids : input.actors.slice(0, 2), location_id: input.location_id,
     started: now(city), ends: now(city) + (input.length ?? DEFAULT_LENGTH), beats: [],
   };
-  story.beats.push({ day: city.clock.day, minute: city.clock.minute_of_day, ...input.first });
+  story.beats.push({ ...stamp(city), ...input.first });
   city.stories = [...(city.stories ?? []).filter((s) => s.id !== story.id).slice(-11), story];
   return story;
 }
@@ -43,7 +50,7 @@ export function addBeat(city: CityState, storyId: string, beat: Omit<StoryBeat, 
   const story = city.stories?.find((s) => s.id === storyId);
   if (!story) return;
   if (story.beats.some((b) => b.text === beat.text)) return;
-  story.beats.push({ day: city.clock.day, minute: city.clock.minute_of_day, ...beat });
+  story.beats.push({ ...stamp(city), ...beat });
   story.beats = story.beats.slice(-30);
 }
 

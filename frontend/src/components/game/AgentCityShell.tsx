@@ -44,7 +44,7 @@ import { WelcomeGuide, WELCOME_KEY } from "./WelcomeGuide";
 import { WorldClock } from "./WorldClock";
 import { GodPanel } from "./GodPanel";
 import { StoryTracker } from "./StoryTracker";
-import { liveElection } from "@/lib/elections";
+import { liveElection, playerTurn } from "@/lib/elections";
 import { ActionPanel } from "./ActionPanel";
 import { minutesBehindRealTime } from "@/lib/session-simulation";
 import { calendarDay, calendarStartFor } from "@/lib/calendar";
@@ -265,7 +265,7 @@ export function AgentCityShell() {
   // Elections created from Create play out step by step, pausing while a campaign conversation is on screen.
   useEffect(() => {
     const election = city ? liveElection(city) : undefined;
-    if (!election?.auto || busy || playbackQueue.length || election.error) return;
+    if (!election?.auto || busy || playbackQueue.length || election.error || playerTurn(city!)?.waiting) return;
     const timer = window.setTimeout(() => void act(api.advanceElection), 2500);
     return () => window.clearTimeout(timer);
   }, [city, busy, playbackQueue.length, act]);
@@ -573,7 +573,9 @@ export function AgentCityShell() {
               </button>
             </div>
           )}
-          {city && !playbackQueue.length && <StoryTracker city={city} onOpenAll={() => setPanel("news")} />}
+          {city && !playbackQueue.length && <StoryTracker city={city} onOpenAll={() => setPanel("news")} busy={busy}
+            onOpenBallots={() => void act(api.openBallots)} onVote={(id) => void act(() => api.castBallot(id))}
+            onAsk={(id) => void act(() => api.callCandidate(id)).then(() => { setRecipient(id); setPanel("journal"); })} />}
           {!city && (
             <div className="world-loading">{error || "Opening Nakameguro..."}</div>
           )}

@@ -19,7 +19,7 @@ import type {
 import { bondLabel, conversationImpact, emptyFeelings, evolveRelationship } from "@/lib/social";
 import { acceptMeeting, cityMinute, meetingFor, meetingMinute, sociallyAvailable } from "./encounters";
 import type { DecideSocial, EncounterContext } from "./encounters";
-import { currentElection, liveElection, electionNotice, recordBallot, tallyElection } from "./elections";
+import { currentElection, liveElection, electionNotice, playerTurn, recordBallot, tallyElection } from "./elections";
 import type { DecideElection, Election, ElectionDecisionRequest } from "./elections";
 import { assertPlayerTextSafe } from "./safety";
 import { isWeekend, routineStop, weekday, type RoutineContext } from "./routine";
@@ -654,6 +654,8 @@ function electionRequest(city: CityState, citizen: CitizenAgent, purpose: Electi
   return {
     purpose, citizen, candidates: event.candidates,
     residents: city.citizens.filter((c) => purpose !== "campaign" || event.waiting_for_player?.candidate_id !== citizen.citizen_id || event.waiting_for_player?.target_id !== c.citizen_id)
+      // A created election's candidates canvass voters, not each other.
+      .filter((c) => purpose !== "campaign" || !event.auto || (event.voter_ids.includes(c.citizen_id) && !event.candidates.some((k) => k.citizen_id === c.citizen_id)))
       .map((c) => ({ citizen_id: c.citizen_id, name: c.name, location: locationName(city, c.current_location_id) })),
     memories: privateMemoryContext(citizen).slice(0, 24),
   };
@@ -713,14 +715,24 @@ function applyBallot(city: CityState, voterId: string, voteFor: string | null, r
   city.activities = city.activities!.map((e) => e.event_id === event.event_id ? updated : e);
   addMemory({ citizen_id: voterId, kind: "episodic", content: `My private ballot: ${voteFor ? updated.candidates.find((c) => c.citizen_id === voteFor)?.name : "abstain"}. ${reason}`, importance: 0.8, salience: 0.8, related_citizen_id: voteFor, extra: { election_id: event.event_id } });
   if (updated.phase === "complete") {
-    const result = tallyElection(updated)!;
-    const description = result.winner ? `${result.winner.name} won the student-council election with ${result.winner.votes} votes.` : result.tied ? "The student-council election ended in a tie. No winner was declared." : "Everyone abstained. No winner was declared.";
-    addEvent(city, { event_type: "election_result", description, actors: updated.candidates.map((c) => c.citizen_id), priority: 3 });
+    let result = tallyElection(updated)!;
+    if (result.tied && updated.auto) {
+      // Japanese elections settle a tie by drawing lots; a created election always ends with a winner.
+      const leaders = result.counts.filter((c) => c.votes === Math.max(...result.counts.map((x) => x.votes)));
+      updated.lot_winner = leaders[Math.floor(Math.random() * leaders.length)].citizen_id;
+      result = tallyElection(updated)!;
+    }
+    const first = (name: string) => name.split(" ")[0];
+    const description = result.by_lot && result.winner
+      ? `${result.counts.map((c) => first(c.name)).join(" and ")} tied ${result.winner.votes}–${result.winner.votes}. ${result.winner.name} won the student council by drawing lots.`
+      : result.winner ? `${result.winner.name} won the student-council election with ${result.winner.votes} votes.` : result.tied ? "The student-council election ended in a tie. No winner was declared." : "Everyone abstained. No winner was declared.";
+    const resultEvent = addEvent(city, { event_type: "election_result", description, actors: updated.candidates.map((c) => c.citizen_id), priority: 3 });
     for (const voter of updated.voter_ids) addMemory({ citizen_id: voter, kind: "episodic", content: description, importance: 0.85, salience: 0.85, related_citizen_id: result.winner?.citizen_id ?? null, extra: { election_id: event.event_id, source: "public_result" } });
     if (updated.story_id) {
-      const score = result.counts.map((c) => `${c.name.split(" ")[0]} ${c.votes}`).join(" – ");
+      const score = result.counts.map((c) => `${first(c.name)} ${c.votes}`).join(" – ");
       addBeat(city, updated.story_id, { icon: result.winner ? "🏆" : "🤝", text: `${description} Final count: ${score}${result.abstentions ? `, ${result.abstentions} abstained` : ""}.` });
-      lifeSink(city)({ kind: "election", icon: "🗳️", headline: description, actors: updated.candidates.map((c) => c.citizen_id), priority: 3 });
+      city.life_log = [...(city.life_log ?? []), { id: resultEvent.event_id, day: city.clock.day, minute: city.clock.minute_of_day, kind: "election",
+        icon: "🗳️", headline: description, actors: updated.candidates.map((c) => c.citizen_id) }].slice(-200);
     }
     if (!updated.auto) city.clock.running = false;
   }
@@ -754,6 +766,33 @@ export async function sessionStartElectionAuto(firstId: string, secondId: string
   return saveAndReturn(city);
 }
 
+/** Campaigning ends and every student casts a private ballot (called by the shell, or by a candidate you play). */
+export async function sessionOpenBallots() {
+  const city = requireSessionCity();
+  const event = liveElection(city);
+  if (!event?.auto || event.phase !== "campaign") throw new Error("There is no campaign to close.");
+  event.phase = "voting";
+  addBeat(city, event.story_id ?? "", { icon: "🗳️", text: "Campaigning is over. Every student is casting a private ballot." });
+  addEvent(city, { event_type: "election_voting", description: "Campaigning has ended. Students are casting private ballots.", priority: 3 });
+  return saveAndReturn(city);
+}
+
+/** Before you vote, a candidate comes over to hear your questions (they want your vote, after all). */
+export async function sessionCallCandidate(candidateId: string) {
+  const city = requireSessionCity();
+  const event = liveElection(city), player = String(city.policy.player_citizen_id ?? "");
+  if (!event?.candidates.some((c) => c.citizen_id === candidateId)) throw new Error("That resident isn't a candidate.");
+  const [candidate, you] = [findCitizen(city, candidateId), findCitizen(city, player)];
+  if (candidate.current_location_id !== you.current_location_id) {
+    candidate.current_location_id = you.current_location_id;
+    candidate.x = candidate.target_x = you.x + 1;
+    candidate.y = candidate.target_y = you.y;
+  }
+  candidate.current_activity = `Campaigning: talking with ${you.name}`;
+  if (event.story_id) addBeat(city, event.story_id, { icon: "🙋", text: `${candidate.name.split(" ")[0]} came over to answer your questions, ${you.name.split(" ")[0]}.` });
+  return saveAndReturn(city);
+}
+
 /** One step of an election created from Create: a campaign conversation, or everyone's private vote. */
 export async function sessionAdvanceAutoElection(generate: GenerateCognition, decide: DecideElection) {
   const city = requireSessionCity();
@@ -761,34 +800,53 @@ export async function sessionAdvanceAutoElection(generate: GenerateCognition, de
   if (!event?.auto) return city;
   const storyId = event.story_id ?? "";
   if (event.phase === "campaign" && event.campaign_turn >= 2) {
-    event.phase = "voting";
-    addBeat(city, storyId, { icon: "🗳️", text: "Campaigning is over. Every student is casting a private ballot." });
-    addEvent(city, { event_type: "election_voting", description: "Campaigning has ended. Students are casting private ballots.", priority: 3 });
-    return saveAndReturn(city);
+    if (playerTurn(city)?.waiting) return city;
+    return sessionOpenBallots();
   }
+  const player = city.policy.player_citizen_id as string | null | undefined;
+  const first = (c: CitizenAgent) => c.name.split(" ")[0];
   if (event.phase === "campaign") {
     const candidate = findCitizen(city, event.candidates[event.campaign_turn % event.candidates.length].citizen_id);
+    if (candidate.citizen_id === player) {
+      // You speak for yourself: the AI never campaigns in your character's voice.
+      event.campaign_turn++;
+      addBeat(city, storyId, { icon: "📣", text: `You're ${first(candidate)}: walk up to voters and make your case in Talk. Ballots open after the other candidate's turn.` });
+      return saveAndReturn(city);
+    }
     const decision = await decide(electionRequest(city, candidate, "campaign"));
     if (isStale(city)) return requireSessionCity();
     event.campaign_turn++;
-    const target = decision.target_id ? city.citizens.find((c) => c.citizen_id === decision.target_id && c !== candidate) : undefined;
+    const canvassed = new Set(event.campaign_log.map((l) => l.target_id));
+    const voters = event.voter_ids.filter((id) => id !== candidate.citizen_id && !event.candidates.some((c) => c.citizen_id === id)).map((id) => findCitizen(city, id));
+    // With only two campaign turns, a candidate who "takes a break" still goes to see a voter, nearest first.
+    const target = (decision.target_id ? voters.find((c) => c.citizen_id === decision.target_id) : undefined)
+      ?? voters.filter((c) => !canvassed.has(c.citizen_id) && c.citizen_id !== player).sort((a, b) => Number(b.current_location_id === candidate.current_location_id) - Number(a.current_location_id === candidate.current_location_id))[0];
     if (!target) {
-      addBeat(city, storyId, { icon: "📝", text: `${candidate.name.split(" ")[0]} spent the time polishing their speech instead of campaigning.` });
+      addBeat(city, storyId, { icon: "📝", text: `${first(candidate)} spent the time polishing their speech instead of campaigning.` });
       return saveAndReturn(city);
     }
-    addBeat(city, storyId, { icon: "🚶", text: `${candidate.name.split(" ")[0]} goes to win over ${target.name.split(" ")[0]}: ${decision.intention || decision.reason}` });
+    event.campaign_log.push({ candidate_id: candidate.citizen_id, target_id: target.citizen_id, conversation_id: "" });
     candidate.current_location_id = target.current_location_id;
     candidate.x = candidate.target_x = target.x;
     candidate.y = candidate.target_y = target.y;
+    if (target.citizen_id === player) {
+      addBeat(city, storyId, { icon: "🙋", text: `${first(candidate)} came to find you, ${first(target)}, to ask for your vote. Answer them in Talk.` });
+      return saveAndReturn(city);
+    }
+    addBeat(city, storyId, { icon: "🚶", text: `${first(candidate)} goes to win over ${first(target)}${decision.target_id === target.citizen_id && decision.intention ? `: ${decision.intention}` : "."}` });
     const response = await generate({ city, actor_id: candidate.citizen_id, target_id: target.citizen_id, require_conversation: true,
-      task: `Ask ${target.name} for their vote in the student-council election.`, observations: [...electionNotice(city), `Your private campaign intention: ${decision.intention || decision.reason}`], memories: [],
+      task: `Ask ${target.name} for their vote in the student-council election.`,
+      observations: [...electionNotice(city), `You are ${candidate.name}, one of the two candidates. Say that you're running, pitch your own platform in your own words and ask ${first(target)} for their vote.`,
+        `Your private campaign intention: ${decision.intention || decision.reason}`], memories: [],
       private_memories: { [candidate.citizen_id]: privateMemoryContext(candidate), [target.citizen_id]: privateMemoryContext(target) } });
     if (isStale(city)) return requireSessionCity();
     applyAutonomousCognition(city, candidate, target, { event_id: event.event_id, location_id: target.current_location_id } as CityEvent, response);
     return saveAndReturn(city);
   }
   // Voting: everyone decides privately and at the same time; a failed decision counts as an abstention.
-  const voters = event.voter_ids.filter((id) => !event.ballots.some((b) => b.voter_id === id));
+  // Your own ballot is yours: everyone else votes, then the election waits for you.
+  const voters = event.voter_ids.filter((id) => id !== player && !event.ballots.some((b) => b.voter_id === id));
+  if (!voters.length) return city;
   const decisions = await Promise.all(voters.map((id) => decide(electionRequest(city, findCitizen(city, id), "vote")).catch(() => null)));
   if (isStale(city)) return requireSessionCity();
   voters.forEach((id, i) => {
@@ -796,6 +854,7 @@ export async function sessionAdvanceAutoElection(generate: GenerateCognition, de
     applyBallot(city, id, d && event.candidates.some((c) => c.citizen_id === d.vote_for) ? d.vote_for : null, d?.reason ?? "I couldn't make up my mind.", "agent");
     if (d?.mood) findCitizen(city, id).mood = d.mood;
   });
+  if (player && liveElection(city)) addBeat(city, storyId, { icon: "🗳️", text: `Everyone else has voted. It's down to your ballot, ${first(findCitizen(city, player))}.` });
   return saveAndReturn(city);
 }
 
@@ -803,7 +862,7 @@ export async function sessionCastVote(voteFor: string | null) {
   const city = requireSessionCity();
   const voter = String(city.policy.player_citizen_id ?? "");
   findCitizen(city, voter);
-  applyBallot(city, voter, voteFor, "I chose this ballot while controlled by the player.", "player");
+  applyBallot(city, voter, voteFor, voteFor ? "I made up my own mind after hearing the candidates." : "Neither candidate won me over.", "player");
   return saveAndReturn(city);
 }
 

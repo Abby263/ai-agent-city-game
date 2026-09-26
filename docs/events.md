@@ -26,15 +26,23 @@ There is no separate Vote tab: an election is a situation like any other.
 
 1. Open **Create** and pick two students under **Student-council election**.
 2. Each candidate's Deep Agent writes its own platform; they appear in the story.
-3. Each candidate walks to a resident of their choice and campaigns in a real
-   conversation (two campaign talks, played as cutscenes).
-4. Every student then votes privately and in parallel. A failed ballot counts as an
-   abstention; a tie has no winner.
-5. The winner (or tie) and the count appear in the story and in News. The clock is
-   not stopped, so the town carries on.
+3. Each candidate walks to a voter of their choice (never the rival) and campaigns in a
+   real conversation: they say they're running, pitch their platform and ask for the vote.
+   If the agent would rather take a break, it still goes to see a voter it hasn't met.
+4. Every student then votes privately and in parallel. A failed ballot counts as an abstention.
+5. The winner and the count appear in the story and in News. A tie is settled by drawing
+   lots, as Japanese elections do, so a created election always ends with a winner.
+
+**Playing a part.** If you're playing as a student, the election treats you as one:
+
+- As a **voter**, your ballot is yours. Everyone else votes, then the Happening now card
+  waits for you: **Ask Zara first** brings that candidate over and opens Talk with them,
+  so you can question them in your own words before you **Vote** or **Abstain**.
+  A candidate who picks you to canvass comes to find you instead of speaking for you.
+- As a **candidate**, the AI never campaigns in your voice: your turn is yours to talk to
+  voters in Talk, and **Open the ballots** ends the campaign when you're ready.
 
 Candidates can vote, including for themselves; one ballot per resident is enforced.
-You can still talk to candidates yourself while they campaign by playing as a resident.
 
 ## Agent Decisions and Game Rules
 
