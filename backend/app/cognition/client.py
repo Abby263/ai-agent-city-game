@@ -5,6 +5,9 @@ from dataclasses import dataclass, field
 from typing import Any, TypedDict
 
 from app.cognition.deep_agents import DeepAgentRuntime
+from app.safety import CHILD_SAFETY_RULES
+from app.cognition.encounters import MeetingAction
+from app.cognition.errors import CognitionUnavailableError, CognitionValidationError, provider_failure
 from app.config import Settings
 
 try:
@@ -90,6 +93,10 @@ TASK_PLAN_SCHEMA: dict[str, Any] = {
 class PrivateExchangeState(TypedDict):
     lines: list[dict[str, str]]
     turn_results: dict[str, list[dict[str, Any]]]
+    meeting_offer: dict[str, Any] | None
+    meeting_plan: dict[str, Any] | None
+    meeting_locations: list[dict[str, str]]
+    meeting_now: int | None
 
 
 @dataclass
@@ -104,6 +111,8 @@ class CognitionResult:
     importance: float = 0.5
     participant_memories: dict[str, str] = field(default_factory=dict)
     participant_reflections: dict[str, str] = field(default_factory=dict)
+    participant_outcomes: dict[str, dict[str, Any]] = field(default_factory=dict)
+    meeting_plan: dict[str, Any] | None = None
 
 
 @dataclass
@@ -115,24 +124,58 @@ class TaskPlanResult:
     player_visible_plan: str = ""
 
 
-class CognitionUnavailableError(RuntimeError):
-    pass
-
-
-class CognitionValidationError(RuntimeError):
-    pass
-
-
 class CitizenCognitionClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.deep_agents = DeepAgentRuntime(settings)
         self.client = None
-        if settings.real_llm_enabled and OpenAI is not None:
-            self.client = OpenAI(api_key=settings.openai_api_key)
+        if settings.real_llm_enabled:
+            if settings.llm_provider == "gemini":
+                from google import genai
+                from google.genai import types
+
+                self.client = genai.Client(
+                    api_key=settings.gemini_api_key, vertexai=False,
+                    http_options=types.HttpOptions(timeout=40000, retry_options=types.HttpRetryOptions(attempts=1)),
+                )
+            elif OpenAI is not None:
+                self.client = OpenAI(api_key=settings.openai_api_key, timeout=40, max_retries=0)
+
+    def _generate_json(self, system: str, prompt: dict[str, Any], schema: dict[str, Any], name: str) -> dict[str, Any]:
+        if not self.client:
+            raise CognitionUnavailableError(f"Configure the backend API key for {self.settings.llm_provider}.")
+        system = f"{system} {CHILD_SAFETY_RULES}"
+        try:
+            if self.settings.llm_provider == "gemini":
+                response = self.client.models.generate_content(
+                    model=self.settings.gemini_model,
+                    contents=json.dumps(prompt),
+                    config={"system_instruction": system, "response_mime_type": "application/json",
+                            "response_json_schema": schema, "max_output_tokens": 4096},
+                )
+                text = response.text
+            else:
+                request: dict[str, Any] = {
+                    "model": self.settings.openai_model,
+                    "input": [{"role": "system", "content": system}, {"role": "user", "content": json.dumps(prompt)}],
+                    "text": {"format": {"type": "json_schema", "name": name, "schema": schema, "strict": True}},
+                }
+                if self._supports_reasoning(self.settings.openai_model):
+                    request["reasoning"] = {"effort": "low"}
+                    request["text"]["verbosity"] = "low"
+                text = self.client.responses.create(**request).output_text
+        except Exception as error:
+            raise provider_failure(error, self.settings.llm_provider) from None
+        try:
+            parsed = json.loads(text or "")
+            if not isinstance(parsed, dict):
+                raise ValueError("Expected a JSON object")
+            return parsed
+        except (ValueError, TypeError):
+            raise CognitionValidationError("The AI did not return a valid structured response. No result was committed.") from None
 
     def embed(self, text: str) -> list[float] | None:
-        if not self.client:
+        if not self.client or self.settings.llm_provider == "gemini":
             return None
         response = self.client.embeddings.create(
             input=text,
@@ -153,10 +196,10 @@ class CitizenCognitionClient:
         require_conversation: bool = False,
     ) -> CognitionResult:
         if not self.client:
-            raise CognitionUnavailableError("OpenAI cognition is unavailable. Set LLM_MODE=real and OPENAI_API_KEY.")
+            raise CognitionUnavailableError(f"Cognition is unavailable. Configure the backend API key for {self.settings.llm_provider}.")
 
         system = (
-            "You are simulating one believable citizen in AgentCity, a living 2D AI city game. "
+            "You are simulating one believable citizen in AgentCity, a living 3D AI city game. "
             "Stay grounded in the citizen's profession, needs, relationships, memories, and the "
             "current city situation. Produce compact JSON only. Do not control movement; explain "
             "human intent, thoughts, plans, memories, and social behavior."
@@ -193,26 +236,7 @@ class CitizenCognitionClient:
             ],
         }
 
-        request: dict[str, Any] = {
-            "model": self.settings.openai_model,
-            "input": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": json.dumps(prompt)},
-            ],
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": "citizen_cognition",
-                    "schema": COGNITION_SCHEMA,
-                    "strict": True,
-                },
-            },
-        }
-        if self._supports_reasoning(self.settings.openai_model):
-            request["reasoning"] = {"effort": "low"}
-            request["text"]["verbosity"] = "low"
-
-        parsed = json.loads(self.client.responses.create(**request).output_text)
+        parsed = self._generate_json(system, prompt, COGNITION_SCHEMA, "citizen_cognition")
         errors = self._conversation_errors(
             parsed,
             actor_id=str(citizen["citizen_id"]),
@@ -231,12 +255,7 @@ class CitizenCognitionClient:
                     "Write the actual lines spoken by both citizens."
                 ),
             }
-            repair_request = dict(request)
-            repair_request["input"] = [
-                {"role": "system", "content": system},
-                {"role": "user", "content": json.dumps(repair_prompt)},
-            ]
-            parsed = json.loads(self.client.responses.create(**repair_request).output_text)
+            parsed = self._generate_json(system, repair_prompt, COGNITION_SCHEMA, "citizen_cognition")
             errors = self._conversation_errors(
                 parsed,
                 actor_id=str(citizen["citizen_id"]),
@@ -258,9 +277,13 @@ class CitizenCognitionClient:
         actor_memories: list[str],
         target_memories: list[str],
         event_context: str,
+        player_utterance: str | None = None,
+        autonomous: bool = False,
+        meeting_locations: list[dict[str, str]] | None = None,
+        meeting_now: int | None = None,
     ) -> CognitionResult:
         if not self.client:
-            raise CognitionUnavailableError("OpenAI cognition is unavailable. Set LLM_MODE=real and OPENAI_API_KEY.")
+            raise CognitionUnavailableError(f"Cognition is unavailable. Configure the backend API key for {self.settings.llm_provider}.")
 
         self.deep_agents.prepare_citizen_agent(actor)
         self.deep_agents.prepare_citizen_agent(target)
@@ -280,8 +303,8 @@ class CitizenCognitionClient:
                 observations=observations,
                 private_memories=actor_memories,
                 event_context=event_context,
-                turn_goal="Open the conversation naturally and make progress on the player's task.",
-                enforce_task_alignment=True,
+                turn_goal="Open on your reason for approaching this person, from the supplied encounter context. Be yourself, not a generic greeting script." if autonomous else "Open the conversation naturally and make progress on the player's task.",
+                enforce_task_alignment=not autonomous,
             )
 
         def target_reply(state: PrivateExchangeState) -> PrivateExchangeState:
@@ -290,10 +313,10 @@ class CitizenCognitionClient:
                 speaker=target,
                 listener=actor,
                 city_time=city_time,
-                task=task,
-                observations=observations,
+                task="Respond to what was said to you. You may decline, disagree, ask a follow-up, or leave.",
+                observations=[f"You are speaking with {actor['name']} at your current location."],
                 private_memories=target_memories,
-                event_context=event_context,
+                event_context="",
                 turn_goal="Reply honestly from your own private memory. If you do not know a fact, say so.",
                 enforce_task_alignment=False,
             )
@@ -319,11 +342,20 @@ class CitizenCognitionClient:
         graph_builder.add_node("actor_open", actor_open)
         graph_builder.add_node("target_reply", target_reply)
         graph_builder.add_node("actor_follow_up", actor_follow_up)
-        graph_builder.add_edge(START, "actor_open")
+        graph_builder.add_edge(START, "target_reply" if player_utterance else "actor_open")
         graph_builder.add_edge("actor_open", "target_reply")
-        graph_builder.add_edge("target_reply", "actor_follow_up")
-        graph_builder.add_edge("actor_follow_up", END)
-        final_state = graph_builder.compile().invoke({"lines": [], "turn_results": {}})
+        def continue_exchange(state: PrivateExchangeState) -> str:
+            last_id = state["lines"][-1]["speaker_id"]
+            last = state["turn_results"][last_id][-1]
+            if player_utterance or last.get("end_conversation") or len(state["lines"]) >= (4 if autonomous else 6):
+                return END
+            return "target_reply" if last_id == actor["citizen_id"] else "actor_follow_up"
+
+        graph_builder.add_conditional_edges("target_reply", continue_exchange)
+        graph_builder.add_conditional_edges("actor_follow_up", continue_exchange)
+        initial_lines = [{"speaker_id": str(actor["citizen_id"]), "text": player_utterance}] if player_utterance else []
+        final_state = graph_builder.compile().invoke({"lines": initial_lines, "turn_results": {}, "meeting_offer": None,
+            "meeting_plan": None, "meeting_locations": meeting_locations or [], "meeting_now": meeting_now})
 
         lines = final_state["lines"]
         actor_id = str(actor["citizen_id"])
@@ -338,11 +370,15 @@ class CitizenCognitionClient:
             raise CognitionValidationError("; ".join(errors))
 
         turn_results = final_state["turn_results"]
-        actor_result = turn_results[actor_id][-1]
+        actor_result = turn_results.get(actor_id, [{}])[-1] if not player_utterance else {
+            "thought": "", "mood": actor.get("mood", "Calm"),
+            "memory": f"I said: {player_utterance}", "reflection": "", "importance": 0.5,
+        }
         target_result = turn_results[target_id][-1]
+        witnessed = "\n".join(f"{actor['name'] if line['speaker_id'] == actor_id else target['name']} said: {line['text']}" for line in lines)
         participant_memories = {
-            actor_id: str(actor_result["memory"]),
-            target_id: str(target_result["memory"]),
+            actor_id: f"I witnessed this conversation at {city_time}. Reported claims are not independently verified.\n{witnessed}",
+            target_id: f"I witnessed this conversation at {city_time}. Reported claims are not independently verified.\n{witnessed}",
         }
         participant_reflections = {
             actor_id: str(actor_result["reflection"]),
@@ -361,6 +397,12 @@ class CitizenCognitionClient:
             importance=importance,
             participant_memories=participant_memories,
             participant_reflections=participant_reflections,
+            meeting_plan=final_state.get("meeting_plan"),
+            participant_outcomes={
+                citizen_id: {key: result.get(key) for key in ("invitation_response", "relationship_effect", "relationship_reason", "task_complete", "feelings", "mood", "thought")}
+                for citizen_id, result in ((actor_id, actor_result), (target_id, target_result))
+                if not player_utterance or citizen_id != actor_id
+            },
         )
 
     def _append_private_turn(
@@ -388,14 +430,36 @@ class CitizenCognitionClient:
             event_context=event_context,
             turn_goal=turn_goal,
             enforce_task_alignment=enforce_task_alignment,
+            meeting_offer=state.get("meeting_offer"),
+            meeting_locations=state.get("meeting_locations", []),
         )
         speaker_id = str(speaker["citizen_id"])
+        offer = state.get("meeting_offer")
+        plan = state.get("meeting_plan")
+        if result.get("meeting_action") and state.get("meeting_now") is not None:
+            try:
+                action = MeetingAction.model_validate(result["meeting_action"]).model_dump()
+                when = action["game_day"] * 1440 + action["game_minute"]
+                now = state["meeting_now"]
+                valid = now + 30 <= when <= now + 1440 and action["location_id"] in {p["location_id"] for p in state.get("meeting_locations", [])}
+                if valid and action["action"] == "propose":
+                    offer = {**action, "proposer_id": speaker_id}
+                elif valid and offer and offer["proposer_id"] != speaker_id and all(action[key] == offer[key] for key in ("location_id", "game_day", "game_minute")):
+                    if action["action"] == "accept":
+                        plan = {key: offer[key] for key in ("location_id", "game_day", "game_minute", "topic")}
+                        plan["actor_ids"] = [offer["proposer_id"], speaker_id]
+                    elif action["action"] == "decline":
+                        offer, plan = None, None
+            except (ValueError, TypeError):
+                pass  # An invalid proposed appointment must not invent a commitment.
         return {
             "lines": [*state["lines"], {"speaker_id": speaker_id, "text": str(result["spoken_line"])}],
             "turn_results": {
                 **state["turn_results"],
                 speaker_id: [*state["turn_results"].get(speaker_id, []), result],
             },
+            "meeting_offer": offer,
+            "meeting_plan": plan,
         }
 
     def _generate_private_turn(
@@ -411,6 +475,8 @@ class CitizenCognitionClient:
         event_context: str,
         turn_goal: str,
         enforce_task_alignment: bool,
+        meeting_offer: dict[str, Any] | None = None,
+        meeting_locations: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         prompt: dict[str, Any] = {
             "city_time": city_time,
@@ -441,18 +507,26 @@ class CitizenCognitionClient:
                 ),
             },
             "turn_goal": turn_goal,
+            "own_nature": speaker.get("personality", {}).get("nature", {}),
             "observations": observations,
             "private_memories_for_speaker_only": private_memories,
             "public_transcript_so_far": public_transcript,
+            "public_meeting_offer": meeting_offer,
+            "meeting_locations": meeting_locations or [],
             "event_context": event_context,
             "rules": [
                 "Write exactly one spoken line for the speaker.",
+                "When it fits your wishes, you may propose meeting again at a specific listed place and time within the next day, at least 30 city minutes from now. Say the place, time and purpose out loud. Do not propose at every encounter.",
+                "Only emit meeting_action if your spoken line explicitly proposes, accepts or declines that meeting. Accept only a public_meeting_offer from the OTHER person and copy its place/day/minute exactly. You may decline or leave it undecided. A proposal alone is not a shared plan.",
                 f"You are {speaker['name']}; every use of 'I' must refer to {speaker['name']}, not {listener['name']}.",
                 "The spoken line must serve the current player_task, not a prior memory.",
                 f"The current listener is {listener['name']}; do not replace them with another named person.",
                 "Use 'you' for the listener. Avoid gendered third-person pronouns for the listener.",
                 "Do not announce that you are about to go ask or talk to someone else when you are already speaking with the current listener.",
                 "Use a human tone with emotion, uncertainty, or a small follow-up when natural.",
+                "Let own_nature shape your voice, values, sensitivities and attempts to repair conflict. Do not recite trait labels. Traits are tendencies, not compulsory reactions or stereotypes.",
+                "Assess only YOUR feelings toward the listener, grounded in specific words in this exchange and your private history. Explain why your personal values make those words matter. Neutral and mixed reactions are valid; do not reward every greeting or force jealousy, affection or romance.",
+                "Use the exchange as a whole for your final emotional assessment, not a cumulative delta on each turn. The game applies that assessment once after the exchange.",
                 "If asked whether something happened and it is not in your private memory or public transcript, say you are not sure or have not heard.",
                 "Do not answer using another citizen's private memory.",
                 "When replying after another citizen answered, acknowledge what they said instead of restating it in first person.",
@@ -543,7 +617,7 @@ class CitizenCognitionClient:
         memories: list[str],
     ) -> TaskPlanResult:
         if not self.client:
-            raise CognitionUnavailableError("OpenAI task planning is unavailable. Set LLM_MODE=real and OPENAI_API_KEY.")
+            raise CognitionUnavailableError(f"Task planning is unavailable. Configure the backend API key for {self.settings.llm_provider}.")
 
         citizens = [
             {
@@ -592,27 +666,7 @@ class CitizenCognitionClient:
                 "player_visible_plan should be one short sentence the player can understand.",
             ],
         }
-        request: dict[str, Any] = {
-            "model": self.settings.openai_model,
-            "input": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": json.dumps(prompt)},
-            ],
-            "text": {
-                "format": {
-                    "type": "json_schema",
-                    "name": "citizen_task_plan",
-                    "schema": TASK_PLAN_SCHEMA,
-                    "strict": True,
-                },
-            },
-        }
-        if self._supports_reasoning(self.settings.openai_model):
-            request["reasoning"] = {"effort": "low"}
-            request["text"]["verbosity"] = "low"
-
-        response = self.client.responses.create(**request)
-        parsed = json.loads(response.output_text)
+        parsed = self._generate_json(system, prompt, TASK_PLAN_SCHEMA, "citizen_task_plan")
         result = TaskPlanResult(**parsed)
         unavailable_names = self._unavailable_named_people(task, citizens, locations)
         known_targets_mentioned = self._known_people_mentioned(task, citizens)

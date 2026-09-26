@@ -1,0 +1,82 @@
+citizen_id: cit_031
+name: Hannah Brooks
+age: 36
+profession: Bank clerk
+active: true
+work_location_id: loc_bank
+position:
+- 3
+- 3
+money: 720
+health: 90
+hunger: 30
+energy: 78
+stress: 35
+happiness: 70
+reputation: 60
+skills: []
+mood: Excited
+personality:
+  nature:
+    traits:
+    - Organised
+    - Warm
+    - Anxious
+    values: Security for her family and doing things properly.
+    voice: Makes lists out loud, asks caring follow-up questions.
+    sensitivity: Plans falling apart; feeling she is doing everything alone.
+    repair: Makes a plan together and says thank you.
+  appearance:
+    skin: '#f0c8a6'
+    hair: '#c49a5c'
+    shirt: '#c98ea7'
+    background: '#f3dce6'
+  playable: true
+current_thought: Eleven days until the due date. Is the cot even assembled?
+short_term_goals:
+- Finish the baby's room
+- Hand over my work before leave
+long_term_goals:
+- Give both kids a calm, happy home
+memory_summary: I work at Aobadai Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.
+relationship_scores:
+  cit_030: 88
+  cit_032: 78
+  cit_026: 90
+seed_memories:
+- memory_id: mem_seed_cit_031
+  content: I work at Aobadai Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.
+  importance: 0.8
+life:
+  sex: female
+  birthday_in_days: 150
+  height_cm: 165
+  weight_kg: 71
+  fitness: 50
+  household_id: home_a
+  parent_ids: []
+  partner_id: cit_030
+  children_ids:
+  - cit_026
+  relationship_status: married
+  job:
+    title: Bank clerk
+    location_id: loc_bank
+    hourly_wage: 24
+    start: 540
+    end: 1020
+    workdays:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  ambition:
+    goal: Welcome our second baby safely
+    kind: family
+    progress: 60
+  conditions: []
+  wants_children: true
+  pregnancy:
+    partner_id: cit_030
+    due_in_days: 11

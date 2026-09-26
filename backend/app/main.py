@@ -24,8 +24,9 @@ app.include_router(router)
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "service": "agentcity-api"}
+def health() -> dict[str, str | bool]:
+    return {"status": "ok", "service": "agentcity-api", "llm_provider": settings.llm_provider,
+            "llm_model": settings.llm_model, "llm_configured": settings.real_llm_enabled}
 
 
 @app.on_event("startup")

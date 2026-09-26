@@ -1,0 +1,46 @@
+citizen_id: cit_029
+name: Eliot Chen
+age: 13
+profession: Student
+active: true
+work_location_id: loc_school
+position: [8, 5]
+skills: [gardening, cooking]
+mood: Peaceful
+personality:
+  nature:
+    traits: ["Warm","Patient","Boundaried"]
+    values: "Keeping promises, including others, and having time to recharge."
+    voice: "Gentle practical questions and offers of help, without always agreeing."
+    sensitivity: "Repeated forgotten promises and being expected to mediate every conflict."
+    repair: "A kept small promise rebuilds trust; sometimes asks for quiet time first."
+  playable: true
+  student_arc: true
+  openness: 68
+  warmth: 85
+  conscientiousness: 75
+current_thought: It would be nice to share a snack and hear someone's story.
+short_term_goals:
+  - Invite someone to plant herbs at the park
+  - Learn what others like to eat
+long_term_goals:
+  - Start a small community garden with friends
+memory_summary: I enjoy growing herbs and cooking with family. I like bringing people together but need quiet time too. I feel hurt when promises are forgotten and appreciate sincere attempts to make things right.
+seed_memories:
+  - memory_id: mem_seed_cit_029
+    content: I arrived with a packet of basil seeds and a hope to make friends. No one has agreed to garden with me yet.
+life:
+  sex: male
+  birthday_in_days: 2
+  height_cm: 157
+  weight_kg: 46
+  fitness: 58
+  household_id: home_e
+  parent_ids:
+  - cit_036
+  grade: 81
+  ambition:
+    goal: Help the new kids feel at home
+    kind: social
+    progress: 30
+  conditions: []

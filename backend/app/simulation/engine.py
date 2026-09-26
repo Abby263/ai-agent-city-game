@@ -5,7 +5,7 @@ from uuid import uuid4
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.cognition.openai_client import CognitionUnavailableError
+from app.cognition.errors import CognitionUnavailableError
 from app.cognition.pipeline import CognitionPipeline, observations_by_actor
 from app.config import Settings
 from app.memory.store import MemoryStore
@@ -156,7 +156,7 @@ class SimulationEngine:
                 db,
                 state=state,
                 event_type="new_day",
-                description=f"Day {state.day} begins in Navora.",
+                description=f"Day {state.day} begins in Nakameguro.",
                 priority=2,
             )
         state.updated_at = utcnow()
@@ -238,7 +238,7 @@ class SimulationEngine:
                         db,
                         citizen_id=citizen.citizen_id,
                         kind="episodic",
-                        content="A flu outbreak is spreading through Navora, especially around the school and hospital.",
+                        content="A flu outbreak is spreading through Nakameguro, especially around the school and hospital.",
                         importance=0.82,
                         salience=0.86,
                     )
@@ -276,7 +276,7 @@ class SimulationEngine:
             actors = [citizen.citizen_id for citizen in citizens if citizen.profession in {"Engineer", "Mayor"}]
             for citizen in citizens:
                 citizen.stress = self._clamp(citizen.stress + 8 * severity_multiplier)
-            description = "A power outage disrupts routines across Navora."
+            description = "A power outage disrupts routines across Nakameguro."
 
         self._event(
             db,
@@ -340,7 +340,7 @@ class SimulationEngine:
 
             raise HTTPException(status_code=404, detail="Citizen not found")
         if not cognition:
-            raise CognitionUnavailableError("OpenAI task planning is required before a citizen can accept a task.")
+            raise CognitionUnavailableError("AI task planning is required before a citizen can accept a task.")
 
         task = request.task.strip()
         city_snapshot = self.get_state(db)

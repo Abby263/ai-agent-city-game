@@ -5,6 +5,7 @@ import type {
   CityState,
   CitizenAgent,
   Conversation,
+  ConversationImpact,
   MayorPolicyPayload,
   Memory,
   Relationship,
@@ -15,6 +16,20 @@ import type {
   SimulationMode,
   TriggerEventPayload,
 } from "@/lib/types";
+import { bondLabel, conversationImpact, emptyFeelings, evolveRelationship } from "@/lib/social";
+import { acceptMeeting, cityMinute, meetingFor, meetingMinute, sociallyAvailable } from "./encounters";
+import type { DecideSocial, EncounterContext } from "./encounters";
+import { currentElection, liveElection, electionNotice, recordBallot, tallyElection } from "./elections";
+import type { DecideElection, Election, ElectionDecisionRequest } from "./elections";
+import { assertPlayerTextSafe } from "./safety";
+import { isWeekend, routineStop, weekday, type RoutineContext } from "./routine";
+import { calendarDay, calendarStartFor, realCityTime } from "./calendar";
+import { dayWeather, weatherAt, type WeatherOverride } from "./weather";
+import { weatherEffects } from "./life";
+import { activeIncidents, applyScenario, type BondChange, type ScenarioRequest } from "./scenarios";
+import { actionBlocked, performAction, type ActionId, type ActionOutcome } from "./actions";
+import { bedRest, careNeeded, caregiverFor, ensureLife, gatheringFor, healthCap, lifeDay, lifeTick, recordMeal, relatives, shiftLife } from "./life";
+import type { BondLookup, LifeFactory, LifeSink } from "./life";
 
 const SESSION_VERSION = "v11";
 const CITY_KEY = `agentcity.${SESSION_VERSION}.city`;
@@ -28,7 +43,14 @@ type PlayerTaskData = {
   target_citizen_ids?: string[];
   completed_target_ids?: string[];
   current_target_index?: number;
-  task_kind?: "targeted_talk" | "greet_all" | "ask_all" | "self_answer" | "open_task" | "go_to_location" | "go_with_citizen";
+  task_kind?:
+    | "targeted_talk"
+    | "greet_all"
+    | "ask_all"
+    | "self_answer"
+    | "open_task"
+    | "go_to_location"
+    | "go_with_citizen";
   companion_confirmed?: boolean;
   plan_summary?: string;
   reasoning_summary?: string;
@@ -45,11 +67,18 @@ type CompanionTaskData = {
   status?: string;
 };
 
-type GenerateCognition = (request: SessionCognitionRequest) => Promise<SessionCognitionResponse>;
-type GenerateTaskPlan = (request: SessionTaskPlanRequest) => Promise<SessionTaskPlanResponse>;
+type GenerateCognition = (
+  request: SessionCognitionRequest,
+) => Promise<SessionCognitionResponse>;
+type GenerateTaskPlan = (
+  request: SessionTaskPlanRequest,
+) => Promise<SessionTaskPlanResponse>;
 
 export function sessionMemoryEnabled() {
-  return typeof window !== "undefined" && process.env.NEXT_PUBLIC_MEMORY_MODE !== "server";
+  return (
+    typeof window !== "undefined" &&
+    process.env.NEXT_PUBLIC_MEMORY_MODE !== "server"
+  );
 }
 
 export function getSessionCity() {
@@ -59,13 +88,57 @@ export function getSessionCity() {
 
 export function saveSessionCity(city: CityState) {
   if (!sessionMemoryEnabled()) return;
+  city.revision = (getSessionCity()?.revision ?? 0) + 1;
   writeJson(CITY_KEY, normalizeCity(city));
 }
 
 export function seedSession(city: CityState) {
   if (!sessionMemoryEnabled()) return city;
   const existing = getSessionCity();
-  if (existing) return existing;
+  if (existing) {
+    // Join newly enabled YAML residents without erasing the player's world or journals.
+    const known = new Set(existing.citizens.map((c) => c.citizen_id));
+    const arrivals = city.citizens.filter((c) => !known.has(c.citizen_id));
+    let natureChanged = false;
+    for (const resident of existing.citizens) {
+      const nature = city.citizens.find((c) => c.citizen_id === resident.citizen_id)?.personality.nature;
+      if (nature && JSON.stringify(resident.personality.nature) !== JSON.stringify(nature)) {
+        // Only profile-owned nature changes; preserve tasks, learned memories and current emotions.
+        resident.personality = { ...resident.personality, nature: clone(nature) };
+        natureChanged = true;
+      }
+    }
+    // Bring older worlds up to date: new places, and life data (family, body, job) for existing residents.
+    let lifeChanged = false;
+    for (const place of city.locations) {
+      const known = existing.locations.find((l) => l.location_id === place.location_id);
+      if (!known) { existing.locations.push(clone(place)); lifeChanged = true; }
+      else if (known.name !== place.name) { known.name = place.name; lifeChanged = true; }
+    }
+    if (existing.city_name !== city.city_name) { existing.city_name = city.city_name; lifeChanged = true; }
+    for (const resident of existing.citizens) {
+      if (resident.life) continue;
+      const profile = city.citizens.find((c) => c.citizen_id === resident.citizen_id)?.life;
+      resident.life = profile ? shiftLife(clone(profile), existing.clock.day - 1) : ensureLife(resident, existing.clock.day);
+      lifeChanged = true;
+    }
+    if (!existing.calendar_start) { existing.calendar_start = calendarStartFor(existing.clock.day); lifeChanged = true; }
+    if (!existing.policy.time_mode) { existing.policy.time_mode = city.policy.time_mode; lifeChanged = true; }
+    existing.departed ??= [];
+    existing.gatherings ??= [];
+    existing.life_log ??= [];
+    if (!arrivals.length) return natureChanged || lifeChanged ? saveAndReturn(existing) : existing;
+    const newcomers = clone(arrivals);
+    for (const person of newcomers) if (person.life) shiftLife(person.life, existing.clock.day - 1);
+    existing.citizens.push(...newcomers);
+    for (const citizen of arrivals) {
+      ensureCitizenMemories(existing, citizen.citizen_id);
+      addEvent(existing, { event_type: "citizen_arrived", actors: [citizen.citizen_id],
+        location_id: citizen.home_location_id, description: `${citizen.name} has joined the neighborhood.`, priority: 2 });
+    }
+    ensureRelationships(existing);
+    return saveAndReturn(existing);
+  }
 
   const normalized = normalizeCity(city);
   writeJson(CITY_KEY, normalized);
@@ -83,16 +156,20 @@ export function sessionMemories(citizenId: string) {
     .slice(0, 80);
 }
 
-export function sessionRelationships(citizenId: string) {
+export function sessionRelationships(citizenId?: string) {
   const city = getSessionCity();
   const relationships = ensureRelationships(city);
-  return relationships.filter((relationship) => relationship.citizen_id === citizenId);
+  return relationships.filter(
+    (relationship) => !citizenId || relationship.citizen_id === citizenId,
+  );
 }
 
 export function sessionConversations(citizenId?: string) {
   const conversations = readJson<Conversation[]>(CONVERSATIONS_KEY) ?? [];
   const filtered = citizenId
-    ? conversations.filter((conversation) => conversation.actor_ids.includes(citizenId))
+    ? conversations.filter((conversation) =>
+        conversation.actor_ids.includes(citizenId),
+      )
     : conversations;
   return filtered
     .sort((a, b) => b.game_day - a.game_day || b.game_minute - a.game_minute)
@@ -120,16 +197,22 @@ function clockLabel(minuteOfDay: number) {
 
 export async function sessionStart() {
   const city = requireSessionCity();
-  if (city.simulation_mode === "manual" && activeTaskCitizens(city).length === 0) {
+  if (
+    !isLive(city) &&
+    city.simulation_mode === "manual" &&
+    activeTaskCitizens(city).length === 0
+  ) {
     city.clock.running = false;
     addEvent(city, {
       event_type: "manual_mode_waiting",
-      description: "Manual mode is waiting for the player to assign a student task.",
+      description:
+        "Manual mode is waiting for the player to assign a student task.",
       priority: 1,
     });
     return saveAndReturn(city);
   }
   city.clock.running = true;
+  delete city.policy.autonomy_error;
   addEvent(city, {
     event_type: "simulation_started",
     description: "The city simulation started.",
@@ -149,15 +232,124 @@ export async function sessionPause() {
   return saveAndReturn(city);
 }
 
+export async function sessionTakeControl(citizenId: string | null) {
+  const city = requireSessionCity();
+  const election = liveElection(city);
+  if (election?.waiting_for_player?.target_id !== citizenId && election) election.waiting_for_player = undefined;
+  if (citizenId) {
+    const citizen = findCitizen(city, citizenId);
+    citizen.personality = {
+      ...citizen.personality,
+      player_task: null,
+      companion_task: null,
+    };
+    citizen.current_activity = "Taking a moment";
+    citizen.target_x = citizen.x;
+    citizen.target_y = citizen.y;
+  }
+  city.policy = {
+    ...city.policy,
+    player_citizen_id: citizenId,
+    player_destination: null,
+  };
+  addEvent(city, {
+    event_type: "player_control",
+    actors: citizenId ? [citizenId] : [],
+    description: citizenId
+      ? `You are now playing as ${findCitizen(city, citizenId).name}.`
+      : "You returned control to the citizens.",
+    priority: 1,
+  });
+  return saveAndReturn(city);
+}
+
+export async function sessionWalkTo(locationId: string) {
+  const city = requireSessionCity();
+  const citizen = findCitizen(city, String(city.policy.player_citizen_id));
+  const location = city.locations.find(
+    (item) => item.location_id === locationId,
+  );
+  if (!location) throw new Error("That destination is unavailable.");
+  citizen.target_x = location.x + Math.floor(location.width / 2);
+  citizen.target_y = location.y + Math.floor(location.height / 2);
+  citizen.current_activity = `Walking to ${location.name}`;
+  city.policy = { ...city.policy, player_destination: locationId };
+  city.clock.running = true;
+  return saveAndReturn(city);
+}
+
+export async function sessionSpeak(
+  targetId: string,
+  text: string,
+  generate: GenerateCognition,
+) {
+  const city = requireSessionCity();
+  const actor = findCitizen(city, String(city.policy.player_citizen_id));
+  const target = findCitizen(city, targetId);
+  if (
+    actor === target ||
+    actor.current_location_id !== target.current_location_id ||
+    city.policy.player_destination
+  ) {
+    throw new Error("Meet this citizen at the same location before speaking.");
+  }
+  const utterance = text.trim();
+  if (!utterance || utterance.length > 600)
+    throw new Error("Write between 1 and 600 characters.");
+  assertPlayerTextSafe(utterance);
+  const response = await generate({
+    city,
+    actor_id: actor.citizen_id,
+    target_id: targetId,
+    require_conversation: true,
+    task: "Respond to the player's spoken words.",
+    player_utterance: utterance,
+    observations: [],
+    memories: [],
+    private_memories: {
+      [actor.citizen_id]: privateMemoryContext(actor),
+      [targetId]: privateMemoryContext(target),
+    },
+  });
+  if (isStale(city)) return requireSessionCity();
+  const source = {
+    event_id: newId("speech"),
+    location_id: actor.current_location_id,
+  } as CityEvent;
+  applyAutonomousCognition(city, actor, target, source, response);
+  actor.current_activity = `Talking with ${target.name}`;
+  city.policy.player_lines = Number(city.policy.player_lines ?? 0) + 1;
+  return saveAndReturn(city);
+}
+
+export function exportSession() {
+  const city = requireSessionCity();
+  return {
+    format: "agentcity-save",
+    version: 1,
+    city,
+    relationships: ensureRelationships(city),
+    conversations: sessionConversations(),
+    memories: Object.fromEntries(
+      city.citizens.map((citizen) => [
+        citizen.citizen_id,
+        readJson<Memory[]>(citizenMemoryKey(citizen.citizen_id)) ?? [],
+      ]),
+    ),
+  };
+}
+
 export async function sessionSetMode(mode: SimulationMode) {
   const city = requireSessionCity();
   const previousMode = city.simulation_mode;
   city.simulation_mode = mode;
   city.policy = { ...city.policy, simulation_mode: mode };
-  city.clock.running = mode === "autonomous";
+  city.clock.running = mode === "autonomous" || isLive(city);
+  delete city.policy.autonomy_error;
   if (previousMode !== mode) {
     addEvent(city, {
-      event_type: mode === "manual" ? "manual_mode_enabled" : "autonomous_mode_enabled",
+      event_type:
+        mode === "manual" ? "manual_mode_enabled" : "autonomous_mode_enabled",
       description:
         mode === "manual"
           ? "Manual mode enabled. The city waits until the player assigns a student task."
@@ -168,11 +360,22 @@ export async function sessionSetMode(mode: SimulationMode) {
   return saveAndReturn(city);
 }
 
-export async function sessionAssignTask(citizenId: string, payload: AssignTaskPayload, generateTaskPlan: GenerateTaskPlan) {
+export async function sessionAssignTask(
+  citizenId: string,
+  payload: AssignTaskPayload,
+  generateTaskPlan: GenerateTaskPlan,
+) {
   const city = requireSessionCity();
   const citizen = findCitizen(city, citizenId);
   const task = payload.task.trim();
-  const taskPlan = await planManualTask(city, citizen, task, generateTaskPlan).catch(() => null);
+  assertPlayerTextSafe(task);
+  const taskPlan = await planManualTask(
+    city,
+    citizen,
+    task,
+    generateTaskPlan,
+  ).catch(() => null);
+  if (isStale(city)) return requireSessionCity();
   if (!taskPlan) {
     blockManualTask(
       city,
@@ -182,7 +385,8 @@ export async function sessionAssignTask(citizenId: string, payload: AssignTaskPa
         status: "blocked",
         task_kind: "open_task",
         location_id: citizen.current_location_id,
-        plan_summary: "The AI planner was unavailable, so the citizen could not decide how to act.",
+        plan_summary:
+          "The AI planner was unavailable, so the citizen could not decide how to act.",
       },
       "agent_planning_blocked",
       `${citizen.name} could not plan the player task because AI planning was unavailable: ${task}`,
@@ -210,7 +414,10 @@ export async function sessionAssignTask(citizenId: string, payload: AssignTaskPa
   };
   citizen.current_activity = `Task: ${task}`;
   citizen.current_thought = `The player asked me to: ${task}. I should focus on that next.`;
-  citizen.short_term_goals = [`Player task: ${task}`, ...withoutPlayerTask(citizen.short_term_goals)].slice(0, 5);
+  citizen.short_term_goals = [
+    `Player task: ${task}`,
+    ...withoutPlayerTask(citizen.short_term_goals),
+  ].slice(0, 5);
   if (city.simulation_mode === "manual") {
     city.clock.running = true;
   }
@@ -227,7 +434,9 @@ export async function sessionAssignTask(citizenId: string, payload: AssignTaskPa
   addEvent(city, {
     event_type: "player_task",
     location_id: locationId,
-    actors: [citizen.citizen_id, ...taskPlan.target_citizen_ids].filter(Boolean),
+    actors: [citizen.citizen_id, ...taskPlan.target_citizen_ids].filter(
+      Boolean,
+    ),
     description: task,
     payload: {
       task,
@@ -271,16 +480,33 @@ export async function sessionCloseTask(citizenId: string) {
     payload: { task: task.task },
     priority: 2,
   });
-  if (city.simulation_mode === "manual" && activeTaskCitizens(city).length === 0) {
+  if (
+    city.simulation_mode === "manual" &&
+    activeTaskCitizens(city).length === 0
+  ) {
     city.clock.running = false;
   }
   return saveAndReturn(city);
 }
 
-export async function sessionTick(generateCognition: GenerateCognition) {
+export async function sessionTick(generateCognition: GenerateCognition, decideElection?: DecideElection, decideSocial?: DecideSocial) {
   const city = requireSessionCity();
-  const updateCitizens = city.simulation_mode === "manual" ? activeTaskCitizens(city) : city.citizens;
-  if (city.simulation_mode === "manual" && updateCitizens.length === 0) {
+  const checkedCognition: GenerateCognition = async (request) => {
+    const response = await generateCognition(request);
+    if (isStale(city)) throw new Error("This action was interrupted.");
+    return response;
+  };
+  const live = isLive(city);
+  const updateCitizens =
+    city.simulation_mode === "manual" && !live
+      ? activeTaskCitizens(city)
+      : city.citizens;
+  if (
+    !live &&
+    city.simulation_mode === "manual" &&
+    updateCitizens.length === 0 &&
+    !city.policy.player_destination
+  ) {
     city.clock.running = false;
     return saveAndReturn(city);
   }
@@ -293,63 +519,265 @@ export async function sessionTick(generateCognition: GenerateCognition) {
     city.clock.day += 1;
     addEvent(city, {
       event_type: "new_day",
-      description: `Day ${city.clock.day} begins in Navora.`,
+      description: `${weekday(city.clock.day)}, day ${city.clock.day} begins in Nakameguro.${isWeekend(city.clock.day) ? " No school today!" : ""}`,
       priority: 2,
     });
+    lifeDay(city, lifeSink(city), bondLookup(city), lifeFactory(city));
+    // Meguro Community Garden's produce restocks the market and the cafe every morning.
+    const farming = city.citizens.some((c) => c.life?.job?.location_id === "loc_farm");
+    for (const place of city.locations)
+      if (["loc_market", "loc_restaurant"].includes(place.location_id))
+        place.inventory.food = Math.min(120, Number(place.inventory.food ?? 0) + (farming ? 45 : 25));
   }
 
+  refreshWeather(city, previousMinute);
   const producedEvents: CityEvent[] = [];
   for (const citizen of updateCitizens) {
+    if (citizen.citizen_id === city.policy.player_citizen_id) continue;
+    if (!city.citizens.includes(citizen)) continue;
     producedEvents.push(...updateCitizen(city, citizen, previousMinute));
   }
-
-  if (city.simulation_mode === "autonomous") {
-    producedEvents.push(...runAutonomousSocial(city));
+  // Bodies, feelings, work and illness carry on for everyone, including the player's citizen.
+  const sink = lifeSink(city), bond = bondLookup(city);
+  for (const citizen of city.citizens) {
+    ensureLife(citizen, city.clock.day);
+    lifeTick(city, citizen, sink, bond);
   }
-
-  const cognitionCandidate = updateCitizens.find((citizen) => {
-    const task = playerTask(citizen);
-    return task?.status === "active" && task.last_cognition_tick !== city.clock.tick;
-  });
-  if (cognitionCandidate) {
-    await runTaskCognition(city, cognitionCandidate, generateCognition).catch(() => {
-      const task = playerTask(cognitionCandidate);
-      if (task) {
-        blockManualTask(
-          city,
-          cognitionCandidate,
-          task,
-          "agent_cognition_blocked",
-          `${cognitionCandidate.name} could not continue the task because AI cognition was unavailable: ${task.task}`,
-        );
-      }
-    });
-  } else if (city.simulation_mode === "autonomous") {
-    const socialMoment = producedEvents.find((event) => event.event_type === "social_opportunity");
-    if (socialMoment) {
-      await runAutonomousCognition(city, socialMoment, generateCognition).catch(() => {
-        addEvent(city, {
-          event_type: "agent_cognition_blocked",
-          location_id: socialMoment.location_id,
-          actors: socialMoment.actors,
-          description: "An autonomous conversation could not continue because AI cognition was unavailable.",
-          payload: { source_event_id: socialMoment.event_id },
-          priority: 3,
-        });
+  const player = city.citizens.find(
+    (item) => item.citizen_id === city.policy.player_citizen_id,
+  );
+  if (player && typeof city.policy.player_destination === "string") {
+    moveToward(player, player.target_x, player.target_y, city);
+    if (player.x === player.target_x && player.y === player.target_y) {
+      player.current_location_id = city.policy.player_destination;
+      const visited = Array.isArray(city.policy.places_visited) ? (city.policy.places_visited as string[]) : [];
+      city.policy.places_visited = [...new Set([...visited, player.current_location_id])];
+      player.current_activity = `At ${locationName(city, player.current_location_id)}`;
+      city.policy.player_destination = null;
+      addEvent(city, {
+        event_type: "citizen_arrived",
+        actors: [player.citizen_id],
+        location_id: player.current_location_id,
+        description: `${player.name} arrived at ${locationName(city, player.current_location_id)}.`,
+        priority: 1,
       });
     }
   }
 
-  if (city.simulation_mode === "manual" && activeTaskCitizens(city).length === 0) {
+  const cognitionCandidate = updateCitizens.find((citizen) => {
+    if (citizen.citizen_id === city.policy.player_citizen_id) return false;
+    const task = playerTask(citizen);
+    return (
+      task?.status === "active" && task.last_cognition_tick !== city.clock.tick
+    );
+  });
+  const election = liveElection(city);
+  if (cognitionCandidate && !(election && (election.phase === "voting" || city.clock.tick >= election.campaign_until_tick))) {
+    await runTaskCognition(city, cognitionCandidate, checkedCognition).catch(
+      () => {
+        if (isStale(city)) return;
+        const task = playerTask(cognitionCandidate);
+        if (task) {
+          blockManualTask(
+            city,
+            cognitionCandidate,
+            task,
+            "agent_cognition_blocked",
+            `${cognitionCandidate.name} could not continue the task because AI cognition was unavailable: ${task.task}`,
+          );
+        }
+      },
+    );
+  } else if (city.simulation_mode === "autonomous" && liveElection(city)) {
+    await advanceElection(city, generateCognition, decideElection);
+  } else if (city.simulation_mode === "autonomous") {
+      await advanceSocial(city, checkedCognition, decideSocial).catch(
+        (error: unknown) => {
+          if (isStale(city)) return;
+          const reason = error instanceof Error
+            ? error.name === "TimeoutError" ? "The AI conversation took too long. Resume Auto to retry." : error.message
+            : "The AI conversation could not finish. Resume Auto to retry.";
+          city.clock.running = false;
+          city.policy.autonomy_error = reason;
+          addEvent(city, {
+            event_type: "agent_cognition_blocked",
+            location_id: city.encounter?.location_id ?? null,
+            actors: city.encounter ? [city.encounter.actor_id, city.encounter.target_id] : [],
+            description: `Auto paused: ${reason}`,
+            payload: {},
+            priority: 3,
+          });
+        },
+      );
+  }
+
+  if (isStale(city)) return requireSessionCity();
+  if (
+    !live &&
+    city.simulation_mode === "manual" &&
+    activeTaskCitizens(city).length === 0 &&
+    !city.policy.player_destination
+  ) {
     city.clock.running = false;
   }
   void producedEvents;
   return saveAndReturn(city);
 }
 
+function electionRequest(city: CityState, citizen: CitizenAgent, purpose: ElectionDecisionRequest["purpose"]): ElectionDecisionRequest {
+  const event = currentElection(city)!;
+  return {
+    purpose, citizen, candidates: event.candidates,
+    residents: city.citizens.filter((c) => purpose !== "campaign" || event.waiting_for_player?.candidate_id !== citizen.citizen_id || event.waiting_for_player?.target_id !== c.citizen_id)
+      .map((c) => ({ citizen_id: c.citizen_id, name: c.name, location: locationName(city, c.current_location_id) })),
+    memories: privateMemoryContext(citizen).slice(0, 24),
+  };
+}
+
+export async function sessionStartElection(candidateId: string, rivalId: string, platform: string, decide: DecideElection) {
+  const city = requireSessionCity();
+  if (liveElection(city)) throw new Error("Finish or cancel the current election first.");
+  const candidate = findCitizen(city, candidateId), rival = findCitizen(city, rivalId);
+  if (candidateId === rivalId) throw new Error("Choose two different candidates.");
+  if (!platform.trim() || platform.length > 800) throw new Error("Write a platform of 1 to 800 characters.");
+  assertPlayerTextSafe(platform);
+  if (playerTask(rival)?.status === "active") throw new Error("The rival has an active task. Finish it or choose another candidate.");
+  const event: Election = {
+    event_id: newId("election"), kind: "student_election", title: "Nakameguro student council",
+    phase: "campaign", candidates: [{ citizen_id: candidateId, name: candidate.name, platform: platform.trim() }, { citizen_id: rivalId, name: rival.name, platform: "" }],
+    // Student council: only students vote.
+    voter_ids: city.citizens.filter((c) => c.profession === "Student").map((c) => c.citizen_id), campaign_until_tick: city.clock.tick + 32,
+    ballots: [], campaign_turn: 0, campaign_log: [],
+  };
+  city.activities = [...(city.activities ?? []).slice(-4), event];
+  const response = await decide(electionRequest(city, rival, "platform"));
+  if (isStale(city)) return requireSessionCity();
+  if (!response.platform.trim()) throw new Error("The rival did not publish a platform. Try again.");
+  event.candidates[1].platform = response.platform;
+  rival.mood = response.mood;
+  candidate.personality = { ...candidate.personality, player_task: null, companion_task: null };
+  candidate.short_term_goals = withoutPlayerTask(candidate.short_term_goals);
+  city.policy.player_citizen_id = candidateId;
+  city.policy.player_destination = null;
+  candidate.target_x = candidate.x;
+  candidate.target_y = candidate.y;
+  city.simulation_mode = "autonomous";
+  city.policy.simulation_mode = "autonomous";
+  city.clock.running = true;
+  addEvent(city, { event_type: "election_started", actors: [candidateId, rivalId], description: `${candidate.name} and ${rival.name} are running for student council.`, priority: 3 });
+  return saveAndReturn(city);
+}
+
+export async function sessionElectionPhase(action: "vote" | "cancel") {
+  const city = requireSessionCity(), event = liveElection(city);
+  if (!event) throw new Error("No election is ongoing.");
+  if (action === "vote" && event.phase !== "campaign") throw new Error("Voting is already open.");
+  event.phase = action === "vote" ? "voting" : "cancelled";
+  event.agenda = undefined;
+  event.waiting_for_player = undefined;
+  event.error = undefined;
+  city.clock.running = false;
+  addEvent(city, { event_type: `election_${event.phase}`, description: action === "vote" ? "Campaigning has ended. Private ballots are open." : "The election was cancelled. No winner was declared.", priority: 3 });
+  return saveAndReturn(city);
+}
+
+function applyBallot(city: CityState, voterId: string, voteFor: string | null, reason: string, source: "agent" | "player") {
+  const event = currentElection(city);
+  if (!event) throw new Error("No election is ongoing.");
+  const updated = recordBallot(event, { voter_id: voterId, vote_for: voteFor, reason, source });
+  city.activities = city.activities!.map((e) => e.event_id === event.event_id ? updated : e);
+  addMemory({ citizen_id: voterId, kind: "episodic", content: `My private ballot: ${voteFor ? updated.candidates.find((c) => c.citizen_id === voteFor)?.name : "abstain"}. ${reason}`, importance: 0.8, salience: 0.8, related_citizen_id: voteFor, extra: { election_id: event.event_id } });
+  if (updated.phase === "complete") {
+    const result = tallyElection(updated)!;
+    const description = result.winner ? `${result.winner.name} won the student-council election with ${result.winner.votes} votes.` : result.tied ? "The student-council election ended in a tie. No winner was declared." : "Everyone abstained. No winner was declared.";
+    addEvent(city, { event_type: "election_result", description, actors: updated.candidates.map((c) => c.citizen_id), priority: 3 });
+    for (const voter of updated.voter_ids) addMemory({ citizen_id: voter, kind: "episodic", content: description, importance: 0.85, salience: 0.85, related_citizen_id: result.winner?.citizen_id ?? null, extra: { election_id: event.event_id, source: "public_result" } });
+    city.clock.running = false;
+  }
+}
+
+export async function sessionCastVote(voteFor: string | null) {
+  const city = requireSessionCity();
+  const voter = String(city.policy.player_citizen_id ?? "");
+  findCitizen(city, voter);
+  applyBallot(city, voter, voteFor, "I chose this ballot while controlled by the player.", "player");
+  return saveAndReturn(city);
+}
+
+export async function sessionNextBallot(decide: DecideElection) {
+  const city = requireSessionCity();
+  if (currentElection(city)?.phase !== "voting") throw new Error("Voting is not open.");
+  await advanceElection(city, async () => { throw new Error("No campaign speech during voting."); }, decide);
+  if (isStale(city)) return requireSessionCity();
+  return saveAndReturn(city);
+}
+
+async function advanceElection(city: CityState, generate: GenerateCognition, decide?: DecideElection) {
+  const event = liveElection(city);
+  if (!event) return;
+  try {
+    if (!decide) throw new Error("Election intelligence is not connected.");
+    event.error = undefined;
+    if (event.phase === "campaign" && city.clock.tick >= event.campaign_until_tick) {
+      event.phase = "voting";
+      event.agenda = undefined;
+      event.waiting_for_player = undefined;
+      addEvent(city, { event_type: "election_voting", description: "Campaigning has ended. Residents are casting private ballots.", priority: 3 });
+    }
+    if (event.phase === "voting") {
+      const id = event.voter_ids.find((id) => id !== city.policy.player_citizen_id && !event.ballots.some((b) => b.voter_id === id));
+      if (!id) { city.clock.running = false; return; }
+      const voter = findCitizen(city, id);
+      const decision = await decide(electionRequest(city, voter, "vote"));
+      if (isStale(city)) return;
+      applyBallot(city, id, decision.vote_for, decision.reason, "agent");
+      voter.mood = decision.mood;
+      return;
+    }
+    if (city.clock.tick % 3 !== 0) return;
+    const candidates = event.candidates.filter((c) => c.citizen_id !== city.policy.player_citizen_id && playerTask(findCitizen(city, c.citizen_id))?.status !== "active");
+    if (!candidates.length) return;
+    if (event.agenda?.candidate_id === city.policy.player_citizen_id) event.agenda = undefined;
+    if (!event.agenda) {
+      const candidate = findCitizen(city, candidates[event.campaign_turn % candidates.length].citizen_id);
+      const decision = await decide(electionRequest(city, candidate, "campaign"));
+      if (isStale(city)) return;
+      event.campaign_turn++;
+      if (!decision.target_id) return;
+      const target = findCitizen(city, decision.target_id);
+      if (target === candidate) throw new Error("A candidate cannot approach themselves.");
+      event.agenda = { candidate_id: candidate.citizen_id, target_id: target.citizen_id, intention: decision.intention || decision.reason };
+      candidate.current_thought = decision.reason;
+      candidate.mood = decision.mood;
+      addEvent(city, { event_type: "campaign_plan", actors: [candidate.citizen_id, target.citizen_id], description: `${candidate.name} plans to approach ${target.name}: ${event.agenda.intention}`, priority: 2 });
+      return;
+    }
+    const actor = findCitizen(city, event.agenda.candidate_id), target = findCitizen(city, event.agenda.target_id);
+    if (!nearCitizen(actor, target) || actor.current_location_id !== target.current_location_id) return;
+    // Never invent the player's reply or hold up the rival's whole campaign.
+    if (target.citizen_id === city.policy.player_citizen_id) {
+      event.waiting_for_player = { ...event.agenda };
+      event.agenda = undefined;
+      addEvent(city, { event_type: "campaign_approach", actors: [actor.citizen_id, target.citizen_id], description: `${actor.name} would like to discuss the election with ${target.name}.`, priority: 2 });
+      return;
+    }
+    const response = await generate({ city, actor_id: actor.citizen_id, target_id: target.citizen_id, require_conversation: true,
+      task: `Discuss the student council election with ${target.name}.`, observations: [...electionNotice(city), `Your private campaign intention: ${event.agenda.intention}`], memories: [],
+      private_memories: { [actor.citizen_id]: privateMemoryContext(actor), [target.citizen_id]: privateMemoryContext(target) } });
+    if (isStale(city)) return;
+    applyAutonomousCognition(city, actor, target, { event_id: event.event_id, location_id: actor.current_location_id } as CityEvent, response);
+    event.agenda = undefined;
+  } catch (error) {
+    if (isStale(city)) return;
+    event.error = error instanceof Error ? error.message : "The agent could not decide. No vote or dialogue was invented.";
+    city.clock.running = false;
+  }
+}
+
 export async function sessionTriggerEvent(payload: TriggerEventPayload) {
   const city = requireSessionCity();
-  const locationId = payload.location_id ?? defaultEventLocation(payload.event_type);
+  const locationId =
+    payload.location_id ?? defaultEventLocation(payload.event_type);
   const severity = payload.severity ?? "medium";
   const multiplier = severity === "high" ? 1.45 : severity === "low" ? 0.6 : 1;
   let description = "A city event changes the students' day.";
@@ -364,7 +792,8 @@ export async function sessionTriggerEvent(payload: TriggerEventPayload) {
       addMemory({
         citizen_id: citizen.citizen_id,
         kind: "episodic",
-        content: "A flu outbreak is spreading around school, and everyone is watching who gets sick.",
+        content:
+          "A flu outbreak is spreading around school, and everyone is watching who gets sick.",
         importance: 0.82,
         salience: 0.86,
         related_citizen_id: null,
@@ -378,7 +807,8 @@ export async function sessionTriggerEvent(payload: TriggerEventPayload) {
       citizen.stress = clamp(citizen.stress + 10 * multiplier);
     }
   } else if (payload.event_type === "city_festival") {
-    description = "A city festival begins at the park and gives the students a reason to meet.";
+    description =
+      "A city festival begins at the park and gives the students a reason to meet.";
     for (const citizen of city.citizens) {
       actors.push(citizen.citizen_id);
       citizen.happiness = clamp(citizen.happiness + 12 * multiplier);
@@ -390,14 +820,16 @@ export async function sessionTriggerEvent(payload: TriggerEventPayload) {
       citizen.stress = clamp(citizen.stress + 5 * multiplier);
     }
   } else if (payload.event_type === "food_shortage") {
-    description = "A food shortage hits the market and students talk about bringing lunch from home.";
+    description =
+      "A food shortage hits the market and students talk about bringing lunch from home.";
     for (const citizen of city.citizens) {
       citizen.hunger = clamp(citizen.hunger + 8 * multiplier);
     }
   } else if (payload.event_type === "bank_policy_change") {
-    description = "The bank changes youth savings rules and families start talking about money.";
+    description =
+      "The bank changes youth savings rules and families start talking about money.";
   } else if (payload.event_type === "power_outage") {
-    description = "A power outage interrupts morning routines across Navora.";
+    description = "A power outage interrupts morning routines across Nakameguro.";
     for (const citizen of city.citizens) {
       citizen.stress = clamp(citizen.stress + 7 * multiplier);
     }
@@ -424,7 +856,9 @@ export async function sessionApplyPolicy(payload: MayorPolicyPayload) {
     event_type: "mayor_policy",
     location_id: "loc_city_hall",
     actors: [city.citizens[0]?.citizen_id].filter(Boolean) as string[],
-    description: changed ? `The mayor changed city policy: ${changed}.` : "The mayor reviewed city policy.",
+    description: changed
+      ? `The mayor changed city policy: ${changed}.`
+      : "The mayor reviewed city policy.",
     payload,
     priority: 2,
   });
@@ -443,31 +877,59 @@ async function planManualTask(
     task,
     memories: scopedPrivateMemoryContext(citizen, task).slice(0, 8),
   });
-  const validCitizenIds = new Set(city.citizens.filter((item) => item.citizen_id !== citizen.citizen_id).map((item) => item.citizen_id));
-  const validLocationIds = new Set(city.locations.map((location) => location.location_id));
-  const inferredTargetIds = inferMentionedCitizenIds(task, city, citizen.citizen_id);
-  const unavailableMentionedNames = inferUnavailableMentionedPersonNames(task, city);
+  const validCitizenIds = new Set(
+    city.citizens
+      .filter((item) => item.citizen_id !== citizen.citizen_id)
+      .map((item) => item.citizen_id),
+  );
+  const validLocationIds = new Set(
+    city.locations.map((location) => location.location_id),
+  );
+  const inferredTargetIds = inferMentionedCitizenIds(
+    task,
+    city,
+    citizen.citizen_id,
+  );
+  const unavailableMentionedNames = inferUnavailableMentionedPersonNames(
+    task,
+    city,
+  );
   const targetIds = Array.from(
     new Set(
       [
-        ...(unavailableMentionedNames.length > 0 && inferredTargetIds.length === 0 ? [] : plan.target_citizen_ids),
+        ...(unavailableMentionedNames.length > 0 &&
+        inferredTargetIds.length === 0
+          ? []
+          : plan.target_citizen_ids),
         ...inferredTargetIds,
       ].filter((targetId) => validCitizenIds.has(targetId)),
     ),
   );
-  const firstTarget = targetIds[0] ? city.citizens.find((item) => item.citizen_id === targetIds[0]) : null;
+  const firstTarget = targetIds[0]
+    ? city.citizens.find((item) => item.citizen_id === targetIds[0])
+    : null;
   const inferredLocationId = inferMentionedLocationId(task, city);
   const locationId =
-    (plan.location_id && validLocationIds.has(plan.location_id) ? plan.location_id : null) ??
+    (plan.location_id && validLocationIds.has(plan.location_id)
+      ? plan.location_id
+      : null) ??
     inferredLocationId ??
     firstTarget?.current_location_id ??
     citizen.current_location_id;
-  const taskKind = unavailableMentionedNames.length > 0 && inferredTargetIds.length === 0
-    ? "open_task"
-    : normalizePlannedTaskKind(task, plan.task_kind, Boolean(firstTarget), Boolean(inferredLocationId));
-  const visiblePlan = unavailableMentionedNames.length > 0 && inferredTargetIds.length === 0
-    ? `${citizen.name} needs to clarify the task because ${unavailableMentionedNames.join(", ")} is not currently in Navora.`
-    : plan.player_visible_plan || `${citizen.name} is deciding how to handle: ${task}`;
+  const taskKind =
+    unavailableMentionedNames.length > 0 && inferredTargetIds.length === 0
+      ? "open_task"
+      : normalizePlannedTaskKind(
+          task,
+          plan.task_kind,
+          Boolean(firstTarget),
+          Boolean(inferredLocationId),
+        );
+  const visiblePlan =
+    unavailableMentionedNames.length > 0 && inferredTargetIds.length === 0
+      ? `${citizen.name} needs to clarify the task because ${unavailableMentionedNames.join(", ")} is not currently in Nakameguro.`
+      : plan.player_visible_plan ||
+        `${citizen.name} is deciding how to handle: ${task}`;
 
   return {
     task_kind: taskKind,
@@ -477,6 +939,247 @@ async function planManualTask(
     reasoning_summary: plan.reasoning_summary,
     player_visible_plan: visiblePlan,
   };
+}
+
+function lifeSink(city: CityState): LifeSink {
+  return (news) => {
+    const event = addEvent(city, { event_type: `life_${news.kind}`, description: news.headline, actors: news.actors,
+      location_id: news.location_id ?? null, priority: news.priority ?? 2 });
+    for (const memory of news.memories ?? [])
+      addMemory({ citizen_id: memory.citizen_id, kind: "episodic", content: memory.content, importance: memory.importance, salience: memory.importance,
+        related_citizen_id: memory.related_citizen_id ?? null, source_event_id: event.event_id, extra: { source: `life_${news.kind}` } });
+    if (["medication", "payday"].includes(news.kind)) return;
+    city.life_log = [...(city.life_log ?? []), { id: event.event_id, day: city.clock.day, minute: city.clock.minute_of_day, kind: news.kind,
+      icon: news.icon, headline: news.headline, actors: news.actors }].slice(-200);
+  };
+}
+
+function bondLookup(city: CityState): BondLookup {
+  const bonds = new Map(ensureRelationships(city).map((r) => [`${r.citizen_id}>${r.other_citizen_id}`, r]));
+  return (from, to) => bonds.get(`${from}>${to}`);
+}
+
+function lifeFactory(city: CityState): LifeFactory {
+  return {
+    newCitizen: (baby) => {
+      city.citizens.push(baby);
+      ensureCitizenMemories(city, baby.citizen_id);
+      ensureRelationships(city);
+    },
+    departed: (person) => {
+      city.departed = [...(city.departed ?? []), person];
+    },
+  };
+}
+
+/** Live mode follows real Tokyo time; fast mode runs the clock as quickly as the player likes. */
+export const isLive = (city: CityState) => city.policy.time_mode === "live";
+
+export async function sessionSetTimeMode(mode: "live" | "fast") {
+  const city = requireSessionCity();
+  city.policy.time_mode = mode;
+  if (mode === "live") city.clock.running = true;
+  addEvent(city, { event_type: "time_mode", description: mode === "live" ? "Nakameguro now follows real Tokyo time." : "Fast-forward: time runs faster than real life.", priority: 1 });
+  return saveAndReturn(city);
+}
+
+/** How far city time trails real Tokyo time, in minutes (negative when ahead after fast-forwarding). */
+export function minutesBehindRealTime(city: CityState, now = new Date()) {
+  const real = realCityTime(city.calendar_start ?? calendarStartFor(city.clock.day), now);
+  return (real.day - city.clock.day) * 1440 + real.minute - city.clock.minute_of_day;
+}
+
+/** Jumps a live world forward to real Tokyo time, living through each missed day without AI calls. */
+export async function sessionSyncToRealTime(now = new Date()) {
+  const city = requireSessionCity();
+  if (!isLive(city)) return city;
+  const behind = minutesBehindRealTime(city, now);
+  if (behind < 15) return city;
+  const real = realCityTime(city.calendar_start!, now);
+  const days = real.day - city.clock.day;
+  const sink = lifeSink(city);
+  for (let d = 0; d < Math.min(days, 400); d++) {
+    city.clock.day += 1;
+    city.clock.minute_of_day = 0;
+    lifeDay(city, sink, bondLookup(city), lifeFactory(city));
+    for (const place of city.locations)
+      if (["loc_market", "loc_restaurant"].includes(place.location_id)) place.inventory.food = Math.min(120, Number(place.inventory.food ?? 0) + 45);
+  }
+  const previous = city.clock.minute_of_day;
+  city.clock.day = real.day;
+  city.clock.minute_of_day = Math.floor(real.minute / 15) * 15;
+  city.clock.tick += Math.round(behind / 15);
+  city.encounter = null;
+  refreshWeather(city, days > 0 ? 1440 : previous);
+  // Everyone is wherever their day would have taken them by now, fed and rested enough.
+  for (const citizen of city.citizens) {
+    if (citizen.citizen_id === city.policy.player_citizen_id) continue;
+    const [locationId, activity] = desiredLocation(city, citizen);
+    const place = city.locations.find((l) => l.location_id === locationId);
+    if (place) {
+      citizen.x = citizen.target_x = place.x + Math.floor(place.width / 2);
+      citizen.y = citizen.target_y = place.y + Math.floor(place.height / 2);
+      citizen.current_location_id = locationId;
+    }
+    citizen.current_activity = activity;
+    citizen.hunger = Math.min(citizen.hunger, 45);
+    citizen.energy = Math.max(citizen.energy, 60);
+  }
+  const hours = Math.round(behind / 60);
+  addEvent(city, { event_type: "time_skip", description: `Caught up with real Tokyo time: ${hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} hours`} passed while you were away.`, priority: 2 });
+  if (hours >= 12) sink({ kind: "time_skip", icon: "⏩", headline: `While you were away, ${hours >= 48 ? `${Math.round(hours / 24)} days` : `${hours} hours`} passed in Nakameguro.`, actors: [], priority: 2 });
+  return saveAndReturn(city);
+}
+
+/** A conversation opportunity between live ticks, so the city keeps talking in real time. */
+export async function sessionSocialBeat(generateCognition: GenerateCognition, decideSocial?: DecideSocial) {
+  const city = requireSessionCity();
+  if (city.simulation_mode !== "autonomous" || !city.clock.running || liveElection(city)) return city;
+  const checked: GenerateCognition = async (request) => {
+    const response = await generateCognition(request);
+    if (isStale(city)) throw new Error("This action was interrupted.");
+    return response;
+  };
+  try {
+    await advanceSocial(city, checked, decideSocial, true);
+  } catch (error) {
+    if (isStale(city)) return requireSessionCity();
+    city.clock.running = false;
+    city.policy.autonomy_error = error instanceof Error ? error.message : "The AI conversation could not finish.";
+  }
+  if (isStale(city)) return requireSessionCity();
+  return saveAndReturn(city);
+}
+
+/** "Sunday 27 Sep 2026, 14:00 in Nakameguro. Weather: Rain, 21°C", for AI prompts. */
+export function describeNow(city: CityState) {
+  const day = calendarDay(city.calendar_start ?? calendarStartFor(city.clock.day), city.clock.day);
+  const clock = `${String(Math.floor(city.clock.minute_of_day / 60)).padStart(2, "0")}:${String(city.clock.minute_of_day % 60).padStart(2, "0")}`;
+  const w = city.weather;
+  return `${weekday(city.clock.day)} ${day.dayOfMonth}/${day.month}/${day.year}, ${clock} in ${city.city_name}, Tokyo${day.holiday ? ` (${day.holiday})` : ""}${w ? `. Weather: ${w.label}, ${Math.round(w.temp_c)}°C${w.alert ? `. ${w.alert.text}` : ""}` : ""}`;
+}
+
+export function routineContext(city: CityState): RoutineContext {
+  const today = calendarDay(city.calendar_start ?? calendarStartFor(city.clock.day), city.clock.day);
+  const weekend = isWeekend(city.clock.day);
+  return {
+    schoolOpen: !weekend && !today.holiday && !today.schoolBreak && city.weather?.condition !== "typhoon",
+    publicHoliday: Boolean(today.holiday),
+    weather: city.weather,
+    evacuating: (city.evacuation_until ?? 0) > cityMinute(city),
+    closed: activeIncidents(city, cityMinute(city)).filter((i) => i.kind === "fire").map((i) => i.location_id),
+  };
+}
+
+/** Player-created situations: the world changes now, and residents talk it through in Auto. */
+export async function sessionCreateSituation(request: ScenarioRequest) {
+  const city = requireSessionCity();
+  city.incidents = activeIncidents(city, cityMinute(city));
+  const result = applyScenario(city, request, { sink: lifeSink(city), adjustBonds: (changes) => adjustBonds(city, changes), cityMinute: cityMinute(city) });
+  return { city: saveAndReturn(city), result };
+}
+
+/**
+ * Any resident can do something to any other: the actor goes to the target, the action takes effect
+ * at once, then the target reacts in their own AI-generated words (only the reply when the player acts).
+ */
+export async function sessionPerformAction(actorId: string, targetId: string, actionId: ActionId, note: string, generate: GenerateCognition):
+  Promise<{ city: CityState; outcome: ActionOutcome; talked: boolean; error?: string }> {
+  const city = requireSessionCity();
+  const actor = findCitizen(city, actorId), target = findCitizen(city, targetId);
+  const blocked = actionBlocked(city, actor, target, actionId);
+  if (blocked) throw new Error(blocked);
+  const text = note.trim().slice(0, 300);
+  if (text) assertPlayerTextSafe(text);
+  actor.current_location_id = target.current_location_id;
+  actor.x = actor.target_x = target.x;
+  actor.y = actor.target_y = target.y;
+  actor.current_activity = `With ${target.name}`;
+  if (actorId === city.policy.player_citizen_id) city.policy.player_destination = null;
+  if (city.encounter && [actorId, targetId].some((id) => [city.encounter!.actor_id, city.encounter!.target_id].includes(id))) city.encounter = null;
+  const outcome = performAction(city, actor, target, actionId, { sink: lifeSink(city), adjustBonds: (changes) => adjustBonds(city, changes), bond: bondLookup(city) }, text);
+  const saved = saveAndReturn(city);
+  if (actor.age < 3 || target.age < 3) return { city: saved, outcome, talked: false };
+  const live = requireSessionCity();
+  const liveActor = findCitizen(live, actorId), liveTarget = findCitizen(live, targetId);
+  try {
+    if (actorId === live.policy.player_citizen_id) {
+      const response = await generate({ city: live, actor_id: actorId, target_id: targetId, require_conversation: true, task: "Respond to the player's action and words.",
+        player_utterance: outcome.utterance, observations: [outcome.reason], memories: [],
+        private_memories: { [actorId]: privateMemoryContext(liveActor), [targetId]: privateMemoryContext(liveTarget) } });
+      if (isStale(live)) return { city: requireSessionCity(), outcome, talked: false };
+      applyAutonomousCognition(live, liveActor, liveTarget, { event_id: newId("action"), location_id: liveTarget.current_location_id } as CityEvent, response);
+      live.policy.player_lines = Number(live.policy.player_lines ?? 0) + 1;
+    } else {
+      const event = addEvent(live, { event_type: "player_action", actors: [actorId, targetId], location_id: liveTarget.current_location_id,
+        description: outcome.reason, payload: { topic: outcome.topic, kind: "chance" }, priority: 2 });
+      await runAutonomousCognition(live, event, generate);
+      if (isStale(live)) return { city: requireSessionCity(), outcome, talked: false };
+    }
+    return { city: saveAndReturn(live), outcome, talked: true };
+  } catch (error) {
+    return { city: isStale(live) ? requireSessionCity() : saved, outcome, talked: false, error: error instanceof Error ? error.message : "They could not talk right now." };
+  }
+}
+
+function adjustBonds(city: CityState, changes: BondChange[]) {
+  if (!changes.length) return;
+  const relationships = ensureRelationships(city);
+  for (const change of changes) {
+    const bond = relationships.find((r) => r.citizen_id === change.from && r.other_citizen_id === change.to);
+    if (!bond) continue;
+    bond.trust = clamp(bond.trust + (change.trust ?? 0));
+    bond.warmth = clamp(bond.warmth + (change.warmth ?? 0));
+    bond.familiarity = clamp(bond.familiarity + (change.familiarity ?? 0));
+    const feelings = { ...emptyFeelings(), ...bond.feelings };
+    for (const [key, value] of Object.entries(change.feelings ?? {})) feelings[key as keyof typeof feelings] = clamp(feelings[key as keyof typeof feelings] + Number(value));
+    bond.feelings = feelings;
+    bond.last_changed_at = cityMinute(city);
+    bond.history = [...(bond.history ?? []), { day: city.clock.day, minute: city.clock.minute_of_day, reason: change.reason, effect: "situation", feelings }].slice(-20);
+  }
+  writeJson(RELATIONSHIPS_KEY, relationships);
+}
+
+/** Updates the sky, announces notable weather and applies earthquakes, heat and storms to residents. */
+function refreshWeather(city: CityState, previousMinute: number) {
+  city.calendar_start ??= calendarStartFor(city.clock.day);
+  const start = city.calendar_start;
+  const override = city.weather_override && city.weather_override.day === city.clock.day ? city.weather_override : null;
+  if (city.weather_override && !override) city.weather_override = null;
+  const before = city.weather;
+  const now = weatherAt(start, city.clock.day, city.clock.minute_of_day, override);
+  city.weather = now;
+  const sink = lifeSink(city);
+  const newDay = city.clock.minute_of_day < previousMinute;
+  if (newDay || !before) {
+    const today = calendarDay(start, city.clock.day);
+    const w = dayWeather(start, city.clock.day);
+    const notes = [
+      today.holiday && `🎌 Today is ${today.holiday}: offices and schools are closed.`,
+      today.schoolBreak && !calendarDay(start, city.clock.day - 1).schoolBreak && `🎒 ${today.schoolBreak} starts today!`,
+      w.rainySeason && !dayWeather(start, city.clock.day - 1).rainySeason && "☔ Tsuyu, the rainy season, has begun.",
+      w.condition === "typhoon" && "🌀 A typhoon is hitting Nakameguro. School is closed and trains are suspended.",
+      w.condition === "heavy_rain" && "🌧️ Heavy rain warning in effect today.",
+      w.condition === "snow" && "❄️ Snow is falling on Nakameguro!",
+      w.heatwave && `🥵 Heatstroke alert: up to ${Math.round(w.high)}°C today.`,
+      today.month === 4 && today.dayOfMonth === 1 && "🌸 Cherry blossom season: hanami picnics in the park!",
+    ].filter(Boolean) as string[];
+    for (const note of notes) sink({ kind: "weather", icon: note.slice(0, note.indexOf(" ")), headline: note.slice(note.indexOf(" ") + 1), actors: [], priority: 2 });
+  }
+  const entering = (key: "lightning" | "heatwave") => Boolean(now[key]) && !before?.[key];
+  if (now.quake && !before?.quake) weatherEffects(city, "earthquake", now.quake.intensity, sink);
+  if (entering("heatwave")) weatherEffects(city, "heatwave", 0, sink);
+  if (now.condition === "typhoon" && before?.condition !== "typhoon") weatherEffects(city, "typhoon", 0, sink);
+  if (now.quake && now.quake.intensity >= 4) city.evacuation_until = cityMinute(city) + 150;
+}
+
+/** Player weather controls: the chosen sky lasts six city hours (an earthquake is instant). */
+export async function sessionSetWeather(condition: WeatherOverride["condition"] | null, options: { temp_c?: number; source?: WeatherOverride["source"] } = {}) {
+  const city = requireSessionCity();
+  const minute = city.clock.minute_of_day;
+  city.weather_override = condition ? { condition, day: city.clock.day, from: minute, until: Math.min(1440, minute + (condition === "earthquake" ? 15 : 360)), ...options } : null;
+  refreshWeather(city, minute);
+  return saveAndReturn(city);
 }
 
 function requireSessionCity() {
@@ -493,6 +1196,10 @@ function saveAndReturn(city: CityState) {
   return normalized;
 }
 
+function isStale(city: CityState) {
+  return (getSessionCity()?.revision ?? 0) !== (city.revision ?? 0);
+}
+
 function normalizeCity(city: CityState): CityState {
   const normalized = clone(city);
   normalized.events = normalized.events.slice(-80);
@@ -500,30 +1207,47 @@ function normalizeCity(city: CityState): CityState {
   return normalized;
 }
 
-function updateCitizen(city: CityState, citizen: CitizenAgent, previousMinute: number) {
+function updateCitizen(
+  city: CityState,
+  citizen: CitizenAgent,
+  previousMinute: number,
+) {
   const events: CityEvent[] = [];
   const oldLocation = citizen.current_location_id;
   const task = playerTask(citizen);
   const taskWasActive = task?.status === "active";
   const [targetLocationId, activity] = desiredLocation(city, citizen);
-  const activeTarget = taskWasActive && task ? currentTaskTarget(city, task) : null;
-  const targetLocation = city.locations.find((location) => location.location_id === targetLocationId) ??
-    city.locations.find((location) => location.location_id === citizen.home_location_id) ??
+  const activeTarget =
+    taskWasActive && task ? currentTaskTarget(city, task) : city.encounter?.actor_id === citizen.citizen_id && activity.startsWith("Approaching ")
+      ? city.citizens.find((c) => c.citizen_id === city.encounter?.target_id) : campaignTarget(city, citizen);
+  const targetLocation =
+    city.locations.find(
+      (location) => location.location_id === targetLocationId,
+    ) ??
+    city.locations.find(
+      (location) => location.location_id === citizen.home_location_id,
+    ) ??
     city.locations[0];
 
   citizen.current_activity = activity;
-  citizen.target_x = activeTarget?.x ?? targetLocation.x + Math.floor(targetLocation.width / 2);
-  citizen.target_y = activeTarget?.y ?? targetLocation.y + Math.floor(targetLocation.height / 2);
-  moveToward(citizen, citizen.target_x, citizen.target_y);
-  const arrived = citizen.x === citizen.target_x && citizen.y === citizen.target_y;
+  citizen.target_x =
+    activeTarget?.x ?? targetLocation.x + Math.floor(targetLocation.width / 2);
+  citizen.target_y =
+    activeTarget?.y ?? targetLocation.y + Math.floor(targetLocation.height / 2);
+  moveToward(citizen, citizen.target_x, citizen.target_y, city);
+  const arrived =
+    citizen.x === citizen.target_x && citizen.y === citizen.target_y;
   if (arrived) {
     citizen.current_location_id = targetLocation.location_id;
   }
   updateNeeds(citizen);
-  if (arrived) applyLocationEffects(citizen, targetLocation.location_id);
+  if (arrived) applyLocationEffects(city, citizen, targetLocation.location_id);
   if (arrived) {
     const companionTask = activeCompanionTask(citizen);
-    if (companionTask && citizen.current_location_id === companionTask.location_id) {
+    if (
+      companionTask &&
+      citizen.current_location_id === companionTask.location_id
+    ) {
       citizen.personality = {
         ...citizen.personality,
         companion_task: { ...companionTask, status: "completed" },
@@ -550,19 +1274,26 @@ function updateCitizen(city: CityState, citizen: CitizenAgent, previousMinute: n
   const taskAfterArrival = playerTask(citizen);
   if (taskAfterArrival?.status === "active") {
     const activeTaskTarget = currentTaskTarget(city, taskAfterArrival);
-    const actors = [citizen.citizen_id, activeTaskTarget?.citizen_id ?? taskAfterArrival.target_citizen_id].filter(Boolean) as string[];
+    const actors = [
+      citizen.citizen_id,
+      activeTaskTarget?.citizen_id ?? taskAfterArrival.target_citizen_id,
+    ].filter(Boolean) as string[];
     const progress = taskProgressLabel(city, citizen, taskAfterArrival);
     events.push(
       addEvent(city, {
-        event_type: activeTaskTarget && !nearCitizen(citizen, activeTaskTarget) ? "player_task_travel" : "player_task_progress",
-        location_id: activeTaskTarget?.current_location_id ?? targetLocation.location_id,
+        event_type:
+          activeTaskTarget && !nearCitizen(citizen, activeTaskTarget)
+            ? "player_task_travel"
+            : "player_task_progress",
+        location_id:
+          activeTaskTarget?.current_location_id ?? targetLocation.location_id,
         actors,
         description: `${citizen.name} is ${progress}: ${taskAfterArrival.task}`,
         payload: { task: taskAfterArrival.task, progress },
         priority: 3,
       }),
     );
-  } else if (previousMinute < 480 && city.clock.minute_of_day >= 480) {
+  } else if (previousMinute < 480 && city.clock.minute_of_day >= 480 && !isWeekend(city.clock.day) && citizen.profession === "Student") {
     events.push(
       addEvent(city, {
         event_type: "school_day_started",
@@ -577,15 +1308,31 @@ function updateCitizen(city: CityState, citizen: CitizenAgent, previousMinute: n
   return events;
 }
 
-function desiredLocation(city: CityState, citizen: CitizenAgent): [string, string] {
+function campaignTarget(city: CityState, citizen: CitizenAgent) {
+  const agenda = liveElection(city)?.agenda;
+  return agenda?.candidate_id === citizen.citizen_id
+    ? city.citizens.find((c) => c.citizen_id === agenda.target_id) ?? null : null;
+}
+
+function desiredLocation(
+  city: CityState,
+  citizen: CitizenAgent,
+): [string, string] {
+  const campaigning = campaignTarget(city, citizen);
+  if (campaigning && playerTask(citizen)?.status !== "active") return [campaigning.current_location_id, `Campaigning: meeting ${campaigning.name}`];
   const task = playerTask(citizen);
   if (task?.status === "active") {
     if (task.task_kind === "go_to_location") {
-      return [task.location_id ?? citizen.current_location_id, `Going to ${locationName(city, task.location_id ?? citizen.current_location_id)}`];
+      return [
+        task.location_id ?? citizen.current_location_id,
+        `Going to ${locationName(city, task.location_id ?? citizen.current_location_id)}`,
+      ];
     }
     if (task.task_kind === "go_with_citizen" && task.companion_confirmed) {
       const companion = task.target_citizen_id
-        ? city.citizens.find((item) => item.citizen_id === task.target_citizen_id)
+        ? city.citizens.find(
+            (item) => item.citizen_id === task.target_citizen_id,
+          )
         : null;
       return [
         task.location_id ?? citizen.current_location_id,
@@ -601,61 +1348,117 @@ function desiredLocation(city: CityState, citizen: CitizenAgent): [string, strin
           : `Going to talk with ${target.name}`,
       ];
     }
-    return [task.location_id ?? citizen.current_location_id, `Thinking through: ${task.task}`];
+    return [
+      task.location_id ?? citizen.current_location_id,
+      `Thinking through: ${task.task}`,
+    ];
   }
   const companionTask = activeCompanionTask(citizen);
   if (companionTask) {
-    const leader = city.citizens.find((item) => item.citizen_id === companionTask.leader_citizen_id);
+    const leader = city.citizens.find(
+      (item) => item.citizen_id === companionTask.leader_citizen_id,
+    );
     return [
       companionTask.location_id,
       `Going to ${locationName(city, companionTask.location_id)}${leader ? ` with ${leader.name}` : ""}`,
     ];
   }
-  if (citizen.health < 55) return ["loc_hospital", "Seeking medical help"];
-  if (citizen.hunger > 74) return ["loc_market", "Buying food"];
+  if (citizen.age < 2) {
+    const carer = caregiverFor(city, citizen);
+    if (carer) return [carer.current_location_id, /sleep|nap/i.test(carer.current_activity) ? "Sleeping" : `Being looked after by ${carer.name.split(" ")[0]}`];
+  }
+  const care = careNeeded(citizen, city.clock.day);
+  if (care) return [care.place, care.place === "loc_hospital" ? `Seeing the doctor about ${care.condition.name}` : `Buying medicine for ${care.condition.name}`];
+  const resting = bedRest(citizen);
+  if (resting && city.clock.minute_of_day >= 420 && city.clock.minute_of_day < 1260) return [citizen.home_location_id, `Resting in bed with ${resting.name === "flu" ? "the flu" : `a ${resting.name}`}`];
+  const gathering = gatheringFor(city, citizen);
+  if (gathering) return [gathering.location_id, gathering.kind === "birthday" && gathering.host_ids.includes(citizen.citizen_id) ? "Celebrating at my birthday party" : `At ${gathering.title}`];
+  const recovering = citizen.current_location_id === "loc_hospital"
+    && citizen.x === citizen.target_x && citizen.y === citizen.target_y
+    && (citizen.health < Math.min(85, healthCap(citizen.age) - 8) || citizen.energy < 45 || citizen.hunger > 60);
+  if (citizen.health < 55 || recovering) return ["loc_hospital", recovering ? "Recovering at hospital" : "Seeking medical help"];
+  if (citizen.hunger > 74) {
+    const market = city.locations.find((l) => l.location_id === "loc_market");
+    // With no money or an empty market, people eat what is at home instead of waiting at the stalls.
+    return citizen.money >= 4 && Number(market?.inventory.food ?? 0) > 0 ? ["loc_market", "Buying food"] : [citizen.home_location_id, "Eating at home"];
+  }
   if (citizen.energy < 22) return [citizen.home_location_id, "Resting at home"];
-  const slot = citizen.daily_schedule.find((entry) => {
-    const start = Number(entry.start);
-    const end = Number(entry.end);
-    return start <= city.clock.minute_of_day && city.clock.minute_of_day < end;
-  });
-  return [
-    typeof slot?.location_id === "string" ? slot.location_id : citizen.home_location_id,
-    typeof slot?.activity === "string" ? slot.activity : "Sleeping",
-  ];
+  const appointment = meetingFor(city, citizen);
+  if (appointment) return [appointment.location_id, `Going to meet ${appointment.actor_ids.filter((id) => id !== citizen.citizen_id).map((id) => city.citizens.find((c) => c.citizen_id === id)?.name).join(" and ")}: ${appointment.topic}`];
+  if (city.encounter?.actor_id === citizen.citizen_id) return [city.encounter.location_id, `Approaching ${city.citizens.find((c) => c.citizen_id === city.encounter?.target_id)?.name}`];
+  const stop = routineStop(citizen, city.clock.day, city.clock.minute_of_day, routineContext(city));
+  return [stop.location_id, stop.activity];
 }
 
-function runAutonomousSocial(city: CityState) {
-  if (city.clock.tick % 3 !== 0) return [];
-  const byLocation = new Map<string, CitizenAgent[]>();
-  for (const citizen of city.citizens) {
-    if (citizen.energy < 18 || citizen.stress > 88) continue;
-    const people = byLocation.get(citizen.current_location_id) ?? [];
-    people.push(citizen);
-    byLocation.set(citizen.current_location_id, people);
+/** In live mode, `beat` lets conversations happen between the 15-minute ticks of real time. */
+async function advanceSocial(city: CityState, cognition: GenerateCognition, decide?: DecideSocial, beat = false) {
+  const now = cityMinute(city);
+  for (const meeting of city.meetings ?? []) {
+    if (meeting.status !== "scheduled") continue;
+    if (now > meetingMinute(meeting) + 60) {
+      meeting.status = "missed";
+      const description = `The meeting about ${meeting.topic} at ${locationName(city, meeting.location_id)} did not happen. Nobody was forced to attend.`;
+      addEvent(city, { event_type: "meeting_missed", actors: meeting.actor_ids, location_id: meeting.location_id, description, priority: 2 });
+      meeting.actor_ids.forEach((id) => addMemory({ citizen_id: id, related_citizen_id: meeting.actor_ids.find((other) => other !== id) ?? null, kind: "episodic", content: `My planned meeting about ${meeting.topic} did not happen. I do not know why the other person did not attend.`, importance: 0.6, salience: 0.6, extra: { source: "meeting_missed" } }));
+    } else if (!city.encounter && now >= meetingMinute(meeting)) {
+      const people = meeting.actor_ids.map((id) => city.citizens.find((c) => c.citizen_id === id));
+      if (people.every((c) => c && sociallyAvailable(c, city.policy.player_citizen_id) && c.current_location_id === meeting.location_id)) {
+        city.encounter = { actor_id: meeting.actor_ids[0], target_id: meeting.actor_ids[1], location_id: meeting.location_id, topic: meeting.topic,
+          reason: `They both kept their plan to meet at ${locationName(city, meeting.location_id)} about ${meeting.topic}.`, started_at: now - 15, meeting_id: meeting.id };
+      }
+    }
   }
-  const events: CityEvent[] = [];
-  for (const [locationId, people] of byLocation) {
-    if (people.length < 2 || events.length >= 1) continue;
-    const first = people[city.clock.tick % people.length];
-    const second = people[(city.clock.tick + 1) % people.length];
-    if (!first || !second || first.citizen_id === second.citizen_id) continue;
-    events.push(
-      addEvent(city, {
-        event_type: "social_opportunity",
-        location_id: locationId,
-        actors: [first.citizen_id, second.citizen_id],
-        description: `${first.name} and ${second.name} have a natural chance to talk. They are ${relationshipLabelFromScore(first.relationship_scores[second.citizen_id] ?? 38)}.`,
-        payload: { relationship: relationshipLabelFromScore(first.relationship_scores[second.citizen_id] ?? 38) },
-        priority: 2,
-      }),
-    );
+  const encounter = city.encounter;
+  if (encounter) {
+    const actor = findCitizen(city, encounter.actor_id), target = findCitizen(city, encounter.target_id);
+    const interrupted = [actor, target].some((c) => c.citizen_id === city.policy.player_citizen_id || playerTask(c)?.status === "active" || c.energy < 18 || c.health < 45 || c.current_location_id !== encounter.location_id);
+    if (interrupted || now - encounter.started_at > 60) {
+      addEvent(city, { event_type: "encounter_interrupted", actors: [actor.citizen_id, target.citizen_id], description: `${actor.name} could not catch ${target.name} before circumstances changed.`, priority: 1 });
+      city.encounter = null;
+      return;
+    }
+    if ((!beat && now <= encounter.started_at) || !sociallyAvailable(actor, city.policy.player_citizen_id) || !sociallyAvailable(target, city.policy.player_citizen_id) || !nearCitizen(actor, target)) return;
+    const event = addEvent(city, { event_type: "social_opportunity", actors: [actor.citizen_id, target.citizen_id], location_id: encounter.location_id,
+      description: encounter.reason, payload: { topic: encounter.topic, kind: encounter.meeting_id ? "planned" : "chance", meeting_id: encounter.meeting_id }, priority: 2 });
+    await runAutonomousCognition(city, event, cognition);
+    if (encounter.meeting_id) {
+      const meeting = city.meetings?.find((m) => m.id === encounter.meeting_id);
+      if (meeting) meeting.status = "completed";
+    }
+    city.encounter = null;
+    return;
   }
-  return events;
+  if (!beat && now - Number(city.policy.last_social_choice ?? -10000) < 45) return;
+  const recent = sessionConversations();
+  const available = city.citizens.filter((c) => sociallyAvailable(c, city.policy.player_citizen_id) && !meetingFor(city, c));
+  const choices = available.map((actor) => ({ actor, nearby: available.filter((target) => target !== actor && target.current_location_id === actor.current_location_id
+    && !recent.some((c) => c.actor_ids.includes(actor.citizen_id) && c.actor_ids.includes(target.citizen_id) && now - (c.game_day * 1440 + c.game_minute) < 120)) })).filter((choice) => choice.nearby.length);
+  const turns = (city.policy.social_choice_times ?? {}) as Record<string, number>;
+  choices.sort((a, b) => (turns[a.actor.citizen_id] ?? 0) - (turns[b.actor.citizen_id] ?? 0));
+  const choice = choices[0];
+  if (!choice) return;
+  if (!decide) throw new Error("Social decision service is unavailable.");
+  const decision = await decide({ citizen: clone(choice.actor), city_time: describeNow(city),
+    location: locationName(city, choice.actor.current_location_id), memories: privateMemoryContext(choice.actor),
+    nearby: choice.nearby.map((c) => ({ citizen_id: c.citizen_id, name: c.name, activity: c.current_activity })) });
+  if (isStale(city)) throw new Error("This action was interrupted.");
+  if (!decision.reason?.trim() || (decision.target_id && (!decision.topic?.trim() || !choice.nearby.some((c) => c.citizen_id === decision.target_id)))) throw new Error("The citizen selected an unavailable encounter.");
+  city.policy.last_social_choice = now;
+  city.policy.social_choice_times = { ...turns, [choice.actor.citizen_id]: now };
+  choice.actor.current_thought = decision.reason;
+  if (!decision.target_id) {
+    addEvent(city, { event_type: "quiet_moment", actors: [choice.actor.citizen_id], description: `${choice.actor.name} chose some time alone: ${decision.reason}`, priority: 1 });
+    return;
+  }
+  city.encounter = { actor_id: choice.actor.citizen_id, target_id: decision.target_id, location_id: choice.actor.current_location_id,
+    reason: decision.reason, topic: decision.topic, started_at: now };
+  addEvent(city, { event_type: "encounter_intention", actors: [choice.actor.citizen_id, decision.target_id], location_id: choice.actor.current_location_id,
+    description: `${choice.actor.name} wants to approach ${findCitizen(city, decision.target_id).name}: ${decision.reason}`, priority: 2 });
 }
 
 function currentTaskTarget(city: CityState, task: PlayerTaskData) {
-  if (task.task_kind === "go_with_citizen" && task.companion_confirmed) return null;
+  if (task.task_kind === "go_with_citizen" && task.companion_confirmed)
+    return null;
   const targetIds = task.target_citizen_ids?.length
     ? task.target_citizen_ids
     : task.target_citizen_id
@@ -667,34 +1470,55 @@ function currentTaskTarget(city: CityState, task: PlayerTaskData) {
     targetIds[task.current_target_index ?? 0] ??
     task.target_citizen_id ??
     null;
-  return nextTargetId ? city.citizens.find((citizen) => citizen.citizen_id === nextTargetId) ?? null : null;
+  return nextTargetId
+    ? (city.citizens.find((citizen) => citizen.citizen_id === nextTargetId) ??
+        null)
+    : null;
 }
 
 function nearCitizen(first: CitizenAgent, second: CitizenAgent) {
-  return first.current_location_id === second.current_location_id && Math.abs(first.x - second.x) + Math.abs(first.y - second.y) <= 2;
+  return (
+    first.current_location_id === second.current_location_id &&
+    Math.abs(first.x - second.x) + Math.abs(first.y - second.y) <= 2
+  );
 }
 
-function taskProgressLabel(city: CityState, citizen: CitizenAgent, task: PlayerTaskData) {
+function taskProgressLabel(
+  city: CityState,
+  citizen: CitizenAgent,
+  task: PlayerTaskData,
+) {
   if (task.task_kind === "self_answer") return "answering the player";
-  if (task.task_kind === "go_to_location") return `walking to ${locationName(city, task.location_id ?? citizen.current_location_id)}`;
+  if (task.task_kind === "go_to_location")
+    return `walking to ${locationName(city, task.location_id ?? citizen.current_location_id)}`;
   if (task.task_kind === "go_with_citizen" && task.companion_confirmed) {
     return `walking to ${locationName(city, task.location_id ?? citizen.current_location_id)} with the companion`;
   }
   const target = currentTaskTarget(city, task);
   if (!target) return "wrapping up the task";
   const completed = task.completed_target_ids?.length ?? 0;
-  const total = task.target_citizen_ids?.length ?? (task.target_citizen_id ? 1 : 0);
+  const total =
+    task.target_citizen_ids?.length ?? (task.target_citizen_id ? 1 : 0);
   const count = total > 1 ? ` (${completed + 1}/${total})` : "";
-  return nearCitizen(citizen, target) ? `talking with ${target.name}${count}` : `walking to ${target.name}${count}`;
+  return nearCitizen(citizen, target)
+    ? `talking with ${target.name}${count}`
+    : `walking to ${target.name}${count}`;
 }
 
-async function runTaskCognition(city: CityState, citizen: CitizenAgent, generateCognition: GenerateCognition) {
+async function runTaskCognition(
+  city: CityState,
+  citizen: CitizenAgent,
+  generateCognition: GenerateCognition,
+) {
   const task = playerTask(citizen);
   if (!task) return;
   const target = currentTaskTarget(city, task);
   if (!target && isLocationTask(task)) {
     citizen.current_thought = `I am focused on the current task: ${task.task}`;
-    citizen.personality = { ...citizen.personality, player_task: { ...task, last_cognition_tick: city.clock.tick } };
+    citizen.personality = {
+      ...citizen.personality,
+      player_task: { ...task, last_cognition_tick: city.clock.tick },
+    };
     return;
   }
   if (!target) {
@@ -714,7 +1538,20 @@ async function runTaskCognition(city: CityState, citizen: CitizenAgent, generate
   }
   if (!nearCitizen(citizen, target)) {
     citizen.current_thought = `I need to reach ${target.name} before I can do this task: ${task.task}`;
-    citizen.personality = { ...citizen.personality, player_task: { ...task, last_cognition_tick: city.clock.tick } };
+    citizen.personality = {
+      ...citizen.personality,
+      player_task: { ...task, last_cognition_tick: city.clock.tick },
+    };
+    return;
+  }
+  if (target.citizen_id === city.policy.player_citizen_id) {
+    blockManualTask(
+      city,
+      citizen,
+      task,
+      "task_unresolved",
+      `${citizen.name} is waiting to speak with you about: ${task.task}. Open Talk to reply as ${target.name}.`,
+    );
     return;
   }
 
@@ -728,28 +1565,54 @@ async function runTaskCognition(city: CityState, citizen: CitizenAgent, generate
     observations: buildTaskObservations(city, citizen, target, task),
     memories: scopedPrivateMemoryContext(citizen, task.task, target),
     private_memories: {
-      [citizen.citizen_id]: scopedPrivateMemoryContext(citizen, task.task, target),
-      [target.citizen_id]: scopedPrivateMemoryContext(target, task.task, citizen),
+      [citizen.citizen_id]: scopedPrivateMemoryContext(
+        citizen,
+        task.task,
+        target,
+      ),
+      [target.citizen_id]: scopedPrivateMemoryContext(
+        target,
+        task.task,
+        citizen,
+      ),
     },
   });
   applyCognition(city, citizen, target, task, response);
 }
 
-function buildSoloTaskObservations(city: CityState, citizen: CitizenAgent, task: PlayerTaskData) {
+function buildSoloTaskObservations(
+  city: CityState,
+  citizen: CitizenAgent,
+  task: PlayerTaskData,
+) {
   return [
     `Player task: "${task.task}". ${citizen.name} has chosen to handle this without a conversation target.`,
-    task.plan_summary ? `Agent plan visible to player: ${task.plan_summary}` : "",
-    task.reasoning_summary ? `Agent private planning summary: ${task.reasoning_summary}` : "",
+    task.plan_summary
+      ? `Agent plan visible to player: ${task.plan_summary}`
+      : "",
+    task.reasoning_summary
+      ? `Agent private planning summary: ${task.reasoning_summary}`
+      : "",
     `${citizen.name} is at ${locationName(city, citizen.current_location_id)}, mood ${citizen.mood}, currently ${citizen.current_activity.toLowerCase()}.`,
     `The answer or next action must come from ${citizen.name}'s own memory, relationships, goals, and current state.`,
   ].filter(Boolean);
 }
 
-function buildTaskObservations(city: CityState, citizen: CitizenAgent, target: CitizenAgent, task: PlayerTaskData) {
-  const relationshipScore = citizen.relationship_scores[target.citizen_id] ?? 38;
+function buildTaskObservations(
+  city: CityState,
+  citizen: CitizenAgent,
+  target: CitizenAgent,
+  task: PlayerTaskData,
+) {
+  const relationshipScore =
+    citizen.relationship_scores[target.citizen_id] ?? 38;
   const completed = task.completed_target_ids?.length ?? 0;
-  const total = task.target_citizen_ids?.length ?? (task.target_citizen_id ? 1 : 0);
-  const routeProgress = total > 1 ? `This is conversation ${completed + 1} of ${total} in a player-directed route.` : "";
+  const total =
+    task.target_citizen_ids?.length ?? (task.target_citizen_id ? 1 : 0);
+  const routeProgress =
+    total > 1
+      ? `This is conversation ${completed + 1} of ${total} in a player-directed route.`
+      : "";
   const taskIntent =
     task.task_kind === "greet_all"
       ? `${citizen.name} should literally greet ${target.name}, let ${target.name} answer, and leave a small human memory.`
@@ -765,8 +1628,14 @@ function buildTaskObservations(city: CityState, citizen: CitizenAgent, target: C
     `${citizen.name} is physically near ${target.name} at ${locationName(city, citizen.current_location_id)}. ${routeProgress}`,
     `${citizen.name} and ${target.name} are ${relationshipLabelFromScore(relationshipScore)}. ${target.name} is ${target.mood.toLowerCase()} and currently ${target.current_activity.toLowerCase()}.`,
     "Memory boundary: the actor only knows their own memories and what other citizens say out loud in this conversation. Do not invent private facts for the target.",
-    ...recentConversationFacts(citizen.citizen_id).map((fact) => `Private memory evidence for ${citizen.name}: ${fact}`),
   ].filter(Boolean);
+}
+
+function privateFeelingContext(citizen: CitizenAgent, targetId?: string) {
+  const names = new Map(getSessionCity()?.citizens.map((c) => [c.citizen_id, c.name]));
+  return sessionRelationships(citizen.citizen_id)
+    .filter((bond) => (!targetId || bond.other_citizen_id === targetId) && bond.history?.length)
+    .map((bond) => `My private feelings toward ${names.get(bond.other_citizen_id) ?? bond.other_citizen_id}: ${JSON.stringify(bond.feelings ?? emptyFeelings())}. Trust: ${bond.trust}. Last experience: ${bond.history?.at(-1)?.reason}. These are my feelings, not evidence of their intentions.`);
 }
 
 function privateMemoryContext(citizen: CitizenAgent) {
@@ -776,58 +1645,84 @@ function privateMemoryContext(citizen: CitizenAgent) {
   const conversations = recentConversationFacts(citizen.citizen_id)
     .slice(-6)
     .map((fact) => `${citizen.name} private conversation memory: ${fact}`);
-  return [...memories, ...conversations];
+  return [...electionNotice(getSessionCity()!), ...privateFeelingContext(citizen), ...memories, ...conversations];
 }
 
-function scopedPrivateMemoryContext(citizen: CitizenAgent, currentTask: string, target?: CitizenAgent | null) {
+function scopedPrivateMemoryContext(
+  citizen: CitizenAgent,
+  currentTask: string,
+  target?: CitizenAgent | null,
+) {
   const rawMemories = sessionMemories(citizen.citizen_id);
   const seed = rawMemories
     .filter((memory) => memory.extra?.source === "seed")
     .slice(0, 1)
-    .map((memory) => `${citizen.name} private identity memory: ${memory.content}`);
+    .map(
+      (memory) => `${citizen.name} private identity memory: ${memory.content}`,
+    );
   const relevant = rawMemories
     .filter((memory) => memory.extra?.source !== "seed")
-    .filter((memory) => memoryRelevantToCurrentTask(memory.content, currentTask, target))
+    .filter((memory) =>
+      memoryRelevantToCurrentTask(memory.content, currentTask, target),
+    )
     .slice(0, 5)
-    .map((memory) => `${citizen.name} private memory relevant to current task: ${memory.content}`);
+    .map(
+      (memory) =>
+        `${citizen.name} private memory relevant to current task: ${memory.content}`,
+    );
   const conversations = recentConversationFacts(citizen.citizen_id)
     .filter((fact) => memoryRelevantToCurrentTask(fact, currentTask, target))
     .slice(0, 4)
-    .map((fact) => `${citizen.name} private conversation history relevant to current task: ${fact}`);
+    .map(
+      (fact) =>
+        `${citizen.name} private conversation history relevant to current task: ${fact}`,
+    );
   return [
     `${citizen.name} current active task, highest priority: ${currentTask}`,
     "Prior memories are background only. Do not continue a prior task or repeat a prior topic unless the current active task explicitly asks for it.",
     ...seed,
+    ...electionNotice(getSessionCity()!),
+    ...privateFeelingContext(citizen, target?.citizen_id),
     ...relevant,
     ...conversations,
   ];
 }
 
 function locationName(city: CityState, locationId: string) {
-  return city.locations.find((location) => location.location_id === locationId)?.name ?? locationId;
+  return (
+    city.locations.find((location) => location.location_id === locationId)
+      ?.name ?? locationId
+  );
 }
 
-async function runAutonomousCognition(city: CityState, event: CityEvent, generateCognition: GenerateCognition) {
+async function runAutonomousCognition(
+  city: CityState,
+  event: CityEvent,
+  generateCognition: GenerateCognition,
+) {
   const [actorId, targetId] = event.actors;
   if (!actorId || !targetId) return;
   const actor = city.citizens.find((citizen) => citizen.citizen_id === actorId);
-  const target = city.citizens.find((citizen) => citizen.citizen_id === targetId);
+  const target = city.citizens.find(
+    (citizen) => citizen.citizen_id === targetId,
+  );
   if (!actor || !target) return;
 
   const relationshipScore = actor.relationship_scores[target.citizen_id] ?? 38;
   const response = await generateCognition({
     city,
     actor_id: actor.citizen_id,
+    conversation_mode: "autonomous",
     target_id: target.citizen_id,
     required_target_id: target.citizen_id,
     require_conversation: true,
-    task: `Have a natural city conversation with ${target.name}.`,
+    task: `Talk with ${target.name} about ${String(event.payload?.topic || "what brought you together").slice(0, 180)}.`,
     observations: [
       `Autonomous social moment: ${event.description}`,
       `${actor.name} and ${target.name} are ${relationshipLabelFromScore(relationshipScore)} at ${locationName(city, actor.current_location_id)}.`,
       `${actor.name} is ${actor.mood.toLowerCase()} and ${target.name} is ${target.mood.toLowerCase()}.`,
-      "Let them talk like real students. The conversation should reveal whether they are strangers, acquaintances, or becoming friends.",
-      ...recentConversationFacts(actor.citizen_id).map((fact) => `Recent actor conversation: ${fact}`),
+      "Let them talk like real people of their ages. The conversation should reveal whether they are strangers, acquaintances, friends, family, or at odds.",
+      "Respect a wish for privacy or a refusal. A conversation may end without becoming friends. Only make a future plan if both genuinely want it.",
     ],
     memories: privateMemoryContext(actor),
     private_memories: {
@@ -845,9 +1740,13 @@ function applyAutonomousCognition(
   sourceEvent: CityEvent,
   response: SessionCognitionResponse,
 ) {
+  if (!validTaskConversation(response.conversation, actor, target))
+    throw new Error(
+      "No valid conversation was returned; nothing was committed.",
+    );
   actor.current_thought = response.thought;
-  actor.mood = response.mood || actor.mood;
-  const actorMemory = response.participant_memories?.[actor.citizen_id] ?? response.memory;
+  const actorMemory =
+    response.participant_memories?.[actor.citizen_id] ?? response.memory;
   const targetMemory = response.participant_memories?.[target.citizen_id] ?? "";
   actor.memory_summary = compactSummary(actor.memory_summary, actorMemory);
 
@@ -860,7 +1759,9 @@ function applyAutonomousCognition(
     related_citizen_id: target.citizen_id,
     extra: {
       source: "autonomous_cognition",
-      reflection: response.participant_reflections?.[actor.citizen_id] ?? response.reflection,
+      reflection:
+        response.participant_reflections?.[actor.citizen_id] ??
+        response.reflection,
       source_event_id: sourceEvent.event_id,
     },
   });
@@ -881,7 +1782,11 @@ function applyAutonomousCognition(
     });
   }
 
-  const conversation = validTaskConversation(response.conversation, actor, target);
+  const conversation = validTaskConversation(
+    response.conversation,
+    actor,
+    target,
+  );
   if (!conversation) {
     addEvent(city, {
       event_type: "agent_cognition_blocked",
@@ -894,7 +1799,9 @@ function applyAutonomousCognition(
     return;
   }
 
-  const before = relationshipLabelFromScore(actor.relationship_scores[target.citizen_id] ?? 38);
+  const before = relationshipLabelFromScore(
+    actor.relationship_scores[target.citizen_id] ?? 38,
+  );
   const savedConversation: Conversation = {
     ...conversation,
     conversation_id: conversation.conversation_id || newId("convo"),
@@ -903,40 +1810,69 @@ function applyAutonomousCognition(
     location_id: conversation.location_id ?? actor.current_location_id,
     actor_ids: [actor.citizen_id, target.citizen_id],
     transcript: conversation.transcript.slice(0, 8),
+    encounter: sourceEvent.event_type === "social_opportunity" ? {
+      kind: sourceEvent.payload?.kind === "planned" ? "planned" : "chance",
+      reason: sourceEvent.description, topic: String(sourceEvent.payload?.topic ?? ""),
+      meeting_id: typeof sourceEvent.payload?.meeting_id === "string" ? sourceEvent.payload.meeting_id : undefined,
+    } as EncounterContext : undefined,
   };
-  strengthenRelationship(city, actor, target, savedConversation.summary);
-  const after = relationshipLabelFromScore(actor.relationship_scores[target.citizen_id] ?? 38);
+  recordMeeting(city, response, savedConversation);
+  savedConversation.impacts = strengthenRelationship(city, actor, target, response, savedConversation.conversation_id);
+  const after = relationshipLabelFromScore(
+    actor.relationship_scores[target.citizen_id] ?? 38,
+  );
   savedConversation.summary = `${savedConversation.summary} Relationship: ${before} -> ${after}.`;
-  writeJson(CONVERSATIONS_KEY, [savedConversation, ...sessionConversations()].slice(0, 80));
+  writeJson(
+    CONVERSATIONS_KEY,
+    [savedConversation, ...sessionConversations()].slice(0, 80),
+  );
   addEvent(city, {
     event_type: "conversation",
     location_id: savedConversation.location_id,
     actors: savedConversation.actor_ids,
     description: `${actor.name} and ${target.name} talked autonomously: ${savedConversation.summary}`,
-    payload: { conversation_id: savedConversation.conversation_id, source_event_id: sourceEvent.event_id },
+    payload: {
+      conversation_id: savedConversation.conversation_id,
+      source_event_id: sourceEvent.event_id,
+    },
     priority: 2,
   });
 }
 
-function applySoloCognition(city: CityState, citizen: CitizenAgent, task: PlayerTaskData, response: SessionCognitionResponse) {
+function applySoloCognition(
+  city: CityState,
+  citizen: CitizenAgent,
+  task: PlayerTaskData,
+  response: SessionCognitionResponse,
+) {
   const answer = response.thought || response.memory || response.reflection;
-  const citizenMemory = response.participant_memories?.[citizen.citizen_id] ?? response.memory;
+  const citizenMemory =
+    response.participant_memories?.[citizen.citizen_id] ?? response.memory;
   citizen.current_activity = "Answered the player";
   citizen.current_thought = answer;
   citizen.mood = response.mood || citizen.mood;
-  citizen.memory_summary = compactSummary(citizen.memory_summary, citizenMemory);
-  citizen.personality = { ...citizen.personality, player_task: { ...task, last_cognition_tick: city.clock.tick } };
+  citizen.memory_summary = compactSummary(
+    citizen.memory_summary,
+    citizenMemory,
+  );
+  citizen.personality = {
+    ...citizen.personality,
+    player_task: { ...task, last_cognition_tick: city.clock.tick },
+  };
 
   addMemory({
     citizen_id: citizen.citizen_id,
     kind: "episodic",
-    content: citizenMemory || `${citizen.name} handled the player task: ${task.task}`,
+    content:
+      citizenMemory || `${citizen.name} handled the player task: ${task.task}`,
     importance: response.importance || 0.64,
     salience: response.importance || 0.64,
     related_citizen_id: null,
     extra: {
       source: "session_cognition",
-      reflection: response.participant_reflections?.[citizen.citizen_id] ?? response.reflection,
+      reflection:
+        response.participant_reflections?.[citizen.citizen_id] ??
+        response.reflection,
       task_kind: task.task_kind,
     },
   });
@@ -948,7 +1884,8 @@ function applySoloCognition(city: CityState, citizen: CitizenAgent, task: Player
         conversation_id: responseConversation.conversation_id || newId("convo"),
         game_day: city.clock.day,
         game_minute: city.clock.minute_of_day,
-        location_id: responseConversation.location_id ?? citizen.current_location_id,
+        location_id:
+          responseConversation.location_id ?? citizen.current_location_id,
         actor_ids: [citizen.citizen_id],
         transcript: responseConversation.transcript.length
           ? responseConversation.transcript
@@ -963,7 +1900,10 @@ function applySoloCognition(city: CityState, citizen: CitizenAgent, task: Player
         summary: `${citizen.name} answered the player: ${answer}`,
         transcript: [{ speaker_id: citizen.citizen_id, text: answer }],
       };
-  writeJson(CONVERSATIONS_KEY, [conversation, ...sessionConversations()].slice(0, 80));
+  writeJson(
+    CONVERSATIONS_KEY,
+    [conversation, ...sessionConversations()].slice(0, 80),
+  );
   addEvent(city, {
     event_type: "task_answer",
     location_id: citizen.current_location_id,
@@ -972,7 +1912,23 @@ function applySoloCognition(city: CityState, citizen: CitizenAgent, task: Player
     payload: { task: task.task, conversation_id: conversation.conversation_id },
     priority: 3,
   });
-  finishManualTask(city, citizen, task, citizen.current_location_id);
+  if (task.task_kind === "self_answer") {
+    finishManualTask(city, citizen, task, citizen.current_location_id);
+  } else {
+    blockManualTask(city, citizen, task, "task_unresolved", `${citizen.name} has a response, but no executed action fulfills this request yet: ${answer}`);
+  }
+}
+
+function recordMeeting(city: CityState, response: SessionCognitionResponse, conversation: Conversation) {
+  const meeting = acceptMeeting(city, response.meeting_plan, conversation.actor_ids, conversation.conversation_id);
+  if (!meeting) return;
+  city.meetings = [...(city.meetings ?? []).filter((m) => m.id !== meeting.id).slice(-39), meeting];
+  const at = `${String(Math.floor(meeting.game_minute / 60)).padStart(2, "0")}:${String(meeting.game_minute % 60).padStart(2, "0")}`;
+  const description = `${meeting.actor_ids.map((id) => findCitizen(city, id).name).join(" and ")} agreed to meet at ${locationName(city, meeting.location_id)} on day ${meeting.game_day} at ${at}: ${meeting.topic}.`;
+  addEvent(city, { event_type: "meeting_planned", location_id: meeting.location_id, actors: meeting.actor_ids, description,
+    payload: { conversation_id: conversation.conversation_id, meeting_id: meeting.id }, priority: 2 });
+  meeting.actor_ids.forEach((id) => addMemory({ citizen_id: id, related_citizen_id: meeting.actor_ids.find((other) => other !== id) ?? null, kind: "episodic", content: description,
+    importance: 0.8, salience: 0.85, extra: { source: "agreed_meeting", meeting_id: meeting.id } }));
 }
 
 function applyCognition(
@@ -982,16 +1938,22 @@ function applyCognition(
   task: PlayerTaskData,
   response: SessionCognitionResponse,
 ) {
+  if (!validTaskConversation(response.conversation, citizen, target))
+    throw new Error(
+      "No valid conversation was returned; nothing was committed.",
+    );
   citizen.current_thought = response.thought;
-  citizen.mood = response.mood || citizen.mood;
-  const actorMemory = response.participant_memories?.[citizen.citizen_id] ?? response.memory;
+  const actorMemory =
+    response.participant_memories?.[citizen.citizen_id] ?? response.memory;
   const targetMemory =
     response.participant_memories?.[target.citizen_id] ??
     `${target.name} remembers that ${citizen.name} spoke with them about: ${task.task}.`;
   citizen.memory_summary = compactSummary(citizen.memory_summary, actorMemory);
   target.memory_summary = compactSummary(target.memory_summary, targetMemory);
   const previousCompleted = task.completed_target_ids ?? [];
-  const completedTargetIds = Array.from(new Set([...previousCompleted, target.citizen_id]));
+  const completedTargetIds = Array.from(
+    new Set([...previousCompleted, target.citizen_id]),
+  );
   const updatedTask = {
     ...task,
     completed_target_ids: completedTargetIds,
@@ -1010,7 +1972,9 @@ function applyCognition(
     related_citizen_id: target.citizen_id,
     extra: {
       source: "session_cognition",
-      reflection: response.participant_reflections?.[citizen.citizen_id] ?? response.reflection,
+      reflection:
+        response.participant_reflections?.[citizen.citizen_id] ??
+        response.reflection,
     },
   });
   addMemory({
@@ -1026,7 +1990,11 @@ function applyCognition(
     },
   });
 
-  const conversation = validTaskConversation(response.conversation, citizen, target);
+  const conversation = validTaskConversation(
+    response.conversation,
+    citizen,
+    target,
+  );
   if (!conversation) {
     blockManualTask(
       city,
@@ -1047,14 +2015,25 @@ function applyCognition(
       actor_ids: [citizen.citizen_id, target.citizen_id],
       transcript: conversation.transcript
         .filter((line) => line.speaker_id && line.text.trim())
-        .map((line) => ({ speaker_id: line.speaker_id, text: line.text.trim() }))
+        .map((line) => ({
+          speaker_id: line.speaker_id,
+          text: line.text.trim(),
+        }))
         .slice(0, 8),
     };
-    const before = relationshipLabelFromScore(citizen.relationship_scores[target.citizen_id] ?? 38);
-    strengthenRelationship(city, citizen, target, savedConversation.summary);
-    const after = relationshipLabelFromScore(citizen.relationship_scores[target.citizen_id] ?? 38);
+    const before = relationshipLabelFromScore(
+      citizen.relationship_scores[target.citizen_id] ?? 38,
+    );
+    recordMeeting(city, response, savedConversation);
+    savedConversation.impacts = strengthenRelationship(city, citizen, target, response, savedConversation.conversation_id);
+    const after = relationshipLabelFromScore(
+      citizen.relationship_scores[target.citizen_id] ?? 38,
+    );
     savedConversation.summary = `${savedConversation.summary} Relationship: ${before} -> ${after}.`;
-    writeJson(CONVERSATIONS_KEY, [savedConversation, ...sessionConversations()].slice(0, 80));
+    writeJson(
+      CONVERSATIONS_KEY,
+      [savedConversation, ...sessionConversations()].slice(0, 80),
+    );
     addEvent(city, {
       event_type: "conversation",
       location_id: savedConversation.location_id,
@@ -1066,6 +2045,19 @@ function applyCognition(
   }
 
   if (task.task_kind === "go_with_citizen") {
+    if (
+      response.participant_outcomes?.[target.citizen_id]
+        ?.invitation_response !== "accepted"
+    ) {
+      blockManualTask(
+        city,
+        citizen,
+        updatedTask,
+        "invitation_unresolved",
+        `${target.name} has not agreed to go. The invitation is unresolved; no journey was started.`,
+      );
+      return;
+    }
     const destinationId = task.location_id ?? citizen.current_location_id;
     const coordinatedTask = {
       ...updatedTask,
@@ -1075,7 +2067,10 @@ function applyCognition(
       completed_target_ids: [target.citizen_id],
       last_cognition_tick: city.clock.tick,
     };
-    citizen.personality = { ...citizen.personality, player_task: coordinatedTask };
+    citizen.personality = {
+      ...citizen.personality,
+      player_task: coordinatedTask,
+    };
     citizen.current_activity = `Going to ${locationName(city, destinationId)} with ${target.name}`;
     citizen.current_thought = `${target.name} and I are going to ${locationName(city, destinationId)} together.`;
     target.personality = {
@@ -1100,9 +2095,35 @@ function applyCognition(
     return;
   }
 
-  const targetCount = task.target_citizen_ids?.length ?? (task.target_citizen_id ? 1 : 0);
+  const targetCount =
+    task.target_citizen_ids?.length ?? (task.target_citizen_id ? 1 : 0);
+  if (
+    response.participant_outcomes?.[citizen.citizen_id]?.task_complete !== true
+  ) {
+    blockManualTask(
+      city,
+      citizen,
+      { ...updatedTask, completed_target_ids: previousCompleted },
+      "task_unresolved",
+      `${citizen.name} spoke with ${target.name}, but this part of the request is unresolved.`,
+    );
+    return;
+  }
   if (targetCount > 0 && completedTargetIds.length >= targetCount) {
-    finishManualTask(city, citizen, updatedTask, citizen.current_location_id);
+    if (
+      response.participant_outcomes?.[citizen.citizen_id]?.task_complete ===
+      true
+    ) {
+      finishManualTask(city, citizen, updatedTask, citizen.current_location_id);
+    } else {
+      blockManualTask(
+        city,
+        citizen,
+        updatedTask,
+        "task_unresolved",
+        `${citizen.name} spoke with ${target.name}, but the request is not resolved. Read their conversation before deciding what to do next.`,
+      );
+    }
   } else {
     const nextTarget = currentTaskTarget(city, updatedTask);
     if (nextTarget) {
@@ -1119,15 +2140,28 @@ function validTaskConversation(
 ): Conversation | null {
   if (!conversation) return null;
   const lines = conversation.transcript
-    .filter((line) => line.speaker_id && line.text.trim())
+    .filter(
+      (line) =>
+        [citizen.citizen_id, target.citizen_id].includes(line.speaker_id) &&
+        line.text.trim(),
+    )
     .map((line) => ({ speaker_id: line.speaker_id, text: line.text.trim() }));
-  const hasActorLine = lines.some((line) => line.speaker_id === citizen.citizen_id);
-  const hasTargetLine = lines.some((line) => line.speaker_id === target.citizen_id);
+  const hasActorLine = lines.some(
+    (line) => line.speaker_id === citizen.citizen_id,
+  );
+  const hasTargetLine = lines.some(
+    (line) => line.speaker_id === target.citizen_id,
+  );
   if (!hasActorLine || !hasTargetLine || lines.length < 2) return null;
   return { ...conversation, transcript: lines };
 }
 
-function completeTask(city: CityState, citizen: CitizenAgent, task: PlayerTaskData, locationId: string) {
+function completeTask(
+  city: CityState,
+  citizen: CitizenAgent,
+  task: PlayerTaskData,
+  locationId: string,
+) {
   const completed = {
     ...task,
     status: "completed",
@@ -1153,7 +2187,11 @@ function blockManualTask(
   city: CityState,
   citizen: CitizenAgent,
   task: PlayerTaskData,
-  eventType: "agent_planning_blocked" | "agent_cognition_blocked",
+  eventType:
+    | "agent_planning_blocked"
+    | "agent_cognition_blocked"
+    | "invitation_unresolved"
+    | "task_unresolved",
   description: string,
 ) {
   const blocked = {
@@ -1164,7 +2202,8 @@ function blockManualTask(
   };
   citizen.personality = { ...citizen.personality, player_task: blocked };
   citizen.current_activity = "AI planning unavailable";
-  citizen.current_thought = "I need my AI cognition before I can handle that task like a real person.";
+  citizen.current_thought =
+    "I need my AI cognition before I can handle that task like a real person.";
   citizen.short_term_goals = withoutPlayerTask(citizen.short_term_goals);
   addEvent(city, {
     event_type: eventType,
@@ -1176,12 +2215,21 @@ function blockManualTask(
   });
 }
 
-function finishManualTask(city: CityState, citizen: CitizenAgent, task: PlayerTaskData, locationId: string) {
+function finishManualTask(
+  city: CityState,
+  citizen: CitizenAgent,
+  task: PlayerTaskData,
+  locationId: string,
+) {
   completeTask(city, citizen, task, locationId);
   addEvent(city, {
     event_type: "player_task_completed",
     location_id: locationId,
-    actors: [citizen.citizen_id, ...(task.completed_target_ids ?? []), task.target_citizen_id].filter(Boolean) as string[],
+    actors: [
+      citizen.citizen_id,
+      ...(task.completed_target_ids ?? []),
+      task.target_citizen_id,
+    ].filter(Boolean) as string[],
     description: `${citizen.name} completed the player task: ${task.task}`,
     payload: {
       task: task.task,
@@ -1194,59 +2242,87 @@ function finishManualTask(city: CityState, citizen: CitizenAgent, task: PlayerTa
 
 function nextTargetId(task: PlayerTaskData, completedTargetIds: string[]) {
   const completed = new Set(completedTargetIds);
-  return (task.target_citizen_ids ?? []).find((targetId) => !completed.has(targetId)) ?? null;
-}
-
-function strengthenRelationship(city: CityState, first: CitizenAgent, second: CitizenAgent, summary: string) {
-  first.relationship_scores = {
-    ...first.relationship_scores,
-    [second.citizen_id]: clamp((first.relationship_scores[second.citizen_id] ?? 38) + 7, 0, 100),
-  };
-  second.relationship_scores = {
-    ...second.relationship_scores,
-    [first.citizen_id]: clamp((second.relationship_scores[first.citizen_id] ?? 38) + 7, 0, 100),
-  };
-  if ((first.relationship_scores[second.citizen_id] ?? 0) >= 58 && !first.friend_ids.includes(second.citizen_id)) {
-    first.friend_ids = [...first.friend_ids, second.citizen_id];
-  }
-  if ((second.relationship_scores[first.citizen_id] ?? 0) >= 58 && !second.friend_ids.includes(first.citizen_id)) {
-    second.friend_ids = [...second.friend_ids, first.citizen_id];
-  }
-
-  const relationships = ensureRelationships(city);
-  writeJson(
-    RELATIONSHIPS_KEY,
-    relationships.map((relationship) => {
-      if (
-        !(
-          (relationship.citizen_id === first.citizen_id && relationship.other_citizen_id === second.citizen_id) ||
-          (relationship.citizen_id === second.citizen_id && relationship.other_citizen_id === first.citizen_id)
-        )
-      ) {
-        return relationship;
-      }
-      return {
-        ...relationship,
-        familiarity: clamp(relationship.familiarity + 7),
-        warmth: clamp(relationship.warmth + 4),
-        trust: clamp(relationship.trust + 3),
-        notes: `Recent interaction: ${summary} Current bond: ${relationshipLabel(relationship)}.`,
-      };
-    }),
+  return (
+    (task.target_citizen_ids ?? []).find(
+      (targetId) => !completed.has(targetId),
+    ) ?? null
   );
 }
 
+function strengthenRelationship(
+  city: CityState,
+  first: CitizenAgent,
+  second: CitizenAgent,
+  response: SessionCognitionResponse,
+  conversationId: string,
+) {
+  const impacts: ConversationImpact[] = [];
+  const election = liveElection(city);
+  if (election?.phase === "campaign") {
+    for (const [speaker, listener] of [[first, second], [second, first]]) {
+      if (election.candidates.some((c) => c.citizen_id === speaker.citizen_id))
+        election.campaign_log.push({ candidate_id: speaker.citizen_id, target_id: listener.citizen_id, conversation_id: conversationId });
+    }
+    if (election.agenda && [first.citizen_id, second.citizen_id].includes(election.agenda.candidate_id) && [first.citizen_id, second.citizen_id].includes(election.agenda.target_id)) election.agenda = undefined;
+    if (election.waiting_for_player && [first.citizen_id, second.citizen_id].includes(election.waiting_for_player.candidate_id) && [first.citizen_id, second.citizen_id].includes(election.waiting_for_player.target_id)) election.waiting_for_player = undefined;
+  }
+  const relationships = ensureRelationships(city).map((relationship) => {
+    const owner =
+      relationship.citizen_id === first.citizen_id &&
+      relationship.other_citizen_id === second.citizen_id
+        ? first
+        : relationship.citizen_id === second.citizen_id &&
+            relationship.other_citizen_id === first.citizen_id
+          ? second
+          : null;
+    if (!owner) return relationship;
+    const outcome = response.participant_outcomes?.[owner.citizen_id];
+    const moodBefore = owner.mood;
+    if (outcome?.mood) owner.mood = outcome.mood;
+    if (outcome?.thought) owner.current_thought = outcome.thought;
+    const updated = outcome ? evolveRelationship(
+      relationship,
+      outcome,
+      city.clock.day,
+      city.clock.minute_of_day,
+      conversationId,
+    ) : relationship;
+    impacts.push(conversationImpact(relationship, updated, outcome, moodBefore, owner.mood, city.clock.day, city.clock.minute_of_day));
+    const otherId = updated.other_citizen_id;
+    owner.relationship_scores[otherId] = (updated.trust + updated.warmth) / 2;
+    owner.friend_ids = owner.friend_ids.filter((id) => id !== otherId);
+    if (["Friends", "Close friends"].includes(bondLabel(updated)))
+      owner.friend_ids.push(otherId);
+    return updated;
+  });
+  writeJson(RELATIONSHIPS_KEY, relationships);
+  return impacts;
+}
+
 function isLocationTask(task: PlayerTaskData) {
-  return task.task_kind === "go_to_location" || task.task_kind === "go_with_citizen";
+  return (
+    task.task_kind === "go_to_location" || task.task_kind === "go_with_citizen"
+  );
 }
 
-function locationTaskReadyToFinish(citizen: CitizenAgent, task: PlayerTaskData) {
-  if (task.status !== "active" || !isLocationTask(task) || !task.location_id) return false;
+function locationTaskReadyToFinish(
+  citizen: CitizenAgent,
+  task: PlayerTaskData,
+) {
+  if (task.status !== "active" || !isLocationTask(task) || !task.location_id)
+    return false;
   if (citizen.current_location_id !== task.location_id) return false;
-  return task.task_kind === "go_to_location" || Boolean(task.companion_confirmed);
+  return (
+    task.task_kind === "go_to_location" || Boolean(task.companion_confirmed)
+  );
 }
 
-function finishLocationTask(city: CityState, citizen: CitizenAgent, task: PlayerTaskData, locationId: string) {
+function finishLocationTask(
+  city: CityState,
+  citizen: CitizenAgent,
+  task: PlayerTaskData,
+  locationId: string,
+) {
   if (task.task_kind === "go_with_citizen") {
     for (const targetId of task.target_citizen_ids ?? []) {
       const target = city.citizens.find((item) => item.citizen_id === targetId);
@@ -1268,9 +2344,11 @@ function activeCompanionTask(citizen: CitizenAgent): CompanionTaskData | null {
   const raw = citizen.personality?.companion_task;
   if (!raw || typeof raw !== "object") return null;
   const data = raw as Record<string, unknown>;
-  const leaderId = typeof data.leader_citizen_id === "string" ? data.leader_citizen_id : "";
+  const leaderId =
+    typeof data.leader_citizen_id === "string" ? data.leader_citizen_id : "";
   const task = typeof data.task === "string" ? data.task : "";
-  const locationId = typeof data.location_id === "string" ? data.location_id : "";
+  const locationId =
+    typeof data.location_id === "string" ? data.location_id : "";
   const status = typeof data.status === "string" ? data.status : "active";
   if (!leaderId || !task || !locationId || status !== "active") return null;
   return {
@@ -1290,12 +2368,19 @@ function playerTask(citizen: CitizenAgent): PlayerTaskData | null {
   return {
     task: taskText,
     location_id: typeof data.location_id === "string" ? data.location_id : null,
-    target_citizen_id: typeof data.target_citizen_id === "string" ? data.target_citizen_id : null,
+    target_citizen_id:
+      typeof data.target_citizen_id === "string"
+        ? data.target_citizen_id
+        : null,
     target_citizen_ids: Array.isArray(data.target_citizen_ids)
-      ? data.target_citizen_ids.filter((id): id is string => typeof id === "string")
+      ? data.target_citizen_ids.filter(
+          (id): id is string => typeof id === "string",
+        )
       : [],
     completed_target_ids: Array.isArray(data.completed_target_ids)
-      ? data.completed_target_ids.filter((id): id is string => typeof id === "string")
+      ? data.completed_target_ids.filter(
+          (id): id is string => typeof id === "string",
+        )
       : [],
     current_target_index: numberOrUndefined(data.current_target_index),
     task_kind:
@@ -1309,8 +2394,12 @@ function playerTask(citizen: CitizenAgent): PlayerTaskData | null {
         ? data.task_kind
         : "open_task",
     companion_confirmed: data.companion_confirmed === true,
-    plan_summary: typeof data.plan_summary === "string" ? data.plan_summary : undefined,
-    reasoning_summary: typeof data.reasoning_summary === "string" ? data.reasoning_summary : undefined,
+    plan_summary:
+      typeof data.plan_summary === "string" ? data.plan_summary : undefined,
+    reasoning_summary:
+      typeof data.reasoning_summary === "string"
+        ? data.reasoning_summary
+        : undefined,
     assigned_day: numberOrUndefined(data.assigned_day),
     assigned_minute: numberOrUndefined(data.assigned_minute),
     status: typeof data.status === "string" ? data.status : "active",
@@ -1319,7 +2408,11 @@ function playerTask(citizen: CitizenAgent): PlayerTaskData | null {
 }
 
 function activeTaskCitizens(city: CityState) {
-  return city.citizens.filter((citizen) => playerTask(citizen)?.status === "active" || Boolean(activeCompanionTask(citizen)));
+  return city.citizens.filter(
+    (citizen) =>
+      playerTask(citizen)?.status === "active" ||
+      Boolean(activeCompanionTask(citizen)),
+  );
 }
 
 function addEvent(
@@ -1350,7 +2443,11 @@ function addEvent(
   return event;
 }
 
-function addMemory(input: Omit<Memory, "memory_id" | "created_at" | "source_event_id"> & { source_event_id?: string | null }) {
+function addMemory(
+  input: Omit<Memory, "memory_id" | "created_at" | "source_event_id"> & {
+    source_event_id?: string | null;
+  },
+) {
   if (!sessionMemoryEnabled()) return;
   const memories = readJson<Memory[]>(citizenMemoryKey(input.citizen_id)) ?? [];
   const memory: Memory = {
@@ -1359,7 +2456,14 @@ function addMemory(input: Omit<Memory, "memory_id" | "created_at" | "source_even
     created_at: new Date().toISOString(),
     ...input,
   };
-  writeJson(citizenMemoryKey(input.citizen_id), [memory, ...memories].slice(0, 120));
+  const recent = [memory, ...memories].slice(0, 80);
+  const important = memories
+    .filter(
+      (item) => !recent.some((entry) => entry.memory_id === item.memory_id),
+    )
+    .sort((a, b) => b.importance - a.importance)
+    .slice(0, 40);
+  writeJson(citizenMemoryKey(input.citizen_id), [...recent, ...important]);
 }
 
 function citizenMemoryKey(citizenId: string) {
@@ -1395,15 +2499,18 @@ function buildInitialRelationships(city: CityState): Relationship[] {
     city.citizens
       .filter((other) => other.citizen_id !== citizen.citizen_id)
       .map((other) => {
-        const score = citizen.relationship_scores[other.citizen_id] ?? 38;
+        const kin = relatives(city, citizen).includes(other.citizen_id);
+        const housemate = Boolean(citizen.life && citizen.life.household_id === other.life?.household_id);
+        const score = Math.max(citizen.relationship_scores[other.citizen_id] ?? 38, kin ? 84 : housemate ? 72 : 0);
         return {
           relationship_id: `rel_${citizen.citizen_id}_${other.citizen_id}`,
           citizen_id: citizen.citizen_id,
           other_citizen_id: other.citizen_id,
           trust: clamp(score),
           warmth: clamp(score),
-          familiarity: clamp(Math.max(12, score - 18)),
-          notes: `${citizen.name} knows ${other.name} from school life in Navora.`,
+          familiarity: clamp(kin || housemate ? 92 : Math.max(12, score - 18)),
+          feelings: emptyFeelings(),
+          notes: `No shared experiences recorded between ${citizen.name} and ${other.name} yet.`,
         };
       }),
   );
@@ -1421,6 +2528,12 @@ function ensureCitizenMemories(city: CityState | null, citizenId: string) {
 
 function ensureRelationships(city: CityState | null) {
   const relationships = readJson<Relationship[]>(RELATIONSHIPS_KEY);
+  if (relationships && city) {
+    const ids = new Set(relationships.map((r) => r.relationship_id));
+    const added = buildInitialRelationships(city).filter((r) => !ids.has(r.relationship_id));
+    if (added.length) writeJson(RELATIONSHIPS_KEY, [...relationships, ...added]);
+    return [...relationships, ...added];
+  }
   if (relationships) return relationships;
   const seeded = city ? buildInitialRelationships(city) : [];
   writeJson(RELATIONSHIPS_KEY, seeded);
@@ -1430,44 +2543,86 @@ function ensureRelationships(city: CityState | null) {
 function calculateMetrics(city: CityState): CityMetrics {
   const population = Math.max(1, city.citizens.length);
   const average = (selector: (citizen: CitizenAgent) => number) =>
-    city.citizens.reduce((sum, citizen) => sum + selector(citizen), 0) / population;
+    city.citizens.reduce((sum, citizen) => sum + selector(citizen), 0) /
+    population;
   const recentEvents = city.events.slice(-20);
   return {
     population: city.citizens.length,
     average_happiness: round1(average((citizen) => citizen.happiness)),
     city_health: round1(average((citizen) => citizen.health)),
-    economy_status: round1(Math.min(100, average((citizen) => citizen.money) / 2.2)),
+    economy_status: round1(
+      Math.min(100, average((citizen) => citizen.money) / 2.2),
+    ),
     education_status: round1(average((citizen) => citizen.happiness)),
-    traffic_status: round1(Math.max(0, 90 - recentEvents.filter((event) => event.event_type === "traffic_accident").length * 4)),
+    traffic_status: round1(
+      Math.max(
+        0,
+        90 -
+          recentEvents.filter(
+            (event) => event.event_type === "traffic_accident",
+          ).length *
+            4,
+      ),
+    ),
     sick_count: city.citizens.filter((citizen) => citizen.health < 65).length,
     active_events: recentEvents.filter((event) => event.priority >= 2).length,
   };
 }
 
-function moveToward(citizen: CitizenAgent, targetX: number, targetY: number) {
-  const speed = 2;
+function moveToward(citizen: CitizenAgent, targetX: number, targetY: number, city?: CityState) {
+  // About 12 map cells per 15 minutes on foot; seniors and snowy pavements are slower.
+  // Longer trips across the river use the bus or train unless a typhoon has stopped them.
+  const distance = Math.abs(targetX - citizen.x) + Math.abs(targetY - citizen.y);
+  const weather = city?.weather?.condition;
+  const transit = distance > 28 && weather !== "typhoon";
+  let budget = transit ? 32 : citizen.age >= 70 || weather === "snow" ? 8 : 12;
   const dx = targetX - citizen.x;
+  const stepX = Math.max(-budget, Math.min(budget, dx));
+  citizen.x += stepX;
+  budget -= Math.abs(stepX);
   const dy = targetY - citizen.y;
-  if (Math.abs(dx) >= Math.abs(dy) && dx !== 0) {
-    citizen.x += Math.max(-speed, Math.min(speed, dx));
-  } else if (dy !== 0) {
-    citizen.y += Math.max(-speed, Math.min(speed, dy));
-  } else if (dx !== 0) {
-    citizen.x += Math.max(-speed, Math.min(speed, dx));
-  }
+  citizen.y += Math.max(-budget, Math.min(budget, dy));
 }
 
 function updateNeeds(citizen: CitizenAgent) {
   citizen.hunger = clamp(citizen.hunger + 3.1);
   citizen.energy = clamp(citizen.energy - 2.3);
   citizen.stress = clamp(citizen.stress + (citizen.energy < 30 ? 0.8 : 0.2));
-  citizen.happiness = clamp(citizen.happiness - (citizen.hunger > 70 ? 0.8 : 0.1));
+  citizen.happiness = clamp(
+    citizen.happiness - (citizen.hunger > 70 ? 0.8 : 0.1),
+  );
   if (citizen.hunger > 88 || citizen.energy < 12) {
     citizen.health = clamp(citizen.health - 1.5);
   }
 }
 
-function applyLocationEffects(citizen: CitizenAgent, locationId: string) {
+function applyLocationEffects(city: CityState, citizen: CitizenAgent, locationId: string) {
+  if (["loc_market", "loc_restaurant"].includes(locationId) && citizen.hunger > 40 && citizen.money >= 4) {
+    const location = city.locations.find((p) => p.location_id === locationId);
+    if (location && Number(location.inventory.food) > 0) {
+      location.inventory.food = Number(location.inventory.food) - 1;
+      citizen.money -= 4;
+      citizen.hunger = clamp(citizen.hunger - 55);
+      recordMeal(citizen, city.clock.tick);
+    }
+  }
+  if (locationId === "loc_hospital") {
+    citizen.health = clamp(citizen.health + 12);
+    citizen.energy = clamp(citizen.energy + 6);
+    citizen.hunger = clamp(citizen.hunger - 8);
+  }
+  // Family meals at home and school lunch are free; without them students skip class to buy food.
+  const mealTime = /breakfast|dinner|lunch/i.test(citizen.current_activity);
+  const lunchHour = city.clock.minute_of_day >= 720 && city.clock.minute_of_day < 780;
+  // Students get school lunch; workers take a packed lunch break at their workplace.
+  const schoolLunch = lunchHour && (locationId === "loc_school" || locationId === citizen.life?.job?.location_id);
+  const workSnack = locationId === citizen.life?.job?.location_id && citizen.hunger > 60;
+  const fridge = locationId === citizen.home_location_id && citizen.hunger > 70;
+  if (((locationId === citizen.home_location_id && mealTime) || schoolLunch || workSnack || fridge) && citizen.hunger > 30) {
+    citizen.hunger = clamp(citizen.hunger - 30);
+    recordMeal(citizen, city.clock.tick);
+    citizen.happiness = clamp(citizen.happiness + 1);
+  }
   if (locationId === citizen.home_location_id && citizen.energy < 85) {
     citizen.energy = clamp(citizen.energy + 12);
     citizen.stress = clamp(citizen.stress - 5);
@@ -1504,7 +2659,8 @@ function defaultEventLocation(eventType: TriggerEventPayload["event_type"]) {
 }
 
 function relationshipLabel(relationship: Relationship) {
-  const score = (relationship.trust + relationship.warmth + relationship.familiarity) / 3;
+  const score =
+    (relationship.trust + relationship.warmth + relationship.familiarity) / 3;
   return relationshipLabelFromScore(score);
 }
 
@@ -1522,12 +2678,18 @@ function normalizePlannedTaskKind(
   hasLocation: boolean,
 ): PlayerTaskData["task_kind"] {
   const lower = task.toLowerCase();
-  const isMovement = /\b(go|walk|head|travel|visit|come|take|bring|meet|move)\b/.test(lower);
-  if (hasLocation && isMovement) return hasTarget ? "go_with_citizen" : "go_to_location";
+  const isMovement =
+    /\b(go|walk|head|travel|visit|come|take|bring|meet|move)\b/.test(lower);
+  if (hasLocation && isMovement)
+    return hasTarget ? "go_with_citizen" : "go_to_location";
   return planned ?? "open_task";
 }
 
-function inferMentionedCitizenIds(task: string, city: CityState, actorId: string) {
+function inferMentionedCitizenIds(
+  task: string,
+  city: CityState,
+  actorId: string,
+) {
   const lower = normalizeText(task);
   return city.citizens
     .filter((citizen) => citizen.citizen_id !== actorId)
@@ -1564,7 +2726,12 @@ function inferUnavailableMentionedPersonNames(task: string, city: CityState) {
         .filter((name) => {
           const lower = name.toLowerCase();
           const first = lower.split(/\s+/)[0];
-          return !availableNames.has(lower) && !availableNames.has(first) && !locationWords.has(lower) && !locationWords.has(first);
+          return (
+            !availableNames.has(lower) &&
+            !availableNames.has(first) &&
+            !locationWords.has(lower) &&
+            !locationWords.has(first)
+          );
         }),
     ),
   );
@@ -1579,7 +2746,11 @@ function inferMentionedLocationId(task: string, city: CityState) {
         location.type.toLowerCase().replaceAll("_", " "),
         ...location.name.toLowerCase().split(/\s+/),
       ];
-      const index = Math.max(...names.map((name) => lower.lastIndexOf(name)).filter((value) => value >= 0));
+      const index = Math.max(
+        ...names
+          .map((name) => lower.lastIndexOf(name))
+          .filter((value) => value >= 0),
+      );
       return { location, index: Number.isFinite(index) ? index : -1 };
     })
     .filter((item) => item.index >= 0)
@@ -1587,7 +2758,11 @@ function inferMentionedLocationId(task: string, city: CityState) {
   return matches[0]?.location.location_id ?? null;
 }
 
-function memoryRelevantToCurrentTask(content: string, task: string, target?: CitizenAgent | null) {
+function memoryRelevantToCurrentTask(
+  content: string,
+  task: string,
+  target?: CitizenAgent | null,
+) {
   const taskTerms = taskKeywords(task, target);
   if (taskTerms.length === 0) return false;
   const normalized = normalizeText(content);
@@ -1627,7 +2802,9 @@ function taskKeywords(task: string, target?: CitizenAgent | null) {
     "me",
     "my",
   ]);
-  const targetNames = new Set((target?.name.toLowerCase().split(/\s+/) ?? []).filter(Boolean));
+  const targetNames = new Set(
+    (target?.name.toLowerCase().split(/\s+/) ?? []).filter(Boolean),
+  );
   return Array.from(new Set(normalizeText(task).split(/\s+/)))
     .filter((term) => term.length >= 3)
     .filter((term) => !stop.has(term))

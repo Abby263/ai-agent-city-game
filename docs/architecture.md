@@ -1,6 +1,6 @@
 # AgentCity Architecture
 
-AgentCity is split into a playable Phaser city client and a FastAPI simulation server.
+AgentCity is split into a playable Three.js city client and a FastAPI cognition/simulation server. The default local-first browser runtime and its private agent exchanges are documented in the [README architecture diagrams](../README.md#architecture-diagrams).
 
 The default MVP keeps the full seeded city in storage but exposes only five active student agents:
 
@@ -14,13 +14,13 @@ This is controlled by citizen profile files plus `ACTIVE_CITIZEN_IDS`. The defau
 
 ## Runtime Flow
 
-1. The frontend opens the city with `GET /city/state`.
-2. The frontend connects to `WS /ws/city`.
-3. Simulation ticks update mechanical game systems: clock, movement, visible state, health, economy, education, transport, and city events.
-4. The cognition pipeline scores citizens for meaningful moments.
-5. Selected citizens retrieve memories from Postgres/pgvector.
-6. OpenAI Responses API generates structured thoughts, plans, conversations, memories, and reflections when `LLM_MODE=real`.
-7. Results are persisted and streamed to the frontend.
+1. In browser memory mode, the frontend restores its local world or seeds one from the citizen profiles. The optional server mode instead loads `GET /city/state` and listens on `WS /ws/city`.
+2. Simulation ticks update mechanical game state; the Three.js renderer projects that state into a continuously animated town without calling an LLM.
+3. Meaningful tasks and exchanges call the FastAPI cognition endpoints. Each speaker receives only their own private context and witnessed dialogue.
+4. The selected Gemini or OpenAI provider and the LangGraph/Deep Agents exchange generate plans, spoken lines, private thoughts, memories, and reflections. Both planning and private turns use the same configured provider; there is no cross-provider fallback.
+5. The browser commits valid results to its world, relationships, transcript, and per-citizen journals. Stale results from interrupted actions are discarded.
+
+See [3D town architecture](3d-town.md) for geometry, navigation, camera, and resource lifecycle details.
 
 ## Memory Layers
 
@@ -42,6 +42,6 @@ This is controlled by citizen profile files plus `ACTIVE_CITIZEN_IDS`. The defau
 
 ## Persistence
 
-Cloud Postgres is the source of truth for V1. Neon is the expected deployment database for this project, and Supabase also works because both support Postgres with the `vector` extension.
+Browser localStorage is the default short-term world store. Optional server mode can use cloud Postgres with pgvector. The 3D conversion does not require a database, alter agent memory ownership, or migrate saved worlds.
 
 Redis is not required for V1. The current MVP streams directly from FastAPI WebSockets; a queue/event-bus can be added later when background cognition workers are split from the API process.

@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "AgentCity"
     city_id: str = "navora"
-    city_name: str = "Navora"
+    city_name: str = "Nakameguro"
     memory_storage: Literal["short_term", "postgres"] = "short_term"
     database_url: str = ""
     supabase_database_url: str | None = None
@@ -19,7 +19,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
 
     llm_mode: Literal["real"] = "real"
-    openai_api_key: str | None = None
+    llm_provider: Literal["openai", "gemini"] = "openai"
+    gemini_api_key: str | None = Field(default=None, repr=False)
+    gemini_model: str = "gemini-3.5-flash-lite"
+    openai_api_key: str | None = Field(default=None, repr=False)
     openai_model: str = "gpt-4.1-nano"
     openai_embedding_model: str = "text-embedding-3-small"
     max_llm_calls_per_tick: int = Field(default=2, ge=0, le=25)
@@ -40,7 +43,15 @@ class Settings(BaseSettings):
 
     @property
     def real_llm_enabled(self) -> bool:
-        return self.llm_mode == "real" and bool(self.openai_api_key)
+        return self.llm_mode == "real" and bool(self.llm_api_key)
+
+    @property
+    def llm_api_key(self) -> str | None:
+        return self.gemini_api_key if self.llm_provider == "gemini" else self.openai_api_key
+
+    @property
+    def llm_model(self) -> str:
+        return self.gemini_model if self.llm_provider == "gemini" else self.openai_model
 
     @property
     def parsed_active_citizen_ids(self) -> list[str]:

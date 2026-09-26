@@ -32,7 +32,7 @@ class SimulationStateORM(Base):
     __tablename__ = "simulation_states"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    city_name: Mapped[str] = mapped_column(String(120), default="Navora")
+    city_name: Mapped[str] = mapped_column(String(120), default="Nakameguro")
     day: Mapped[int] = mapped_column(Integer, default=1)
     minute_of_day: Mapped[int] = mapped_column(Integer, default=6 * 60)
     tick: Mapped[int] = mapped_column(Integer, default=0)

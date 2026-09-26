@@ -6,7 +6,7 @@ from uuid import uuid4
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.cognition.openai_client import CitizenCognitionClient
+from app.cognition.client import CitizenCognitionClient
 from app.config import Settings
 from app.memory.store import MemoryStore
 from app.models import (
@@ -352,7 +352,7 @@ class CognitionPipeline:
             trust=38,
             warmth=38,
             familiarity=12,
-            notes="They are new to each other and only know each other from life in Navora.",
+            notes="They are new to each other and only know each other from life in Nakameguro.",
         )
         db.add(relationship)
         return relationship

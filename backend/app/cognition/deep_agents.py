@@ -3,22 +3,40 @@ from __future__ import annotations
 import json
 from contextvars import ContextVar
 from functools import lru_cache
-from typing import Any
+from typing import Any, Literal
 
 from app.config import Settings
+from app.cognition.errors import CognitionValidationError, provider_failure
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
+from app.cognition.encounters import MeetingAction
+from app.safety import CHILD_SAFETY_RULES
 
 
 _turn_context: ContextVar[dict[str, Any]] = ContextVar("agentcity_turn_context", default={})
 
 
+class FeelingChange(BaseModel):
+    affection: int = Field(ge=-8, le=8, description="Change in platonic care or fondness, not automatic romance. Zero if unchanged.")
+    jealousy: int = Field(ge=-8, le=8, description="Change in envy or feeling left out, only with witnessed evidence. Zero if unchanged.")
+    resentment: int = Field(ge=-8, le=8, description="Change in hurt, dislike or grievance. Repair can reduce it. Zero if unchanged.")
+    admiration: int = Field(ge=-8, le=8, description="Change in respect for something the listener actually did. Zero if unchanged.")
+    reason: str = Field(max_length=400, description="Specific words or actions in this exchange explaining these changes. Empty if none.")
+
+
 class PrivateTurnOutput(BaseModel):
+    meeting_action: MeetingAction | None = Field(default=None, description="Only when you explicitly SAY a future meeting proposal, acceptance or refusal out loud. Accept/decline must exactly match an existing public meeting offer. Never agree for the listener. Otherwise null.")
     spoken_line: str = Field(description="Exactly one spoken line said out loud by the current citizen.")
     thought: str = Field(description="The private inner thought behind this one turn.")
     mood: str = Field(description="The current emotional tone after this turn.")
     memory: str = Field(description="A first-person memory this citizen should keep from the exchange.")
     reflection: str = Field(description="A first-person reflection that can affect future behavior.")
+    end_conversation: bool = Field(description="True only when you want to leave or the exchange has naturally ended. False when asking a question or expecting a reply.")
+    invitation_response: Literal["accepted", "declined", "undecided", "none"] = Field(description="Your own explicit response to an invitation made in the transcript. Never decide for another citizen.")
+    relationship_effect: Literal["neutral", "positive", "negative"] = Field(description="How this exchange affected YOUR feelings toward the listener. Greetings and routine small talk are neutral, not earned trust.")
+    relationship_reason: str = Field(description="Specific witnessed words or actions explaining the effect. Do not invent shared history.")
+    feelings: FeelingChange = Field(description="Your own change in feelings toward the listener across the WHOLE exchange, not just this line. Usually zero; never manufacture drama.")
+    task_complete: bool = Field(description="True only if the current conversational objective was achieved with evidence in the transcript. A promise to travel is not arrival. False for unresolved or refused requests.")
     importance: float = Field(
         default=0.5,
         description="How important this turn is to remember, from 0.0 to 1.0.",
@@ -40,16 +58,20 @@ class DeepAgentRuntime:
         return self._agent_for(
             str(citizen["citizen_id"]),
             str(citizen["name"]),
-            str(citizen["profession"]),
-            self.settings.openai_model,
-            self.settings.openai_api_key or "",
+            _persona(citizen),
+            self.settings.llm_provider,
+            self.settings.llm_model,
+            self.settings.llm_api_key or "",
         )
 
     def generate_private_turn(self, *, citizen: dict[str, Any], prompt: dict[str, Any]) -> dict[str, Any]:
         agent = self.prepare_citizen_agent(citizen)
         token = _turn_context.set(prompt)
         try:
-            result = agent.invoke({"messages": [{"role": "user", "content": json.dumps(prompt)}]})
+            try:
+                result = agent.invoke({"messages": [{"role": "user", "content": json.dumps(prompt)}]}, config={"recursion_limit": 24})
+            except Exception as error:
+                raise provider_failure(error, self.settings.llm_provider) from None
             structured = result.get("structured_response")
             if isinstance(structured, PrivateTurnOutput):
                 return self._normalize_turn(structured.model_dump())
@@ -57,7 +79,7 @@ class DeepAgentRuntime:
                 return self._normalize_turn(structured.model_dump())
             if isinstance(structured, dict):
                 return self._normalize_turn(structured)
-            raise ValueError("Deep Agent did not return a structured private turn.")
+            raise CognitionValidationError("Deep Agent did not return a structured private turn.")
         finally:
             _turn_context.reset(token)
 
@@ -69,26 +91,78 @@ class DeepAgentRuntime:
         turn["importance"] = max(0.0, min(1.0, importance))
         return turn
 
+    def generate_election_decision(self, *, citizen: dict[str, Any], prompt: dict[str, Any]) -> dict[str, Any]:
+        return self._generate_decision(citizen=citizen, prompt=prompt, purpose="election")
+
+    def generate_social_decision(self, *, citizen: dict[str, Any], prompt: dict[str, Any]) -> dict[str, Any]:
+        return self._generate_decision(citizen=citizen, prompt=prompt, purpose="social")
+
+    def _generate_decision(self, *, citizen: dict[str, Any], prompt: dict[str, Any], purpose: str) -> dict[str, Any]:
+        agent = self._agent_for(str(citizen["citizen_id"]), str(citizen["name"]), _persona(citizen),
+            self.settings.llm_provider, self.settings.llm_model, self.settings.llm_api_key or "", purpose)
+        token = _turn_context.set(prompt)
+        try:
+            try:
+                result = agent.invoke({"messages": [{"role": "user", "content": json.dumps(prompt)}]}, config={"recursion_limit": 24})
+            except Exception as error:
+                raise provider_failure(error, self.settings.llm_provider) from None
+            structured = result.get("structured_response")
+            if hasattr(structured, "model_dump"):
+                return structured.model_dump()
+            if isinstance(structured, dict):
+                return structured
+            raise CognitionValidationError("The citizen did not return a structured decision.")
+        finally:
+            _turn_context.reset(token)
+
     @staticmethod
     @lru_cache(maxsize=64)
-    def _agent_for(citizen_id: str, name: str, profession: str, model: str, api_key: str) -> Any:
+    def _agent_for(citizen_id: str, name: str, profession: str, provider: str, model: str, api_key: str, purpose: str = "conversation") -> Any:
         from deepagents import create_deep_agent
         from langchain_openai import ChatOpenAI
+        from langchain.agents.middleware import ModelCallLimitMiddleware
+        from langchain.agents.structured_output import ToolStrategy
+        from app.cognition.elections import ElectionDecision
+        from app.cognition.encounters import SocialDecision
+        output_model = ElectionDecision if purpose == "election" else SocialDecision if purpose == "social" else PrivateTurnOutput
+
+        if provider == "gemini":
+            from langchain_google_genai import ChatGoogleGenerativeAI
+
+            chat_model = ChatGoogleGenerativeAI(model=model, api_key=api_key, vertexai=False, timeout=40, max_retries=0)
+        else:
+            chat_model = ChatOpenAI(model=model, api_key=api_key, timeout=40, max_retries=0)
 
         system_prompt = (
             f"You are {name}, citizen id {citizen_id}, a {profession} in AgentCity. "
             "You must preserve private memory boundaries. You can only reason from "
             "your own memory and public transcript lines spoken to you. Return the "
-            "structured private turn exactly, including the importance score; do not "
-            "narrate as the city or another citizen."
+            "requested structured response exactly; do not "
+            "narrate as the city or another citizen. Feelings are directional and need not be mutual. "
+            "Act like a real person of your age with a real life: needs, body, health, money, work or school, family, "
+            "ambitions and moods all shape what you say. Your turn data includes a 'life' block (age, family, job, grades, "
+            "health conditions, emotions, pregnancy, relationship status); use it and never contradict it. "
+            "Children and teenagers talk like real kids their age: care, envy, rivalry, hurt and forgiveness, but never romance. "
+            "Adults (18+) talk like real grown-ups about work stress, bills, illness, grief, parenting, dating and marriage, "
+            "honestly and with feeling, in words a child could overhear. When an adult talks with a child they act like a "
+            "caring parent, teacher or neighbour. A friendly greeting is not love or earned trust. "
+            "Use your prior feelings as context, not proof of another person's intent. Allow apologies, "
+            "misunderstandings, mixed feelings and repair; do not escalate conflict without evidence. "
+            f"{CHILD_SAFETY_RULES}"
         )
         return create_deep_agent(
-            model=ChatOpenAI(model=model, api_key=api_key),
+            model=chat_model,
+            middleware=[ModelCallLimitMiddleware(run_limit=3, exit_behavior="error")],
             tools=[inspect_private_memory, inspect_current_task, list_city_actions],
             system_prompt=system_prompt,
-            response_format=PrivateTurnOutput,
+            response_format=ToolStrategy(output_model) if provider == "gemini" else output_model,
             name=f"agentcity-{citizen_id}",
         )
+
+
+def _persona(citizen: dict[str, Any]) -> str:
+    age = citizen.get("age")
+    return f"{age}-year-old {citizen['profession']}" if isinstance(age, int) else str(citizen["profession"])
 
 
 @tool

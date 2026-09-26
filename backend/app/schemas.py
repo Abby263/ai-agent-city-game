@@ -57,6 +57,8 @@ class CitizenAgent(BaseModel):
     current_thought: str
     memory_summary: str
     mood: str
+    # Body, family, work, health and feelings from the browser simulation; passed to the model as context.
+    life: dict[str, Any] | None = None
 
 
 class CityEvent(BaseModel):
@@ -150,6 +152,9 @@ class CityState(BaseModel):
     locations: list[Location]
     citizens: list[CitizenAgent]
     events: list[CityEvent]
+    # Real-calendar context from the browser simulation (day 1 date, current sky).
+    calendar_start: str | None = None
+    weather: dict[str, Any] | None = None
 
 
 class TriggerEventRequest(BaseModel):
@@ -184,6 +189,7 @@ class SimulationModeRequest(BaseModel):
 
 
 class SessionCognitionRequest(BaseModel):
+    conversation_mode: Literal["task", "autonomous"] = "task"
     city: CityState
     actor_id: str
     target_id: str | None = None
@@ -193,9 +199,11 @@ class SessionCognitionRequest(BaseModel):
     observations: list[str] = Field(default_factory=list)
     memories: list[str] = Field(default_factory=list)
     private_memories: dict[str, list[str]] = Field(default_factory=dict)
+    player_utterance: str | None = Field(default=None, min_length=1, max_length=600)
 
 
 class SessionCognitionResponse(BaseModel):
+    meeting_plan: dict[str, Any] | None = None
     thought: str
     mood: str
     memory: str
@@ -204,6 +212,7 @@ class SessionCognitionResponse(BaseModel):
     conversation: Conversation | None = None
     participant_memories: dict[str, str] = Field(default_factory=dict)
     participant_reflections: dict[str, str] = Field(default_factory=dict)
+    participant_outcomes: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class SessionTaskPlanRequest(BaseModel):

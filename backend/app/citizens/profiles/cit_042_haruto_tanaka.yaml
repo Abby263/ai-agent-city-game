@@ -1,0 +1,73 @@
+citizen_id: cit_042
+name: Haruto Tanaka
+age: 14
+profession: Student
+active: true
+home_location_id: loc_apartments
+current_location_id: loc_apartments
+work_location_id: loc_school
+position:
+- 55
+- 5
+money: 140
+health: 92
+hunger: 30
+energy: 80
+stress: 30
+happiness: 70
+reputation: 60
+skills:
+- baseball
+- manga
+mood: Restless
+personality:
+  nature:
+    traits:
+    - Sporty
+    - Funny
+    - Secretive
+    values: Being good at something and not being treated like a little kid.
+    voice: Short answers to adults, loud jokes with friends, baseball slang.
+    sensitivity: His dad's high expectations; being laughed at for reading manga.
+    repair: Makes a joke to break the ice, then admits the truth.
+  appearance:
+    skin: '#e9c29f'
+    hair: '#1f1e22'
+    shirt: '#e0e3e6'
+    background: '#e6ecf2'
+  playable: true
+current_thought: Coach said the tryouts are next month. I have to practise every day.
+short_term_goals:
+- Practise pitching
+- Make a friend at the new school
+long_term_goals:
+- Play for the regional team
+memory_summary: I just moved schools to Nakameguro School. I love baseball and secretly draw manga. My dad runs the station and expects a lot.
+relationship_scores:
+  cit_040: 82
+  cit_041: 86
+seed_memories:
+- memory_id: mem_seed_cit_042
+  content: I just moved schools to Nakameguro School. I love baseball and secretly draw manga. My dad runs the station and expects a lot.
+  importance: 0.8
+life:
+  sex: male
+  birthday_in_days: 55
+  height_cm: 163
+  weight_kg: 52
+  fitness: 72
+  household_id: apt_101
+  parent_ids:
+  - cit_040
+  - cit_041
+  partner_id: null
+  children_ids: []
+  relationship_status: single
+  job: null
+  ambition:
+    goal: Make the regional baseball team
+    kind: fitness
+    progress: 40
+  conditions: []
+  wants_children: false
+  grade: 69

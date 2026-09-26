@@ -13,6 +13,8 @@ import type {
   TriggerEventPayload,
 } from "@/lib/types";
 import { createInitialCity } from "@/lib/initial-city";
+import type { ElectionDecision, ElectionDecisionRequest } from "./elections";
+import type { SocialDecision, SocialDecisionRequest } from "./encounters";
 import {
   getSessionCity,
   seedSession,
@@ -28,33 +30,64 @@ import {
   sessionStart,
   sessionTick,
   sessionTriggerEvent,
+  sessionTakeControl,
+  sessionWalkTo,
+  sessionSpeak,
+  sessionStartElection,
+  sessionSetWeather,
+  sessionCreateSituation,
+  sessionSetTimeMode,
+  sessionSyncToRealTime,
+  sessionSocialBeat,
+  sessionPerformAction,
+  sessionElectionPhase,
+  sessionCastVote,
+  sessionNextBallot,
 } from "@/lib/session-simulation";
 
-const defaultApiUrl =
-  typeof window !== "undefined" && !["localhost", "127.0.0.1"].includes(window.location.hostname)
-    ? "/api"
-    : "http://localhost:8000";
-
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || defaultApiUrl;
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
+    signal: init?.signal ?? AbortSignal.timeout(90000),
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers ?? {}),
     },
   });
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    const error = await response.json().catch(() => null);
+    throw new Error(
+      typeof error?.detail === "string"
+        ? error.detail
+        : "The AI could not finish this action. Your task has not been completed.",
+    );
   }
   return response.json() as Promise<T>;
 }
 
 export const api = {
+  // Play-god tools run in the browser world only.
+  setWeather: (condition: Parameters<typeof sessionSetWeather>[0], options?: Parameters<typeof sessionSetWeather>[1]) => sessionSetWeather(condition, options),
+  createSituation: (request: import("./scenarios").ScenarioRequest) => sessionCreateSituation(request),
+  setTimeMode: (mode: "live" | "fast") => sessionSetTimeMode(mode),
+  performAction: (actorId: string, targetId: string, action: import("./actions").ActionId, note = "") =>
+    sessionPerformAction(actorId, targetId, action, note, generateSessionCognition),
+  syncToRealTime: () => sessionSyncToRealTime(),
+  socialBeat: (onCognitionStart?: (request: SessionCognitionRequest) => void) => sessionSocialBeat((request) => {
+    onCognitionStart?.(request);
+    return generateSessionCognition(request);
+  }, generateSocialDecision),
+  startElection: (candidateId: string, rivalId: string, platform: string) => sessionStartElection(candidateId, rivalId, platform, generateElectionDecision),
+  electionPhase: sessionElectionPhase,
+  castVote: sessionCastVote,
+  nextBallot: () => sessionNextBallot(generateElectionDecision),
+  takeControl: sessionTakeControl,
+  walkTo: sessionWalkTo,
+  speak: (targetId: string, text: string) =>
+    sessionSpeak(targetId, text, generateSessionCognition),
   getState: async () => {
-    const sessionCity = getSessionCity();
-    if (sessionMemoryEnabled() && sessionCity) return sessionCity;
     if (sessionMemoryEnabled()) return seedSession(createInitialCity());
     const city = await request<CityState>("/city/state");
     return seedSession(city);
@@ -78,61 +111,83 @@ export const api = {
       body: JSON.stringify({ mode }),
     });
   },
-  tick: async () => {
+  tick: async (onCognitionStart?: (request: SessionCognitionRequest) => void) => {
     if (sessionMemoryEnabled() && getSessionCity()) {
-      return sessionTick(generateSessionCognition);
+      return sessionTick((request) => {
+        onCognitionStart?.(request);
+        return generateSessionCognition(request);
+      }, generateElectionDecision, generateSocialDecision);
     }
     return request<CityState>("/simulation/tick", { method: "POST" });
   },
   triggerEvent: async (payload: TriggerEventPayload) => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionTriggerEvent(payload);
+    if (sessionMemoryEnabled() && getSessionCity())
+      return sessionTriggerEvent(payload);
     return request<CityState>("/events/trigger", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
   applyPolicy: async (payload: MayorPolicyPayload) => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionApplyPolicy(payload);
+    if (sessionMemoryEnabled() && getSessionCity())
+      return sessionApplyPolicy(payload);
     return request<CityState>("/mayor/policy", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
   getMemories: async (citizenId: string) => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionMemories(citizenId);
+    if (sessionMemoryEnabled() && getSessionCity())
+      return sessionMemories(citizenId);
     return request<Memory[]>(`/citizens/${citizenId}/memories`);
   },
   getRelationships: async (citizenId: string) => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionRelationships(citizenId);
+    if (sessionMemoryEnabled() && getSessionCity())
+      return sessionRelationships(citizenId);
     return request<Relationship[]>(`/citizens/${citizenId}/relationships`);
   },
   getConversations: async (citizenId: string) => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionConversations(citizenId);
+    if (sessionMemoryEnabled() && getSessionCity())
+      return sessionConversations(citizenId);
     return request<Conversation[]>(`/citizens/${citizenId}/conversations`);
   },
   assignTask: async (citizenId: string, payload: AssignTaskPayload) => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionAssignTask(citizenId, payload, generateSessionTaskPlan);
+    if (sessionMemoryEnabled() && getSessionCity())
+      return sessionAssignTask(citizenId, payload, generateSessionTaskPlan);
     return request<CityState>(`/citizens/${citizenId}/task`, {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
   closeTask: async (citizenId: string) => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionCloseTask(citizenId);
+    if (sessionMemoryEnabled() && getSessionCity())
+      return sessionCloseTask(citizenId);
     return request<CityState>(`/citizens/${citizenId}/task/close`, {
       method: "POST",
     });
   },
 };
 
-async function generateSessionCognition(requestBody: SessionCognitionRequest): Promise<SessionCognitionResponse> {
+async function generateSocialDecision(body: SocialDecisionRequest): Promise<SocialDecision> {
+  return request<SocialDecision>("/cognition/social", { method: "POST", body: JSON.stringify(body) });
+}
+
+async function generateElectionDecision(body: ElectionDecisionRequest): Promise<ElectionDecision> {
+  return request<ElectionDecision>("/cognition/election", { method: "POST", body: JSON.stringify(body) });
+}
+
+async function generateSessionCognition(
+  requestBody: SessionCognitionRequest,
+): Promise<SessionCognitionResponse> {
   return request<SessionCognitionResponse>("/cognition/session", {
     method: "POST",
     body: JSON.stringify(requestBody),
   });
 }
 
-async function generateSessionTaskPlan(requestBody: SessionTaskPlanRequest): Promise<SessionTaskPlanResponse> {
+async function generateSessionTaskPlan(
+  requestBody: SessionTaskPlanRequest,
+): Promise<SessionTaskPlanResponse> {
   return request<SessionTaskPlanResponse>("/cognition/task-plan", {
     method: "POST",
     body: JSON.stringify(requestBody),

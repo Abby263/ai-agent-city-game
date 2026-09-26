@@ -1,0 +1,2573 @@
+[
+  {
+    "citizen_id": "cit_009",
+    "name": "Ava Singh",
+    "age": 13,
+    "profession": "Student",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      3,
+      3
+    ],
+    "money": 186,
+    "health": 90,
+    "hunger": 35,
+    "energy": 80,
+    "stress": 24,
+    "happiness": 72,
+    "reputation": 56,
+    "skills": [
+      "science",
+      "debate"
+    ],
+    "mood": "Curious",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Curious",
+          "Earnest",
+          "Impatient"
+        ],
+        "values": "Being reliable and understanding why things work.",
+        "voice": "Asks specific questions; sometimes jumps to a solution before listening.",
+        "sensitivity": "Being dismissed as bossy after trying to help; a promise left vague.",
+        "repair": "Listens without fixing, admits when she rushed, and follows through."
+      },
+      "playable": true,
+      "student_arc": true,
+      "openness": 82,
+      "conscientiousness": 68,
+      "warmth": 74,
+      "risk_tolerance": 42
+    },
+    "current_thought": "I want to understand what my friends are really worried about today.",
+    "short_term_goals": [
+      "Ask one friend how they are doing",
+      "Finish the science worksheet"
+    ],
+    "long_term_goals": [
+      "Build a real friendship circle in Navora",
+      "Become more confident at school"
+    ],
+    "memory_summary": "I love science and debate. I want to be someone people can rely on, but I sometimes offer help before listening. I would like a partner for a small science project.",
+    "friend_ids": [
+      "cit_010",
+      "cit_021"
+    ],
+    "relationship_scores": {
+      "cit_010": 42,
+      "cit_021": 42,
+      "cit_022": 42,
+      "cit_026": 42
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "cit_010",
+        "trust": 36,
+        "warmth": 38,
+        "familiarity": 18,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_021",
+        "trust": 36,
+        "warmth": 38,
+        "familiarity": 18,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_022",
+        "trust": 36,
+        "warmth": 38,
+        "familiarity": 18,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_026",
+        "trust": 36,
+        "warmth": 38,
+        "familiarity": 18,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_009",
+        "content": "I enjoy science and debate and feel good when I can help someone understand something."
+      },
+      {
+        "memory_id": "mem_student_arc_cit_009",
+        "content": "I want friendships built on listening and keeping promises, not just knowing everyone's name.",
+        "importance": 0.72,
+        "salience": 0.7
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 4,
+      "height_cm": 156,
+      "weight_kg": 45,
+      "fitness": 55,
+      "household_id": "home_b",
+      "parent_ids": [
+        "cit_033"
+      ],
+      "grade": 84,
+      "ambition": {
+        "goal": "Win the school science fair",
+        "kind": "study",
+        "progress": 30
+      },
+      "conditions": []
+    }
+  },
+  {
+    "citizen_id": "cit_010",
+    "name": "Mateo Garcia",
+    "age": 14,
+    "profession": "Student",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      5,
+      3
+    ],
+    "money": 137,
+    "health": 83,
+    "hunger": 29,
+    "energy": 73,
+    "stress": 17,
+    "happiness": 66,
+    "reputation": 49,
+    "skills": [
+      "math",
+      "music"
+    ],
+    "mood": "Playful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Playful",
+          "Inventive",
+          "Proud"
+        ],
+        "values": "Creative freedom and having his ideas taken seriously.",
+        "voice": "Uses light humor and musical comparisons, but becomes direct about his art.",
+        "sensitivity": "People treating his jokes as proof he never cares; someone copying his work without credit.",
+        "repair": "Drops the joke, explains what hurt, and appreciates a specific sincere apology."
+      },
+      "playable": true,
+      "student_arc": true,
+      "openness": 78,
+      "conscientiousness": 55,
+      "warmth": 70,
+      "risk_tolerance": 58
+    },
+    "current_thought": "Maybe I can turn today's school drama into a song idea.",
+    "short_term_goals": [
+      "Practice music at the park",
+      "Help someone with math homework"
+    ],
+    "long_term_goals": [
+      "Build a real friendship circle in Navora",
+      "Become more confident at school"
+    ],
+    "memory_summary": "I love music and solving math problems. I joke when I am nervous, but I also want people to take my ideas seriously. I would like to write a song with a friend.",
+    "friend_ids": [
+      "cit_009",
+      "cit_021"
+    ],
+    "relationship_scores": {
+      "cit_009": 43,
+      "cit_021": 43,
+      "cit_022": 43,
+      "cit_026": 43
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "cit_009",
+        "trust": 39,
+        "warmth": 41,
+        "familiarity": 22,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_021",
+        "trust": 39,
+        "warmth": 41,
+        "familiarity": 22,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_022",
+        "trust": 39,
+        "warmth": 41,
+        "familiarity": 22,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_026",
+        "trust": 39,
+        "warmth": 41,
+        "familiarity": 22,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_010",
+        "content": "Music and math are my favorite subjects. I like turning ordinary moments into song ideas."
+      },
+      {
+        "memory_id": "mem_student_arc_cit_010",
+        "content": "Joking helps when I feel nervous, but I do not want to hurt someone's feelings for a laugh.",
+        "importance": 0.72,
+        "salience": 0.7
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 40,
+      "height_cm": 163,
+      "weight_kg": 52,
+      "fitness": 60,
+      "household_id": "home_c",
+      "parent_ids": [
+        "cit_034"
+      ],
+      "grade": 71,
+      "ambition": {
+        "goal": "Paint a mural on the cafe wall",
+        "kind": "creative",
+        "progress": 20
+      },
+      "conditions": []
+    }
+  },
+  {
+    "citizen_id": "cit_021",
+    "name": "Noah Mensah",
+    "age": 12,
+    "profession": "Student",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      7,
+      4
+    ],
+    "money": 130,
+    "health": 84,
+    "hunger": 35,
+    "energy": 74,
+    "stress": 24,
+    "happiness": 66,
+    "reputation": 68,
+    "skills": [
+      "biology",
+      "sports"
+    ],
+    "mood": "Energetic",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Energetic",
+          "Loyal",
+          "Insecure"
+        ],
+        "values": "Belonging to the group and teammates looking out for each other.",
+        "voice": "Speaks openly, offers shared activities, and may blurt out a worry.",
+        "sensitivity": "Being left out of plans, or friends turning everything into a competition.",
+        "repair": "A clear invitation and honest explanation help; empty reassurance does not."
+      },
+      "playable": true,
+      "student_arc": true,
+      "openness": 65,
+      "conscientiousness": 60,
+      "warmth": 73,
+      "risk_tolerance": 67
+    },
+    "current_thought": "I want to get through class and still have energy for the park.",
+    "short_term_goals": [
+      "Check on Leo after class",
+      "Organize a small game at the park"
+    ],
+    "long_term_goals": [
+      "Build a real friendship circle in Navora",
+      "Become more confident at school"
+    ],
+    "memory_summary": "I enjoy sports and biology. I like bringing people into a game and making sure everyone gets a turn. Being left out bothers me more than I usually admit.",
+    "friend_ids": [
+      "cit_009",
+      "cit_010"
+    ],
+    "relationship_scores": {
+      "cit_009": 44,
+      "cit_010": 44,
+      "cit_022": 44,
+      "cit_026": 44
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "cit_009",
+        "trust": 42,
+        "warmth": 44,
+        "familiarity": 26,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_010",
+        "trust": 42,
+        "warmth": 44,
+        "familiarity": 26,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_022",
+        "trust": 42,
+        "warmth": 44,
+        "familiarity": 26,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_026",
+        "trust": 42,
+        "warmth": 44,
+        "familiarity": 26,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_021",
+        "content": "Sports and biology make me curious. I would rather do something together than sit around talking all day."
+      },
+      {
+        "memory_id": "mem_student_arc_cit_021",
+        "content": "I value fair teams and people who include others. I want enough energy left after school to play at the park.",
+        "importance": 0.72,
+        "salience": 0.7
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 9,
+      "height_cm": 150,
+      "weight_kg": 40,
+      "fitness": 78,
+      "household_id": "home_d",
+      "parent_ids": [
+        "cit_035"
+      ],
+      "grade": 66,
+      "ambition": {
+        "goal": "Make the school football team",
+        "kind": "fitness",
+        "progress": 35
+      },
+      "conditions": []
+    }
+  },
+  {
+    "citizen_id": "cit_022",
+    "name": "Iris Novak",
+    "age": 15,
+    "profession": "Student",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      4,
+      6
+    ],
+    "money": 151,
+    "health": 85,
+    "hunger": 35,
+    "energy": 75,
+    "stress": 24,
+    "happiness": 67,
+    "reputation": 51,
+    "skills": [
+      "writing",
+      "chemistry"
+    ],
+    "mood": "Observant",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Observant",
+          "Private",
+          "Principled"
+        ],
+        "values": "Honesty, discretion, and space to think for herself.",
+        "voice": "Brief considered replies, precise questions, occasional dry humor.",
+        "sensitivity": "Gossip presented as fact or pressure to reveal someone else's secret.",
+        "repair": "Needs acknowledgment of the boundary and changed behavior, not a grand gesture."
+      },
+      "playable": true,
+      "student_arc": true,
+      "openness": 88,
+      "conscientiousness": 71,
+      "warmth": 62,
+      "risk_tolerance": 33
+    },
+    "current_thought": "There is a story in how everyone is reacting today. I should pay attention.",
+    "short_term_goals": [
+      "Write down one meaningful conversation",
+      "Study chemistry at the library"
+    ],
+    "long_term_goals": [
+      "Build a real friendship circle in Navora",
+      "Become more confident at school"
+    ],
+    "memory_summary": "I love writing and chemistry. I notice little details but need time to get comfortable around people. I value honest answers more than cheerful guesses.",
+    "friend_ids": [
+      "cit_009",
+      "cit_010"
+    ],
+    "relationship_scores": {
+      "cit_009": 45,
+      "cit_010": 45,
+      "cit_021": 45,
+      "cit_026": 45
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "cit_009",
+        "trust": 45,
+        "warmth": 47,
+        "familiarity": 18,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_010",
+        "trust": 45,
+        "warmth": 47,
+        "familiarity": 18,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_021",
+        "trust": 45,
+        "warmth": 47,
+        "familiarity": 18,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_026",
+        "trust": 45,
+        "warmth": 47,
+        "familiarity": 18,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_022",
+        "content": "I enjoy writing observations in my notebook and working through chemistry questions."
+      },
+      {
+        "memory_id": "mem_student_arc_cit_022",
+        "content": "I prefer a thoughtful conversation with one person over being the center of a noisy group.",
+        "importance": 0.72,
+        "salience": 0.7
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 120,
+      "height_cm": 164,
+      "weight_kg": 52,
+      "fitness": 50,
+      "household_id": "home_f",
+      "parent_ids": [],
+      "grade": 92,
+      "ambition": {
+        "goal": "Top marks in chemistry",
+        "kind": "study",
+        "progress": 60
+      },
+      "conditions": [
+        {
+          "id": "asthma",
+          "name": "asthma",
+          "severity": 26,
+          "contagious": false,
+          "chronic": true,
+          "treated": true,
+          "since_day": -1500,
+          "treated_until": 6
+        }
+      ]
+    }
+  },
+  {
+    "citizen_id": "cit_026",
+    "name": "Leo Brooks",
+    "age": 13,
+    "profession": "Student",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      8,
+      7
+    ],
+    "money": 165,
+    "health": 89,
+    "hunger": 35,
+    "energy": 79,
+    "stress": 24,
+    "happiness": 71,
+    "reputation": 55,
+    "skills": [
+      "robotics",
+      "sketching"
+    ],
+    "mood": "Thoughtful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Thoughtful",
+          "Cautious",
+          "Persistent"
+        ],
+        "values": "Patient collaboration and finding a place where he belongs.",
+        "voice": "Starts with careful questions; gets animated about a sketch or something he built.",
+        "sensitivity": "Being interrupted or assumed incapable because he is new.",
+        "repair": "Warms up through a small shared project and being genuinely heard."
+      },
+      "playable": true,
+      "student_arc": true,
+      "openness": 76,
+      "conscientiousness": 66,
+      "warmth": 64,
+      "risk_tolerance": 38
+    },
+    "current_thought": "I'm new to the group, so I should find a natural way to join the conversation.",
+    "short_term_goals": [
+      "Make one real friend",
+      "Show someone my robot sketch"
+    ],
+    "long_term_goals": [
+      "Build a real friendship circle in Navora",
+      "Become more confident at school"
+    ],
+    "memory_summary": "I like robotics and sketching. I am new to this group and want to show someone my robot ideas, but I worry they will seem silly. Being asked a genuine question helps me open up.",
+    "friend_ids": [
+      "cit_009",
+      "cit_010"
+    ],
+    "relationship_scores": {
+      "cit_009": 46,
+      "cit_010": 46,
+      "cit_021": 46,
+      "cit_022": 46
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "cit_009",
+        "trust": 36,
+        "warmth": 50,
+        "familiarity": 22,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_010",
+        "trust": 36,
+        "warmth": 50,
+        "familiarity": 22,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_021",
+        "trust": 36,
+        "warmth": 50,
+        "familiarity": 22,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "cit_022",
+        "trust": 36,
+        "warmth": 50,
+        "familiarity": 22,
+        "notes": "They are part of the same small student circle and can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_026",
+        "content": "I like building little robots and sketching designs before I try them."
+      },
+      {
+        "memory_id": "mem_student_arc_cit_026",
+        "content": "I want to make a real friend in the group without pretending to be someone else.",
+        "importance": 0.72,
+        "salience": 0.7
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 200,
+      "height_cm": 155,
+      "weight_kg": 44,
+      "fitness": 48,
+      "household_id": "home_a",
+      "parent_ids": [
+        "cit_030",
+        "cit_031"
+      ],
+      "grade": 78,
+      "ambition": {
+        "goal": "Finish his robot sketchbook",
+        "kind": "creative",
+        "progress": 45
+      },
+      "conditions": []
+    }
+  },
+  {
+    "citizen_id": "cit_027",
+    "name": "Sophie Laurent",
+    "age": 13,
+    "profession": "Student",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      5,
+      6
+    ],
+    "skills": [
+      "illustration",
+      "storytelling"
+    ],
+    "mood": "Hopeful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Imaginative",
+          "Reserved",
+          "Sensitive"
+        ],
+        "values": "Kindness toward unfinished work and room for quieter voices.",
+        "voice": "Uses concrete images and small observations; opens up when someone listens.",
+        "sensitivity": "Public teasing of her drawings and louder people speaking for her.",
+        "repair": "Prefers a quiet specific apology and a chance to decide when to share again."
+      },
+      "playable": true,
+      "student_arc": true,
+      "openness": 88,
+      "warmth": 70,
+      "conscientiousness": 58
+    },
+    "current_thought": "Maybe someone would like to draw a comic with me.",
+    "short_term_goals": [
+      "Find someone to illustrate a comic with",
+      "Learn one new neighbor's interests"
+    ],
+    "long_term_goals": [
+      "Share my art without fearing criticism"
+    ],
+    "memory_summary": "I draw comics and notice small acts of kindness. I am shy about showing unfinished work. Being left out can sting, but I try to ask what happened instead of assuming the worst.",
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_027",
+        "content": "I brought my sketchbook to Navora. I hope to find a patient collaborator, but I have not met one yet."
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 17,
+      "height_cm": 154,
+      "weight_kg": 43,
+      "fitness": 52,
+      "household_id": "home_h",
+      "parent_ids": [
+        "ext_laurent_parents"
+      ],
+      "grade": 80,
+      "ambition": {
+        "goal": "Publish her own comic",
+        "kind": "creative",
+        "progress": 25
+      },
+      "conditions": []
+    }
+  },
+  {
+    "citizen_id": "cit_028",
+    "name": "Zara Ali",
+    "age": 14,
+    "profession": "Student",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      7,
+      6
+    ],
+    "skills": [
+      "robotics",
+      "chess"
+    ],
+    "mood": "Determined",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Ambitious",
+          "Direct",
+          "Fair-minded"
+        ],
+        "values": "Earned achievement, useful feedback, and fair credit.",
+        "voice": "Gets to the point, asks challenging questions, and appreciates competence.",
+        "sensitivity": "Unfair praise, stolen credit, or feeling her hard work is overlooked.",
+        "repair": "Can own a mistake when shown specifics; values a fair next step over flattery."
+      },
+      "playable": true,
+      "student_arc": true,
+      "openness": 76,
+      "warmth": 56,
+      "conscientiousness": 90
+    },
+    "current_thought": "I want to find a teammate who challenges my ideas.",
+    "short_term_goals": [
+      "Ask someone to try a robot-building challenge",
+      "Practice listening before correcting someone"
+    ],
+    "long_term_goals": [
+      "Build a team where everyone's contribution matters"
+    ],
+    "memory_summary": "I enjoy robotics and chess. I am competitive and sometimes compare my progress to others. I respect honest feedback, dislike taking credit for someone else's work, and can apologize when I get carried away.",
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_028",
+        "content": "I have an unfinished robot design and would like to work with someone. I do not yet know who enjoys building things here."
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 60,
+      "height_cm": 160,
+      "weight_kg": 48,
+      "fitness": 66,
+      "household_id": "home_g",
+      "parent_ids": [
+        "cit_038"
+      ],
+      "grade": 88,
+      "ambition": {
+        "goal": "Save $250 for a telescope",
+        "kind": "money",
+        "progress": 48,
+        "target": 250
+      },
+      "conditions": []
+    }
+  },
+  {
+    "citizen_id": "cit_029",
+    "name": "Eliot Chen",
+    "age": 13,
+    "profession": "Student",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      8,
+      5
+    ],
+    "skills": [
+      "gardening",
+      "cooking"
+    ],
+    "mood": "Peaceful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Warm",
+          "Patient",
+          "Boundaried"
+        ],
+        "values": "Keeping promises, including others, and having time to recharge.",
+        "voice": "Gentle practical questions and offers of help, without always agreeing.",
+        "sensitivity": "Repeated forgotten promises and being expected to mediate every conflict.",
+        "repair": "A kept small promise rebuilds trust; sometimes asks for quiet time first."
+      },
+      "playable": true,
+      "student_arc": true,
+      "openness": 68,
+      "warmth": 85,
+      "conscientiousness": 75
+    },
+    "current_thought": "It would be nice to share a snack and hear someone's story.",
+    "short_term_goals": [
+      "Invite someone to plant herbs at the park",
+      "Learn what others like to eat"
+    ],
+    "long_term_goals": [
+      "Start a small community garden with friends"
+    ],
+    "memory_summary": "I enjoy growing herbs and cooking with family. I like bringing people together but need quiet time too. I feel hurt when promises are forgotten and appreciate sincere attempts to make things right.",
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_029",
+        "content": "I arrived with a packet of basil seeds and a hope to make friends. No one has agreed to garden with me yet."
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 2,
+      "height_cm": 157,
+      "weight_kg": 46,
+      "fitness": 58,
+      "household_id": "home_e",
+      "parent_ids": [
+        "cit_036"
+      ],
+      "grade": 81,
+      "ambition": {
+        "goal": "Help the new kids feel at home",
+        "kind": "social",
+        "progress": 30
+      },
+      "conditions": []
+    }
+  },
+  {
+    "citizen_id": "cit_030",
+    "name": "Tom Brooks",
+    "age": 38,
+    "profession": "Farmer",
+    "active": true,
+    "work_location_id": "loc_farm",
+    "position": [
+      3,
+      3
+    ],
+    "money": 640,
+    "health": 90,
+    "hunger": 8,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Steady",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Hardworking",
+          "Gentle",
+          "Stubborn"
+        ],
+        "values": "Honest work, feeding the town and being there for his family.",
+        "voice": "Few words, dry jokes, talks about weather and soil.",
+        "sensitivity": "Being told farming is not real work; money worries he keeps to himself.",
+        "repair": "Shows up with fresh vegetables and fixes what is broken."
+      },
+      "appearance": {
+        "skin": "#e8bd98",
+        "hair": "#8a6437",
+        "shirt": "#7f9a5c",
+        "background": "#e3ecd2"
+      },
+      "playable": true
+    },
+    "current_thought": "If the weather holds, the tomatoes will be ready by the weekend.",
+    "short_term_goals": [
+      "Get the tomatoes to the market",
+      "Help Hannah get ready for the baby"
+    ],
+    "long_term_goals": [
+      "Keep the farm going for the next generation"
+    ],
+    "memory_summary": "I run Meadow Farm like my father did. Hannah and I have a son, Leo, and a baby on the way. Dad lives with us now and his heart worries me.",
+    "relationship_scores": {
+      "cit_031": 88,
+      "cit_032": 85,
+      "cit_026": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_030",
+        "content": "I run Meadow Farm like my father did. Hannah and I have a son, Leo, and a baby on the way. Dad lives with us now and his heart worries me.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 48,
+      "height_cm": 181,
+      "weight_kg": 84,
+      "fitness": 68,
+      "household_id": "home_a",
+      "parent_ids": [
+        "cit_032"
+      ],
+      "partner_id": "cit_031",
+      "children_ids": [
+        "cit_026"
+      ],
+      "relationship_status": "married",
+      "job": {
+        "title": "Farmer",
+        "location_id": "loc_farm",
+        "hourly_wage": 21,
+        "start": 360,
+        "end": 900,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Expand Meadow Farm with a new greenhouse",
+        "kind": "career",
+        "progress": 35
+      },
+      "conditions": [],
+      "wants_children": true
+    }
+  },
+  {
+    "citizen_id": "cit_031",
+    "name": "Hannah Brooks",
+    "age": 36,
+    "profession": "Bank clerk",
+    "active": true,
+    "work_location_id": "loc_bank",
+    "position": [
+      3,
+      3
+    ],
+    "money": 720,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Excited",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Organised",
+          "Warm",
+          "Anxious"
+        ],
+        "values": "Security for her family and doing things properly.",
+        "voice": "Makes lists out loud, asks caring follow-up questions.",
+        "sensitivity": "Plans falling apart; feeling she is doing everything alone.",
+        "repair": "Makes a plan together and says thank you."
+      },
+      "appearance": {
+        "skin": "#f0c8a6",
+        "hair": "#c49a5c",
+        "shirt": "#c98ea7",
+        "background": "#f3dce6"
+      },
+      "playable": true
+    },
+    "current_thought": "Eleven days until the due date. Is the cot even assembled?",
+    "short_term_goals": [
+      "Finish the baby's room",
+      "Hand over my work before leave"
+    ],
+    "long_term_goals": [
+      "Give both kids a calm, happy home"
+    ],
+    "memory_summary": "I work at Navora Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.",
+    "relationship_scores": {
+      "cit_030": 88,
+      "cit_032": 78,
+      "cit_026": 90
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_031",
+        "content": "I work at Navora Bank and I'm about to have my second baby. Leo is going to be a big brother. Walter, Tom's dad, lives with us.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 150,
+      "height_cm": 165,
+      "weight_kg": 71,
+      "fitness": 50,
+      "household_id": "home_a",
+      "parent_ids": [],
+      "partner_id": "cit_030",
+      "children_ids": [
+        "cit_026"
+      ],
+      "relationship_status": "married",
+      "job": {
+        "title": "Bank clerk",
+        "location_id": "loc_bank",
+        "hourly_wage": 24,
+        "start": 540,
+        "end": 1020,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Welcome our second baby safely",
+        "kind": "family",
+        "progress": 60
+      },
+      "conditions": [],
+      "wants_children": true,
+      "pregnancy": {
+        "partner_id": "cit_030",
+        "due_in_days": 11
+      }
+    }
+  },
+  {
+    "citizen_id": "cit_032",
+    "name": "Walter Brooks",
+    "age": 81,
+    "profession": "Retired farmer",
+    "active": true,
+    "work_location_id": null,
+    "position": [
+      3,
+      3
+    ],
+    "money": 1400,
+    "health": 62,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 25,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Wistful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Storyteller",
+          "Proud",
+          "Kind"
+        ],
+        "values": "Family, old friends and not being a burden.",
+        "voice": "Long stories from the old days, calls everyone 'kiddo'.",
+        "sensitivity": "Being treated as fragile; forgetting names.",
+        "repair": "Tells a funny story and admits when he was wrong."
+      },
+      "appearance": {
+        "skin": "#e6b999",
+        "hair": "#d9d7d2",
+        "shirt": "#8c7a6b",
+        "background": "#ebe4da"
+      },
+      "playable": true
+    },
+    "current_thought": "My ticker's been grumbling. I won't make a fuss about it.",
+    "short_term_goals": [
+      "Play chess with Leo",
+      "Remember to take my heart pills"
+    ],
+    "long_term_goals": [
+      "See my new grandchild born"
+    ],
+    "memory_summary": "I farmed this land for fifty years. My wife Rose passed away four years ago. I live with my son Tom, his wife Hannah and my grandson Leo. My heart isn't what it was.",
+    "relationship_scores": {
+      "cit_030": 86,
+      "cit_031": 80,
+      "cit_026": 92
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_032",
+        "content": "I farmed this land for fifty years. My wife Rose passed away four years ago. I live with my son Tom, his wife Hannah and my grandson Leo. My heart isn't what it was.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 25,
+      "height_cm": 172,
+      "weight_kg": 70,
+      "fitness": 30,
+      "household_id": "home_a",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "cit_030"
+      ],
+      "relationship_status": "widowed",
+      "job": null,
+      "ambition": {
+        "goal": "Teach Leo everything he knows about chess",
+        "kind": "social",
+        "progress": 40
+      },
+      "conditions": [
+        {
+          "id": "heart-condition",
+          "name": "heart condition",
+          "severity": 58,
+          "contagious": false,
+          "chronic": true,
+          "treated": true,
+          "since_day": -900,
+          "treated_until": 3
+        }
+      ],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "cit_033",
+    "name": "Priya Singh",
+    "age": 42,
+    "profession": "Doctor",
+    "active": true,
+    "work_location_id": "loc_hospital",
+    "position": [
+      5,
+      3
+    ],
+    "money": 2100,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Focused",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Calm",
+          "Precise",
+          "Overworked"
+        ],
+        "values": "Caring for people properly, even when she is exhausted.",
+        "voice": "Clear and reassuring; asks 'how long has it hurt?'",
+        "sensitivity": "Missing Ava's important moments because of work.",
+        "repair": "Makes time, puts the phone away and really listens."
+      },
+      "appearance": {
+        "skin": "#b57a58",
+        "hair": "#2f2729",
+        "shirt": "#5f9fb3",
+        "background": "#d9ebf0"
+      },
+      "playable": true
+    },
+    "current_thought": "Three flu cases this week already. I hope it doesn't spread through the school.",
+    "short_term_goals": [
+      "Get home in time for dinner with Ava",
+      "Keep an eye on the flu season"
+    ],
+    "long_term_goals": [
+      "Lead the hospital one day"
+    ],
+    "memory_summary": "I'm a doctor at Navora Hospital and Ava's mum. I raise her on my own and I worry that I work too much.",
+    "relationship_scores": {
+      "cit_009": 90
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_033",
+        "content": "I'm a doctor at Navora Hospital and Ava's mum. I raise her on my own and I worry that I work too much.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 11,
+      "height_cm": 162,
+      "weight_kg": 58,
+      "fitness": 62,
+      "household_id": "home_b",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "cit_009"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Doctor",
+        "location_id": "loc_hospital",
+        "hourly_wage": 40,
+        "start": 480,
+        "end": 1020,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Become head of Navora Hospital",
+        "kind": "career",
+        "progress": 55
+      },
+      "conditions": [],
+      "wants_children": false,
+      "gym_days": [
+        1,
+        3
+      ]
+    }
+  },
+  {
+    "citizen_id": "cit_034",
+    "name": "Carlos Garcia",
+    "age": 45,
+    "profession": "Cafe owner",
+    "active": true,
+    "work_location_id": "loc_restaurant",
+    "position": [
+      4,
+      6
+    ],
+    "money": 900,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Cheerful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Generous",
+          "Loud",
+          "Restless"
+        ],
+        "values": "Good food, a full table and people feeling welcome.",
+        "voice": "Big laugh, calls regulars by name, offers food mid-sentence.",
+        "sensitivity": "Empty tables; being compared to his late father's cooking.",
+        "repair": "Cooks something special and says sorry with a grin."
+      },
+      "appearance": {
+        "skin": "#c9956f",
+        "hair": "#3e3129",
+        "shirt": "#e0a54a",
+        "background": "#f4e2c6"
+      },
+      "playable": true
+    },
+    "current_thought": "Mateo wants to paint a mural on the cafe wall. Maybe it's a good idea.",
+    "short_term_goals": [
+      "Try a new breakfast special",
+      "Put money aside for the truck"
+    ],
+    "long_term_goals": [
+      "Own a food truck by next summer"
+    ],
+    "memory_summary": "I run the Sunny Side Cafe. Mateo is my son; his mum and I split up years ago but we're friendly. I'm saving for a food truck.",
+    "relationship_scores": {
+      "cit_010": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_034",
+        "content": "I run the Sunny Side Cafe. Mateo is my son; his mum and I split up years ago but we're friendly. I'm saving for a food truck.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 210,
+      "height_cm": 174,
+      "weight_kg": 88,
+      "fitness": 40,
+      "household_id": "home_c",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "cit_010"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Cafe owner",
+        "location_id": "loc_restaurant",
+        "hourly_wage": 23,
+        "start": 360,
+        "end": 900,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Save $3,000 for a food truck",
+        "kind": "money",
+        "progress": 30,
+        "target": 3000
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "cit_035",
+    "name": "Grace Mensah",
+    "age": 39,
+    "profession": "Teacher",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      7,
+      4
+    ],
+    "money": 780,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Determined",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Patient",
+          "Funny",
+          "Demanding"
+        ],
+        "values": "Every child being seen, and fairness in the classroom.",
+        "voice": "Teacher voice with a wink; turns things into questions.",
+        "sensitivity": "Parents who blame teachers; her own son thinking she's harder on him.",
+        "repair": "Admits a mistake in front of the class and laughs about it."
+      },
+      "appearance": {
+        "skin": "#7a4a36",
+        "hair": "#211f22",
+        "shirt": "#9d6fb5",
+        "background": "#e7dcef"
+      },
+      "playable": true
+    },
+    "current_thought": "Exam week is coming. Half the class hasn't started revising.",
+    "short_term_goals": [
+      "Mark the science tests",
+      "Spend a proper evening with Noah"
+    ],
+    "long_term_goals": [
+      "Help run the school one day"
+    ],
+    "memory_summary": "I teach at Navora School, which means I teach my own son Noah, and he hates that. I'm raising him on my own.",
+    "relationship_scores": {
+      "cit_021": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_035",
+        "content": "I teach at Navora School, which means I teach my own son Noah, and he hates that. I'm raising him on my own.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 300,
+      "height_cm": 168,
+      "weight_kg": 66,
+      "fitness": 55,
+      "household_id": "home_d",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "cit_021"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Teacher",
+        "location_id": "loc_school",
+        "hourly_wage": 27,
+        "start": 450,
+        "end": 960,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Become deputy head teacher",
+        "kind": "career",
+        "progress": 45
+      },
+      "conditions": [],
+      "wants_children": false,
+      "gym_days": [
+        5
+      ]
+    }
+  },
+  {
+    "citizen_id": "cit_036",
+    "name": "Wei Chen",
+    "age": 47,
+    "profession": "Scientist",
+    "active": true,
+    "work_location_id": "loc_lab",
+    "position": [
+      8,
+      5
+    ],
+    "money": 1800,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Absorbed",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Curious",
+          "Absent-minded",
+          "Kind"
+        ],
+        "values": "Understanding the world and leaving it better for his son.",
+        "voice": "Explains with analogies, loses track of time mid-sentence.",
+        "sensitivity": "Forgetting promises because he was busy working.",
+        "repair": "Writes a note so he never forgets again, and keeps it."
+      },
+      "appearance": {
+        "skin": "#e0ad86",
+        "hair": "#2b2a2f",
+        "shirt": "#d9d4c3",
+        "background": "#eef0e6"
+      },
+      "playable": true
+    },
+    "current_thought": "If the solar cell test works tonight, I'll show Eliot first.",
+    "short_term_goals": [
+      "Finish the solar cell test",
+      "Make it home for dinner"
+    ],
+    "long_term_goals": [
+      "Publish my research"
+    ],
+    "memory_summary": "I'm a scientist at the Discovery Lab and Eliot's dad. I get lost in my work sometimes, but Eliot comes first.",
+    "relationship_scores": {
+      "cit_029": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_036",
+        "content": "I'm a scientist at the Discovery Lab and Eliot's dad. I get lost in my work sometimes, but Eliot comes first.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 90,
+      "height_cm": 170,
+      "weight_kg": 69,
+      "fitness": 45,
+      "household_id": "home_e",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "cit_029"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Scientist",
+        "location_id": "loc_lab",
+        "hourly_wage": 35,
+        "start": 540,
+        "end": 1080,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Publish his clean-energy research",
+        "kind": "career",
+        "progress": 70
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "cit_037",
+    "name": "Elena Novak",
+    "age": 33,
+    "profession": "Librarian",
+    "active": true,
+    "work_location_id": "loc_library",
+    "position": [
+      4,
+      6
+    ],
+    "money": 950,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Hopeful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Bookish",
+          "Romantic",
+          "Shy"
+        ],
+        "values": "Stories, quiet kindness and giving Iris a steady home.",
+        "voice": "Soft-spoken, quotes books, blushes easily.",
+        "sensitivity": "Being overlooked; Iris shutting her out.",
+        "repair": "Writes a heartfelt note and leaves it somewhere to be found."
+      },
+      "appearance": {
+        "skin": "#efc3a5",
+        "hair": "#7d4a38",
+        "shirt": "#6f9c86",
+        "background": "#dcebe2"
+      },
+      "playable": true
+    },
+    "current_thought": "Officer Ali came in again for a book he'd already read. I think?",
+    "short_term_goals": [
+      "Start a reading club",
+      "Help Iris feel at home"
+    ],
+    "long_term_goals": [
+      "Build a life here"
+    ],
+    "memory_summary": "I'm the town librarian. My niece Iris lives with me while her parents work overseas. I moved to Navora last year and I'm still a bit lonely. Samir Ali, the police officer, is kind to me.",
+    "relationship_scores": {
+      "cit_022": 82,
+      "cit_038": 62
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_037",
+        "content": "I'm the town librarian. My niece Iris lives with me while her parents work overseas. I moved to Navora last year and I'm still a bit lonely. Samir Ali, the police officer, is kind to me.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 33,
+      "height_cm": 166,
+      "weight_kg": 60,
+      "fitness": 48,
+      "household_id": "home_f",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Librarian",
+        "location_id": "loc_library",
+        "hourly_wage": 23,
+        "start": 600,
+        "end": 1080,
+        "workdays": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Make real friends in Navora",
+        "kind": "social",
+        "progress": 20
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "cit_038",
+    "name": "Samir Ali",
+    "age": 41,
+    "profession": "Police officer",
+    "active": true,
+    "work_location_id": "loc_police",
+    "position": [
+      7,
+      6
+    ],
+    "money": 1200,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Steady",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Protective",
+          "Honest",
+          "Quietly grieving"
+        ],
+        "values": "Keeping people safe and raising Zara the way her mum would have wanted.",
+        "voice": "Calm, direct, a surprisingly goofy laugh.",
+        "sensitivity": "Anything about his late wife Amira; Zara taking risks.",
+        "repair": "Owns it plainly and does better next time."
+      },
+      "appearance": {
+        "skin": "#a86e4a",
+        "hair": "#26252b",
+        "shirt": "#3f5f86",
+        "background": "#d6e0ee"
+      },
+      "playable": true
+    },
+    "current_thought": "Zara says I should 'get out more'. Maybe she's right. Maybe the library.",
+    "short_term_goals": [
+      "Train for the half-marathon",
+      "Get Zara to the science fair on time"
+    ],
+    "long_term_goals": [
+      "Be happy again"
+    ],
+    "memory_summary": "I'm a police officer and Zara's dad. My wife Amira died three years ago. We're doing okay. I've started noticing Elena at the library.",
+    "relationship_scores": {
+      "cit_028": 90,
+      "cit_037": 62
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_038",
+        "content": "I'm a police officer and Zara's dad. My wife Amira died three years ago. We're doing okay. I've started noticing Elena at the library.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 130,
+      "height_cm": 179,
+      "weight_kg": 80,
+      "fitness": 72,
+      "household_id": "home_g",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "cit_028"
+      ],
+      "relationship_status": "widowed",
+      "job": {
+        "title": "Police officer",
+        "location_id": "loc_police",
+        "hourly_wage": 29,
+        "start": 480,
+        "end": 1080,
+        "workdays": [
+          0,
+          1,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Run the Navora half-marathon",
+        "kind": "fitness",
+        "progress": 25
+      },
+      "conditions": [],
+      "wants_children": false,
+      "gym_days": [
+        0,
+        2,
+        4
+      ]
+    }
+  },
+  {
+    "citizen_id": "cit_039",
+    "name": "Maya Laurent",
+    "age": 26,
+    "profession": "Fitness coach",
+    "active": true,
+    "work_location_id": "loc_gym",
+    "position": [
+      5,
+      6
+    ],
+    "money": 1800,
+    "health": 90,
+    "hunger": 8,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Energetic",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Upbeat",
+          "Driven",
+          "Impulsive"
+        ],
+        "values": "Health, independence and looking after her little sister.",
+        "voice": "Energetic, sporty slang, cheers people on.",
+        "sensitivity": "Being seen as too young to be responsible for Sophie.",
+        "repair": "Apologises fast and plans something fun together."
+      },
+      "appearance": {
+        "skin": "#ecb793",
+        "hair": "#5d3630",
+        "shirt": "#e06c7a",
+        "background": "#f5dadd"
+      },
+      "playable": true
+    },
+    "current_thought": "Sophie's been quiet lately. Is she okay, or is she just being thirteen?",
+    "short_term_goals": [
+      "Get three new members at the gym",
+      "Take Sophie for pancakes"
+    ],
+    "long_term_goals": [
+      "Open my own studio"
+    ],
+    "memory_summary": "I coach at Navora Gym. Our parents work abroad, so my little sister Sophie lives with me. I love her, but being a big sister and a parent is hard.",
+    "relationship_scores": {
+      "cit_027": 86
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_039",
+        "content": "I coach at Navora Gym. Our parents work abroad, so my little sister Sophie lives with me. I love her, but being a big sister and a parent is hard.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 77,
+      "height_cm": 170,
+      "weight_kg": 62,
+      "fitness": 88,
+      "household_id": "home_h",
+      "parent_ids": [
+        "ext_laurent_parents"
+      ],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Fitness coach",
+        "location_id": "loc_gym",
+        "hourly_wage": 20,
+        "start": 360,
+        "end": 900,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Save $5,000 to open her own studio",
+        "kind": "money",
+        "progress": 36,
+        "target": 5000
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "cit_040",
+    "name": "Kenji Tanaka",
+    "age": 54,
+    "profession": "Station master",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_station",
+    "position": [
+      55,
+      5
+    ],
+    "money": 1600,
+    "health": 92,
+    "hunger": 12,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Composed",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Punctual",
+          "Dutiful",
+          "Secretly sentimental"
+        ],
+        "values": "Trains on time, a tidy station and a family that eats dinner together.",
+        "voice": "Formal and polite, checks his watch, softens around children.",
+        "sensitivity": "Delays he can't control; being thanked in public.",
+        "repair": "Bows deeply, apologises properly, and fixes the schedule."
+      },
+      "appearance": {
+        "skin": "#e9c29f",
+        "hair": "#6d6a6a",
+        "shirt": "#2f4f7a",
+        "background": "#dbe3ef"
+      },
+      "playable": true
+    },
+    "current_thought": "The 7:42 was two minutes late yesterday. Unacceptable.",
+    "short_term_goals": [
+      "Keep the morning trains on time",
+      "Watch Haruto's baseball practice"
+    ],
+    "long_term_goals": [
+      "Retire with a perfect record"
+    ],
+    "memory_summary": "I have been station master at Navora Station for twenty years. My wife Aiko runs HappyMart 24 and our son Haruto is fourteen and obsessed with baseball.",
+    "relationship_scores": {
+      "cit_041": 88,
+      "cit_042": 86
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_040",
+        "content": "I have been station master at Navora Station for twenty years. My wife Aiko runs HappyMart 24 and our son Haruto is fourteen and obsessed with baseball.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 140,
+      "height_cm": 170,
+      "weight_kg": 68,
+      "fitness": 50,
+      "household_id": "apt_101",
+      "parent_ids": [],
+      "partner_id": "cit_041",
+      "children_ids": [
+        "cit_042"
+      ],
+      "relationship_status": "married",
+      "job": {
+        "title": "Station master",
+        "location_id": "loc_station",
+        "hourly_wage": 30,
+        "start": 330,
+        "end": 1050,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Run a whole year with zero late trains",
+        "kind": "career",
+        "progress": 60
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "cit_041",
+    "name": "Aiko Tanaka",
+    "age": 51,
+    "profession": "Konbini owner",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_konbini",
+    "position": [
+      55,
+      5
+    ],
+    "money": 1200,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Cheerful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Chatty",
+          "Practical",
+          "Nosy"
+        ],
+        "values": "Knowing her neighbours and keeping the shop open for anyone who needs it.",
+        "voice": "Warm, quick, knows everyone's favourite onigiri.",
+        "sensitivity": "Being taken for granted; Haruto hiding things.",
+        "repair": "Slips you a free snack and says 'let's forget it'."
+      },
+      "appearance": {
+        "skin": "#ecc6a4",
+        "hair": "#3a3033",
+        "shirt": "#3f8f6d",
+        "background": "#d9eee4"
+      },
+      "playable": true
+    },
+    "current_thought": "The new salmon onigiri are selling out. Order double tomorrow.",
+    "short_term_goals": [
+      "Restock before the lunch rush",
+      "Find out what Haruto is hiding"
+    ],
+    "long_term_goals": [
+      "Renovate the shop"
+    ],
+    "memory_summary": "I run HappyMart 24 next to the shrine. I know everyone in the neighbourhood. My husband Kenji is the station master; our son Haruto is fourteen.",
+    "relationship_scores": {
+      "cit_040": 88,
+      "cit_042": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_041",
+        "content": "I run HappyMart 24 next to the shrine. I know everyone in the neighbourhood. My husband Kenji is the station master; our son Haruto is fourteen.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 260,
+      "height_cm": 158,
+      "weight_kg": 56,
+      "fitness": 45,
+      "household_id": "apt_101",
+      "parent_ids": [],
+      "partner_id": "cit_040",
+      "children_ids": [
+        "cit_042"
+      ],
+      "relationship_status": "married",
+      "job": {
+        "title": "Konbini owner",
+        "location_id": "loc_konbini",
+        "hourly_wage": 22,
+        "start": 420,
+        "end": 1140,
+        "workdays": [
+          0,
+          1,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "ambition": {
+        "goal": "Save $4,000 to renovate HappyMart 24",
+        "kind": "money",
+        "progress": 30,
+        "target": 4000
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "cit_042",
+    "name": "Haruto Tanaka",
+    "age": 14,
+    "profession": "Student",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_school",
+    "position": [
+      55,
+      5
+    ],
+    "money": 140,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [
+      "baseball",
+      "manga"
+    ],
+    "mood": "Restless",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Sporty",
+          "Funny",
+          "Secretive"
+        ],
+        "values": "Being good at something and not being treated like a little kid.",
+        "voice": "Short answers to adults, loud jokes with friends, baseball slang.",
+        "sensitivity": "His dad's high expectations; being laughed at for reading manga.",
+        "repair": "Makes a joke to break the ice, then admits the truth."
+      },
+      "appearance": {
+        "skin": "#e9c29f",
+        "hair": "#1f1e22",
+        "shirt": "#e0e3e6",
+        "background": "#e6ecf2"
+      },
+      "playable": true
+    },
+    "current_thought": "Coach said the tryouts are next month. I have to practise every day.",
+    "short_term_goals": [
+      "Practise pitching",
+      "Make a friend at the new school"
+    ],
+    "long_term_goals": [
+      "Play for the regional team"
+    ],
+    "memory_summary": "I just moved schools to Navora School. I love baseball and secretly draw manga. My dad runs the station and expects a lot.",
+    "relationship_scores": {
+      "cit_040": 82,
+      "cit_041": 86
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_042",
+        "content": "I just moved schools to Navora School. I love baseball and secretly draw manga. My dad runs the station and expects a lot.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 55,
+      "height_cm": 163,
+      "weight_kg": 52,
+      "fitness": 72,
+      "household_id": "apt_101",
+      "parent_ids": [
+        "cit_040",
+        "cit_041"
+      ],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": null,
+      "ambition": {
+        "goal": "Make the regional baseball team",
+        "kind": "fitness",
+        "progress": 40
+      },
+      "conditions": [],
+      "wants_children": false,
+      "grade": 69
+    }
+  },
+  {
+    "citizen_id": "cit_043",
+    "name": "Yui Sato",
+    "age": 28,
+    "profession": "Office worker",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_office",
+    "position": [
+      55,
+      5
+    ],
+    "money": 2200,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Busy",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Ambitious",
+          "Witty",
+          "Overworked"
+        ],
+        "values": "Doing great work and one day having a life outside of it.",
+        "voice": "Fast, funny, lots of work jargon she then makes fun of.",
+        "sensitivity": "Being overlooked for promotion; being told to smile.",
+        "repair": "Owns it with humour and buys the coffee."
+      },
+      "appearance": {
+        "skin": "#efcaa8",
+        "hair": "#2b2a2f",
+        "shirt": "#b86e8e",
+        "background": "#f2dde6"
+      },
+      "playable": true
+    },
+    "current_thought": "If I skip lunch again I'll finish the deck. Or I could... not.",
+    "short_term_goals": [
+      "Finish the campaign pitch",
+      "Go to the gym twice this week"
+    ],
+    "long_term_goals": [
+      "Get promoted",
+      "Find someone who makes me laugh"
+    ],
+    "memory_summary": "I work in marketing on the ninth floor of Harbor Tower. I moved to Navora for the job. I love my work but I'm tired, and a bit lonely.",
+    "relationship_scores": {
+      "cit_044": 55
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_043",
+        "content": "I work in marketing on the ninth floor of Harbor Tower. I moved to Navora for the job. I love my work but I'm tired, and a bit lonely.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 20,
+      "height_cm": 161,
+      "weight_kg": 52,
+      "fitness": 58,
+      "household_id": "apt_102",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Marketing specialist",
+        "location_id": "loc_office",
+        "hourly_wage": 31,
+        "start": 540,
+        "end": 1110,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Lead her first big campaign at Harbor Tower",
+        "kind": "career",
+        "progress": 35
+      },
+      "conditions": [],
+      "wants_children": false,
+      "gym_days": [
+        1,
+        3
+      ]
+    }
+  },
+  {
+    "citizen_id": "cit_044",
+    "name": "Daichi Mori",
+    "age": 31,
+    "profession": "Mall manager",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_mall",
+    "position": [
+      55,
+      5
+    ],
+    "money": 2400,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Easygoing",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Easygoing",
+          "Generous",
+          "Disorganised"
+        ],
+        "values": "Good vibes, fair treatment for his staff, and travel.",
+        "voice": "Relaxed, friendly, always mentions the food court.",
+        "sensitivity": "Being thought of as lazy; conflict at work.",
+        "repair": "Apologises with a big grin and a plan."
+      },
+      "appearance": {
+        "skin": "#e3b58f",
+        "hair": "#4a3a30",
+        "shirt": "#6f93c9",
+        "background": "#dde6f2"
+      },
+      "playable": true
+    },
+    "current_thought": "The woman from Harbor Tower buys the same matcha latte every day. Should I say hi?",
+    "short_term_goals": [
+      "Fix the broken escalator",
+      "Say hi to Yui properly"
+    ],
+    "long_term_goals": [
+      "Travel around the world"
+    ],
+    "memory_summary": "I manage Sakura Mall. I'm saving up to travel the world. I keep noticing Yui from Harbor Tower at the food court.",
+    "relationship_scores": {
+      "cit_043": 55
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_044",
+        "content": "I manage Sakura Mall. I'm saving up to travel the world. I keep noticing Yui from Harbor Tower at the food court.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 190,
+      "height_cm": 176,
+      "weight_kg": 78,
+      "fitness": 50,
+      "household_id": "apt_201",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Mall manager",
+        "location_id": "loc_mall",
+        "hourly_wage": 28,
+        "start": 600,
+        "end": 1140,
+        "workdays": [
+          0,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "ambition": {
+        "goal": "Save $8,000 to travel around the world",
+        "kind": "money",
+        "progress": 30,
+        "target": 8000
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "cit_045",
+    "name": "Hiroshi Nakamura",
+    "age": 74,
+    "profession": "Retired carpenter",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": null,
+    "position": [
+      55,
+      5
+    ],
+    "money": 3200,
+    "health": 80,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 62,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Lonely",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Quiet",
+          "Skilled",
+          "Stubborn"
+        ],
+        "values": "Craftsmanship, tradition, and being useful.",
+        "voice": "Few words, carpentry metaphors, surprisingly gentle with kids.",
+        "sensitivity": "Feeling forgotten since his wife Keiko died; young people rushing.",
+        "repair": "Fixes something for you without being asked."
+      },
+      "appearance": {
+        "skin": "#e6bd98",
+        "hair": "#cfccc6",
+        "shirt": "#6b5f55",
+        "background": "#e6e0d8"
+      },
+      "playable": true
+    },
+    "current_thought": "Keiko would have liked the new shrine lanterns.",
+    "short_term_goals": [
+      "Visit the shrine",
+      "Trim the bonsai"
+    ],
+    "long_term_goals": [
+      "Not be forgotten"
+    ],
+    "memory_summary": "I was a carpenter for fifty years and built half the old houses in Navora. My wife Keiko died last year. My days are quiet now; I tend my bonsai and visit the shrine.",
+    "relationship_scores": {},
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_045",
+        "content": "I was a carpenter for fifty years and built half the old houses in Navora. My wife Keiko died last year. My days are quiet now; I tend my bonsai and visit the shrine.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 300,
+      "height_cm": 165,
+      "weight_kg": 60,
+      "fitness": 34,
+      "household_id": "apt_202",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "widowed",
+      "job": null,
+      "ambition": {
+        "goal": "Make a new friend in Navora",
+        "kind": "social",
+        "progress": 0
+      },
+      "conditions": [
+        {
+          "id": "high-blood-pressure",
+          "name": "high blood pressure",
+          "severity": 40,
+          "contagious": false,
+          "chronic": true,
+          "treated": true,
+          "since_day": -2000,
+          "treated_until": 5
+        }
+      ],
+      "wants_children": false,
+      "loneliness": 70
+    }
+  },
+  {
+    "citizen_id": "cit_046",
+    "name": "Emi Kobayashi",
+    "age": 44,
+    "profession": "Clinic doctor",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_clinic",
+    "position": [
+      55,
+      5
+    ],
+    "money": 2600,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Calm",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Gentle",
+          "Meticulous",
+          "Tired"
+        ],
+        "values": "Patients who feel listened to, and her daughter's happiness.",
+        "voice": "Soft, careful, explains things with drawings.",
+        "sensitivity": "Being rushed; Sakura growing up too fast.",
+        "repair": "Writes a thoughtful note and follows up."
+      },
+      "appearance": {
+        "skin": "#efcaa8",
+        "hair": "#262528",
+        "shirt": "#7fb0ac",
+        "background": "#dcefeb"
+      },
+      "playable": true
+    },
+    "current_thought": "Mr Nakamura hasn't been in for his blood pressure check. I should call.",
+    "short_term_goals": [
+      "Check on Mr Nakamura",
+      "Attend Sakura's piano recital"
+    ],
+    "long_term_goals": [
+      "Open a seniors' clinic"
+    ],
+    "memory_summary": "I run Minami Clinic near the station. I'm raising my daughter Sakura on my own. I worry about the lonely seniors in the apartments.",
+    "relationship_scores": {
+      "cit_047": 90,
+      "cit_045": 50
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_046",
+        "content": "I run Minami Clinic near the station. I'm raising my daughter Sakura on my own. I worry about the lonely seniors in the apartments.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 75,
+      "height_cm": 160,
+      "weight_kg": 54,
+      "fitness": 55,
+      "household_id": "apt_301",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "cit_047"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Clinic doctor",
+        "location_id": "loc_clinic",
+        "hourly_wage": 38,
+        "start": 540,
+        "end": 1080,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Open a free Saturday clinic for seniors",
+        "kind": "career",
+        "progress": 40
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "cit_047",
+    "name": "Sakura Kobayashi",
+    "age": 12,
+    "profession": "Student",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_school",
+    "position": [
+      55,
+      5
+    ],
+    "money": 110,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [
+      "piano",
+      "science"
+    ],
+    "mood": "Dreamy",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Dreamy",
+          "Talented",
+          "Shy"
+        ],
+        "values": "Music, kindness and one best friend who really gets her.",
+        "voice": "Quiet at first, then talks fast about music and stars.",
+        "sensitivity": "Being put on the spot; mum working late.",
+        "repair": "Plays a song as an apology."
+      },
+      "appearance": {
+        "skin": "#efcaa8",
+        "hair": "#2b2a2f",
+        "shirt": "#e6a3c2",
+        "background": "#f5e2ec"
+      },
+      "playable": true
+    },
+    "current_thought": "If I practise the Chopin piece forty more times, maybe I won't freeze on stage.",
+    "short_term_goals": [
+      "Practise piano",
+      "Talk to someone new at school"
+    ],
+    "long_term_goals": [
+      "Become a pianist"
+    ],
+    "memory_summary": "I'm twelve and I live above the station with my mum, who is a doctor. I love piano and looking at stars. I'm shy at school.",
+    "relationship_scores": {
+      "cit_046": 90
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_cit_047",
+        "content": "I'm twelve and I live above the station with my mum, who is a doctor. I love piano and looking at stars. I'm shy at school.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 160,
+      "height_cm": 149,
+      "weight_kg": 39,
+      "fitness": 50,
+      "household_id": "apt_301",
+      "parent_ids": [
+        "cit_046"
+      ],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": null,
+      "ambition": {
+        "goal": "Play piano at the autumn concert",
+        "kind": "creative",
+        "progress": 30
+      },
+      "conditions": [],
+      "wants_children": false,
+      "grade": 88
+    }
+  }
+]

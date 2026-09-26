@@ -1,2196 +1,1180 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ComponentType, FormEvent, ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import {
-  Activity,
-  AlertTriangle,
-  Banknote,
+  ArrowLeft,
+  ArrowRight,
   BookOpen,
-  Brain,
-  BriefcaseBusiness,
-  Building2,
-  Bus,
-  ChevronLeft,
-  ChevronRight,
-  CircleDollarSign,
-  Coffee,
-  Factory,
-  FlaskConical,
-  Gauge,
-  Handshake,
-  HeartPulse,
-  HelpCircle,
-  Home,
-  Library,
+  Check,
+  ChevronDown,
+  CircleHelp,
+  Compass,
+  Download,
+  Footprints,
+  Heart,
+  LoaderCircle,
   MapPin,
   MessageCircle,
-  MessageSquareText,
-  Moon,
-  MousePointerClick,
+  Hand,
+  Wand2,
+  Newspaper,
   Pause,
-  PiggyBank,
-  Pill,
   Play,
-  Radio,
-  Route,
-  Shield,
-  ShoppingBag,
+  Send,
   Sparkles,
-  Stethoscope,
   Sun,
-  Sunrise,
-  Sunset,
-  Target,
-  TreePine,
-  UserRound,
+  Trophy,
   Users,
-  Wheat,
-  Wifi,
-  WifiOff,
-  Wind,
+  Vote,
   X,
-  Zap,
 } from "lucide-react";
-
-import { GameCanvas } from "@/components/game/GameCanvas";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import type { ProgressTone } from "@/components/ui/progress";
+import { GameCanvas } from "./GameCanvas";
+import { CitizenPortrait } from "./CitizenPortrait";
+import { SocialPanel } from "./SocialPanel";
+import { BondNetwork } from "./BondNetwork";
+import { ConversationImpact } from "./ConversationImpact";
+import { CitizenNature } from "./CitizenNature";
+import { AutonomyStatus, type PendingExchange } from "./AutonomyStatus";
+import { CityEventsPanel } from "./CityEventsPanel";
+import { BadgesPanel } from "./BadgesPanel";
+import { LifeDetails } from "./LifeDetails";
+import { NewsPanel } from "./NewsPanel";
+import { WelcomeGuide, WELCOME_KEY } from "./WelcomeGuide";
+import { WorldClock } from "./WorldClock";
+import { GodPanel } from "./GodPanel";
+import { ActionPanel } from "./ActionPanel";
+import { minutesBehindRealTime } from "@/lib/session-simulation";
+import { calendarDay, calendarStartFor } from "@/lib/calendar";
+import { dayWeather } from "@/lib/weather";
 import { api } from "@/lib/api";
+import { exportSession, sessionMemoryEnabled, sessionRelationships } from "@/lib/session-simulation";
+import { readUnlocked, unlockNew, type Achievement, type Unlocked } from "@/lib/achievements";
+import { isWeekend, weekday } from "@/lib/routine";
+import { checkPlayerText } from "@/lib/safety";
 import { useGameStore } from "@/lib/store";
 import type {
   CitizenAgent,
-  CityEvent,
   CityState,
   Conversation,
-  Location,
-  Memory,
   Relationship,
-  SimulationMode,
-  TriggerEventPayload,
 } from "@/lib/types";
 
-type Tone = "accent" | "warning" | "danger" | "success" | "violet";
-type InspectorTab = "life" | "memory" | "social";
-type ActivePanel = "city" | "citizen" | "story" | null;
-type SpeedKey = "paused" | "1x" | "2x" | "4x";
-type PlayerTask = {
-  task: string;
-  status: string;
-  location_id: string | null;
-  target_citizen_id: string | null;
-  plan_summary?: string;
+type Panel = "citizens" | "journal" | "city" | "social" | "events" | "news" | "create" | "badges" | null;
+type Page = "act" | "life" | "memories" | "bonds";
+type OutgoingSpeech = {
+  id: string;
+  actor: CitizenAgent;
+  target: CitizenAgent;
+  text: string;
+  status: "pending" | "failed";
+  error?: string;
 };
-type ConversationFlowItem =
-  | { kind: "task"; id: string; day: number; minute: number; event: CityEvent }
-  | {
-      kind: "line";
-      id: string;
-      day: number;
-      minute: number;
-      conversation: Conversation;
-      line: Conversation["transcript"][number];
-      lineIndex: number;
-    }
-  | { kind: "done"; id: string; day: number; minute: number; event: CityEvent };
-type HoverInfo =
-  | { kind: "location"; data: Location }
-  | { kind: "citizen"; data: { name: string; subtitle: string } }
-  | null;
-
-const SPEED_INTERVALS: Record<SpeedKey, number | null> = {
-  paused: null,
-  "1x": 1800,
-  "2x": 900,
-  "4x": 450,
-};
-
-const eventButtons: Array<{
-  label: string;
-  detail: string;
-  event_type: TriggerEventPayload["event_type"];
-  icon: ComponentType<{ className?: string }>;
-  tone: "default" | "secondary" | "danger" | "warning";
-}> = [
-  { label: "Flu Outbreak", detail: "Health system stress", event_type: "flu_outbreak", icon: Stethoscope, tone: "danger" },
-  { label: "Traffic Accident", detail: "Police & driver call", event_type: "traffic_accident", icon: Bus, tone: "warning" },
-  { label: "Food Shortage", detail: "Farm & market squeeze", event_type: "food_shortage", icon: Wheat, tone: "warning" },
-  { label: "School Exam", detail: "Teacher & student push", event_type: "school_exam", icon: BookOpen, tone: "secondary" },
-  { label: "City Festival", detail: "Mood surge at park", event_type: "city_festival", icon: Sparkles, tone: "default" },
-  { label: "Bank Policy", detail: "Loan rate ripples", event_type: "bank_policy_change", icon: PiggyBank, tone: "secondary" },
-  { label: "Power Outage", detail: "Engineer scramble", event_type: "power_outage", icon: Zap, tone: "danger" },
-];
-
-const systemRows = [
-  { key: "city_health", label: "City Health", icon: HeartPulse, tone: "success" as ProgressTone },
-  { key: "average_happiness", label: "Public Mood", icon: Sparkles, tone: "accent" as ProgressTone },
-  { key: "economy_status", label: "Local Economy", icon: CircleDollarSign, tone: "warning" as ProgressTone },
-  { key: "education_status", label: "Education", icon: BookOpen, tone: "violet" as ProgressTone },
-  { key: "traffic_status", label: "Traffic Flow", icon: Bus, tone: "water" as ProgressTone },
-];
-
-const professionFilters = ["All", "Student"];
-
-const AUTO_EVENT_TYPES: TriggerEventPayload["event_type"][] = [
-  "city_festival",
-  "flu_outbreak",
-  "traffic_accident",
-  "food_shortage",
-  "school_exam",
-  "bank_policy_change",
-  "power_outage",
-];
+const time = (minute: number) =>
+  `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+const shortName = (citizen?: CitizenAgent) =>
+  citizen?.name.split(" ")[0] ?? "Citizen";
+function chapterLine(day: number, minute: number) {
+  if (isWeekend(day)) return minute < 720 ? "No school today. Everyone follows their own hobbies." : "A lazy weekend afternoon. Who will meet whom?";
+  if (minute < 450) return "Morning at home. School ahead. Plans still unwritten.";
+  if (minute < 900) return "School is in. Friendships are tested in the corridors.";
+  if (minute < 1080) return "After school. Parks, clubs and chance meetings.";
+  return "Evening settles over Nakameguro. Windows glow one by one.";
+}
 
 export function AgentCityShell() {
   const {
     city,
     selectedCitizenId,
     memories,
-    relationships,
-    conversations,
     cityConversations,
-    connectionStatus,
+    playbackQueue,
     error,
     loadInitialState,
-    refreshCityConversations,
-    connectWebSocket,
     setCity,
     selectCitizen,
+    refreshCityConversations,
   } = useGameStore();
+  const [panel, setPanel] = useState<Panel>(null);
+  const [page, setPage] = useState<Page>("life");
   const [busy, setBusy] = useState(false);
-  const [speed, setSpeed] = useState<SpeedKey>("paused");
-  const [autoDirector, setAutoDirector] = useState(false);
-  const [autoFollow, setAutoFollow] = useState(false);
-  const [professionFilter, setProfessionFilter] = useState("All");
-  const [inspectorTab, setInspectorTab] = useState<InspectorTab>("life");
-  const [hoverInfo, setHoverInfo] = useState<HoverInfo>(null);
-  const [showGuide, setShowGuide] = useState(false);
-  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
-  const lastUserSelectRef = useRef<number>(0);
-  const socketRef = useRef<WebSocket | null>(null);
-  const tickInFlightRef = useRef(false);
-  const gameMode = city?.simulation_mode ?? "manual";
-  const activeTasks = useMemo(
-    () =>
-      (city?.citizens ?? []).reduce<Array<{ citizen: CitizenAgent; task: PlayerTask }>>((items, citizen) => {
-        const task = playerTaskFor(citizen);
-        if (task?.status === "active") {
-          items.push({ citizen, task });
-        }
-        return items;
-      }, []),
-    [city?.citizens],
+  const [pendingExchange, setPendingExchange] = useState<PendingExchange | null>(null);
+  const [message, setMessage] = useState("");
+  const [draft, setDraft] = useState("");
+  const [outgoing, setOutgoing] = useState<OutgoingSpeech | null>(null);
+  const speechInput = useRef<HTMLTextAreaElement>(null);
+  const [taskDraft, setTaskDraft] = useState("");
+  const [recipient, setRecipient] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [focusedConversation, setFocusedConversation] = useState<string | null>(null);
+  const [cityBonds, setCityBonds] = useState<Relationship[]>([]);
+  const [speed, setSpeed] = useState(1);
+  const [unlocked, setUnlocked] = useState<Unlocked>({});
+  const [celebration, setCelebration] = useState<Achievement[]>([]);
+  const [welcome, setWelcome] = useState(false);
+  const [alertSeen, setAlertSeen] = useState("");
+  const flight = useRef(false);
+  const player = city?.citizens.find(
+    (c) => c.citizen_id === city.policy.player_citizen_id,
+  );
+  const selected =
+    city?.citizens.find((c) => c.citizen_id === selectedCitizenId) ??
+    city?.citizens[0];
+  const nearby =
+    city?.citizens.filter(
+      (c) =>
+        c.citizen_id !== player?.citizen_id &&
+        c.current_location_id === player?.current_location_id,
+    ) ?? [];
+  const targetId = nearby.some((c) => c.citizen_id === recipient)
+    ? recipient
+    : (nearby[0]?.citizen_id ?? "");
+  const activeTask = selected?.personality.player_task as
+    { task: string; status: string; plan_summary?: string } | undefined;
+
+  useEffect(() => {
+    void loadInitialState();
+  }, [loadInitialState]);
+  useEffect(() => {
+    // Browser-only storage is read after mount so the server render stays deterministic.
+    let first = true;
+    try { first = !localStorage.getItem(WELCOME_KEY); } catch { /* storage blocked: show the guide */ }
+    const timer = window.setTimeout(() => { setUnlocked(readUnlocked()); setWelcome(first); }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!city) return;
+    const relationships = sessionMemoryEnabled() ? sessionRelationships() : cityBonds;
+    const { fresh, unlocked: next } = unlockNew({ city, conversations: cityConversations, relationships });
+    if (!fresh.length) return;
+    // Unlocks are already saved, so this update must not be cancelled by a quick re-render.
+    window.setTimeout(() => {
+      setUnlocked(next);
+      setCelebration((current) => [...current, ...fresh]);
+    }, 0);
+  }, [city, cityConversations, cityBonds]);
+  useEffect(() => {
+    if (!celebration.length) return;
+    const timer = window.setTimeout(() => setCelebration([]), 5200);
+    return () => window.clearTimeout(timer);
+  }, [celebration]);
+  const closeWelcome = useCallback(() => {
+    setWelcome(false);
+    try { localStorage.setItem(WELCOME_KEY, "1"); } catch { /* the guide can show again next visit */ }
+  }, []);
+  useEffect(() => useGameStore.subscribe((state, previous) => {
+    if (state.playbackQueue[0] && state.playbackQueue[0].conversation_id !== previous.playbackQueue[0]?.conversation_id) setPanel(null);
+  }), []);
+  useEffect(() => {
+    if (!city) return;
+    void refreshCityConversations();
+    const id = selectedCitizenId ?? city.citizens[0]?.citizen_id;
+    if (id) void selectCitizen(id);
+  }, [city, selectedCitizenId, selectCitizen, refreshCityConversations]);
+  useEffect(() => {
+    if (!city || (panel !== "social" && !(panel === "citizens" && page === "bonds"))) return;
+    let cancelled = false;
+    Promise.all(city.citizens.map((c) => api.getRelationships(c.citizen_id)))
+      .then((rows) => { if (!cancelled) setCityBonds(rows.flat()); })
+      .catch(() => { if (!cancelled) setMessage("Relationships could not be loaded."); });
+    return () => { cancelled = true; };
+  }, [city, panel, page]);
+
+  const act = useCallback(
+    async (action: () => Promise<CityState>) => {
+      if (flight.current) return;
+      flight.current = true;
+      setBusy(true);
+      setMessage("");
+      try {
+        setCity(await action());
+      } catch (error) {
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "This action could not finish.",
+        );
+      } finally {
+        flight.current = false;
+        setBusy(false);
+      }
+    },
+    [setCity],
   );
 
+  const live = city?.policy.time_mode === "live";
+  const lastBeat = useRef(0);
+  const onCognitionStart = useCallback((request: import("@/lib/types").SessionCognitionRequest) => {
+    if (request.conversation_mode !== "autonomous" || !request.target_id) return;
+    const people = [request.actor_id, request.target_id].map((id) => request.city.citizens.find((c) => c.citizen_id === id)?.name.split(" ")[0] ?? "Resident");
+    setPendingExchange({ names: people.join(" and "), startedAt: Date.now() });
+  }, []);
+  const tickOnce = useCallback(async () => {
+    try {
+      return await api.tick(onCognitionStart);
+    } finally {
+      setPendingExchange(null);
+    }
+  }, [onCognitionStart]);
+  // Live mode: the clock follows real Tokyo time; conversations happen between ticks when Auto is on.
   useEffect(() => {
-    loadInitialState();
-    socketRef.current = connectWebSocket();
-    return () => socketRef.current?.close();
-  }, [connectWebSocket, loadInitialState]);
-
-  // Tick loop driven by selected speed.
-  useEffect(() => {
-    const interval = SPEED_INTERVALS[speed];
-    if (!interval || !city?.clock.running) return;
-    if (city.simulation_mode === "manual" && activeTasks.length === 0) return;
-    const id = window.setInterval(async () => {
-      if (tickInFlightRef.current) return;
-      tickInFlightRef.current = true;
-      try {
-        const next = await api.tick();
-        setCity(next);
-        if (next.simulation_mode === "manual" && activePlayerTaskCount(next.citizens) === 0) {
-          setSpeed("paused");
-        }
-      } catch {
-        setSpeed("paused");
-      } finally {
-        tickInFlightRef.current = false;
+    if (!live) return;
+    const check = () => {
+      const current = useGameStore.getState().city;
+      if (!current || document.hidden || useGameStore.getState().playbackQueue.length || flight.current) return;
+      const behind = minutesBehindRealTime(current);
+      if (behind >= 60) void act(api.syncToRealTime);
+      else if (behind >= 15 || current.policy.player_destination) void act(tickOnce);
+      else if (current.simulation_mode === "autonomous" && current.clock.running && Date.now() - lastBeat.current > 40000) {
+        lastBeat.current = Date.now();
+        void act(async () => {
+          try { return await api.socialBeat(onCognitionStart); } finally { setPendingExchange(null); }
+        });
       }
-    }, interval);
-    return () => window.clearInterval(id);
-  }, [activeTasks.length, speed, city?.clock.running, city?.simulation_mode, setCity]);
-
-  // Auto-director: trigger random ambient events when on.
+    };
+    const first = window.setTimeout(check, 800);
+    const timer = window.setInterval(check, 3000);
+    return () => { window.clearTimeout(first); window.clearInterval(timer); };
+  }, [live, act, tickOnce, onCognitionStart]);
   useEffect(() => {
-    if (!autoDirector || !city?.clock.running || city.simulation_mode !== "autonomous") return;
-    const id = window.setInterval(async () => {
-      const recentHigh = city.events.some((event) => event.priority >= 3);
-      if (recentHigh) return;
-      const eventType = AUTO_EVENT_TYPES[Math.floor(Math.random() * AUTO_EVENT_TYPES.length)];
-      try {
-        const next = await api.triggerEvent({ event_type: eventType, severity: "low" });
-        setCity(next);
-      } catch {
-        // silently ignore
-      }
-    }, 36000);
-    return () => window.clearInterval(id);
-  }, [autoDirector, city?.clock.running, city?.events, city?.simulation_mode, setCity]);
+    if (live || !city?.clock.running) return;
+    const advance = () => {
+      if (document.hidden || useGameStore.getState().playbackQueue.length) return;
+      void act(tickOnce);
+    };
+    const firstTick = window.setTimeout(advance, 1000);
+    const timer = window.setInterval(
+      advance,
+      city.policy.player_destination ? 850 : 8000 / speed,
+    );
+    return () => { window.clearTimeout(firstTick); window.clearInterval(timer); };
+  }, [live, city?.clock.running, city?.policy.player_destination, speed, act, tickOnce]);
 
-  // Auto-follow: rotate selected citizen to keep things lively.
+  // A paused or hidden game must not keep scheduling model calls.
   useEffect(() => {
-    if (!autoFollow || !city || city.simulation_mode !== "autonomous") return;
-    const id = window.setInterval(() => {
-      // Only rotate if user hasn't picked someone in the last 25s.
-      if (Date.now() - lastUserSelectRef.current < 25000) return;
-      const candidates = city.citizens
-        .map((citizen) => ({
-          citizen,
-          score: citizenInterestScore(citizen),
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 6);
-      if (candidates.length === 0) return;
-      const pick = candidates[Math.floor(Math.random() * candidates.length)].citizen;
-      if (pick.citizen_id !== selectedCitizenId) {
-        void selectCitizen(pick.citizen_id);
-      }
-    }, 9000);
-    return () => window.clearInterval(id);
-  }, [autoFollow, city, selectedCitizenId, selectCitizen]);
-
+    const hide = () => {
+      if (document.hidden) void api.pause().then(setCity);
+    };
+    document.addEventListener("visibilitychange", hide);
+    return () => document.removeEventListener("visibilitychange", hide);
+  }, [setCity]);
   useEffect(() => {
-    if (!city || selectedCitizenId || !city.citizens[0]) return;
-    void selectCitizen(city.citizens[0].citizen_id);
-  }, [city, selectedCitizenId, selectCitizen]);
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setPanel(null); closeWelcome(); }
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [closeWelcome]);
 
-  useEffect(() => {
-    if (activePanel !== "story") return;
-    void refreshCityConversations().catch(() => undefined);
-  }, [activePanel, city?.clock.tick, refreshCityConversations]);
-
-  useEffect(() => {
-    if (!city || !selectedCitizenId) return;
-    void selectCitizen(selectedCitizenId).catch(() => undefined);
-  }, [city?.clock.tick, city?.events.length, city, selectedCitizenId, selectCitizen]);
-
-  const handleSelectCitizen = useCallback(
-    (citizenId: string) => {
-      lastUserSelectRef.current = Date.now();
-      void selectCitizen(citizenId);
-      setActivePanel("citizen");
+  const choose = useCallback(
+    (id: string) => {
+      void selectCitizen(id);
+      setPage("life");
+      setPanel("citizens");
     },
     [selectCitizen],
   );
 
-  const selectedCitizen = useMemo(
-    () => city?.citizens.find((citizen) => citizen.citizen_id === selectedCitizenId) ?? city?.citizens[0],
-    [city, selectedCitizenId],
-  );
-  const locationById = useMemo(
-    () => Object.fromEntries(city?.locations.map((location) => [location.location_id, location]) ?? []),
-    [city?.locations],
-  );
-  const citizenNames = useMemo(
-    () => Object.fromEntries(city?.citizens.map((citizen) => [citizen.citizen_id, citizen.name]) ?? []),
-    [city?.citizens],
-  );
-  const visibleCitizens = useMemo(() => {
-    const citizens = city?.citizens ?? [];
-    if (professionFilter === "All") return citizens;
-    return citizens.filter((citizen) => citizen.profession === professionFilter);
-  }, [city?.citizens, professionFilter]);
-  const activeEvent = city?.events.find((event) => event.priority >= 2) ?? city?.events[0] ?? null;
-
-  const selectAdjacentCitizen = useCallback(
-    (direction: -1 | 1) => {
-      const citizens = visibleCitizens.length > 0 ? visibleCitizens : (city?.citizens ?? []);
-      if (citizens.length === 0) return;
-      const currentIndex = citizens.findIndex((citizen) => citizen.citizen_id === selectedCitizen?.citizen_id);
-      const baseIndex = currentIndex >= 0 ? currentIndex : 0;
-      const nextIndex = (baseIndex + direction + citizens.length) % citizens.length;
-      handleSelectCitizen(citizens[nextIndex].citizen_id);
-    },
-    [city?.citizens, handleSelectCitizen, selectedCitizen?.citizen_id, visibleCitizens],
-  );
-
-  async function runAction(action: () => Promise<unknown>) {
-    setBusy(true);
-    try {
-      const result = await action();
-      if (result && typeof result === "object" && "city_id" in result) {
-        setCity(result as CityState);
-      }
-      return result;
-    } finally {
-      setBusy(false);
-    }
+  async function pause() {
+    // Pause can invalidate a pending AI response immediately.
+    setCity(await api.pause());
   }
-
-  async function handleModeChange(nextMode: SimulationMode) {
-    if (busy || nextMode === gameMode) return;
-    setBusy(true);
-    try {
-      const next = await api.setMode(nextMode);
-      setCity(next);
-      if (nextMode === "manual") {
-        setSpeed("paused");
-        setAutoDirector(false);
-        setAutoFollow(false);
-      } else {
-        setSpeed("1x");
-        setAutoDirector(true);
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function handleTaskAssigned(next: CityState) {
-    setCity(next);
-    if (next.simulation_mode === "manual") {
-      setSpeed(activePlayerTaskCount(next.citizens) > 0 ? "1x" : "paused");
-      setActivePanel("story");
-    }
-  }
-
-  function closeGuide() {
-    window.localStorage.setItem("agentcity-guide-dismissed", "true");
-    setShowGuide(false);
-  }
-
-  const clockLabel = city ? minutesLabel(city.clock.minute_of_day) : "--:--";
-  const period = periodInfo(city?.clock.minute_of_day ?? 0);
-
-  return (
-    <main className="agentcity-shell min-h-[100dvh] w-screen overflow-x-hidden overflow-y-auto pb-24 text-[rgb(var(--foreground))] lg:grid lg:h-[100dvh] lg:grid-rows-[68px_minmax(0,1fr)] lg:overflow-hidden lg:pb-0">
-      <TopHeader
-        cityName={city?.city_name}
-        connectionStatus={connectionStatus}
-        clock={clockLabel}
-        day={city?.clock.day ?? 1}
-        period={period}
-        running={Boolean(city?.clock.running)}
-        speed={speed}
-        gameMode={gameMode}
-        activeTaskCount={activeTasks.length}
-        onModeChange={handleModeChange}
-        onSpeed={(next) => {
-          if (gameMode === "manual" && next !== "paused" && activeTasks.length === 0) {
-            setSpeed("paused");
-            return;
-          }
-          setSpeed(next);
-          if (next === "paused") {
-            void runAction(api.pause);
-          } else if (!city?.clock.running) {
-            void runAction(api.start);
-          }
-        }}
-        autoDirector={autoDirector}
-        onAutoDirector={setAutoDirector}
-        autoFollow={autoFollow}
-        onAutoFollow={setAutoFollow}
-        busy={busy}
-        runAction={runAction}
-        onShowGuide={() => setShowGuide(true)}
-      />
-
-      <section className="relative min-h-0 px-2 pt-2 pb-3 sm:px-3 lg:h-full lg:pb-3">
-        <div id="city-map" className="glass-panel holo-grid hud-frame relative h-[68dvh] min-h-[430px] scroll-mt-24 overflow-hidden rounded-2xl bg-[#0a1226] sm:h-[72dvh] lg:h-full lg:min-h-0">
-          <GameCanvas
-            city={city}
-            selectedCitizenId={selectedCitizen?.citizen_id ?? null}
-            onSelectCitizen={handleSelectCitizen}
-            onHoverChange={setHoverInfo}
-          />
-          <div className="scanlines" aria-hidden />
-          <div className="map-vignette" aria-hidden />
-          <SceneOverlay
-            citizen={selectedCitizen ?? null}
-            city={city}
-            event={activeEvent}
-            hover={hoverInfo}
-            gameMode={gameMode}
-            activeTaskCount={activeTasks.length}
-          />
-          <MapPanelDock
-            activePanel={activePanel}
-            citizen={selectedCitizen ?? null}
-            conversationCount={cityConversations.length}
-            onOpen={setActivePanel}
-          />
-          {showGuide ? <HowToPlayOverlay onClose={closeGuide} /> : null}
-          {activePanel === "city" ? <SceneLegend /> : null}
-        </div>
-
-        <MobileCitizenControls
-          citizen={selectedCitizen ?? null}
-          busy={busy}
-          runAction={runAction}
-          gameMode={gameMode}
-          activeTaskCount={activeTasks.length}
-          onPrevious={() => selectAdjacentCitizen(-1)}
-          onNext={() => selectAdjacentCitizen(1)}
-          onOpenProfile={() => setActivePanel("citizen")}
-        />
-
-        {activePanel === "city" ? (
-          <GameDrawer
-            id="city-panel"
-            title="City Controls"
-            subtitle="Events, policies, citizens"
-            icon={Gauge}
-            side="left"
-            onClose={() => setActivePanel(null)}
-          >
-            <HeroStats city={city} />
-            <CitySystems city={city} />
-            <ActionPanel busy={busy} city={city} gameMode={gameMode} runAction={runAction} />
-            <CitizenRoster
-              citizens={visibleCitizens}
-              totalCitizens={city?.citizens.length ?? 0}
-              selectedCitizenId={selectedCitizen?.citizen_id ?? null}
-              professionFilter={professionFilter}
-              onFilter={setProfessionFilter}
-              onSelect={handleSelectCitizen}
-            />
-          </GameDrawer>
-        ) : null}
-
-        {activePanel === "citizen" ? (
-          <GameDrawer
-            id="citizen-panel"
-            title={selectedCitizen?.name ?? "Citizen"}
-            subtitle={selectedCitizen ? `${selectedCitizen.profession} profile` : "Select someone on the map"}
-            icon={UserRound}
-            side="right"
-            onClose={() => setActivePanel(null)}
-          >
-            {error ? (
-              <div className="mb-3 rounded-lg border border-[rgba(244,89,89,0.4)] bg-[rgba(244,89,89,0.1)] p-3 text-sm text-[rgb(252,165,165)]">
-                {error}
-              </div>
-            ) : null}
-            {selectedCitizen ? (
-              <>
-                <CitizenSwitcher
-                  citizens={city?.citizens ?? []}
-                  selectedCitizenId={selectedCitizen.citizen_id}
-                  onSelect={handleSelectCitizen}
-                />
-                <CitizenPanel
-                  citizen={selectedCitizen}
-                  memories={memories}
-                  relationships={relationships}
-                  conversations={conversations}
-                  citizenNames={citizenNames}
-                  locationById={locationById}
-                  tab={inspectorTab}
-                  onTab={setInspectorTab}
-                  busy={busy}
-                  runAction={runAction}
-                  onRefreshCitizen={() => selectCitizen(selectedCitizen.citizen_id)}
-                  gameMode={gameMode}
-                  onTaskAssigned={handleTaskAssigned}
-                />
-              </>
-            ) : (
-              <EmptyLine text="Tap a citizen on the map to inspect them." />
-            )}
-          </GameDrawer>
-        ) : null}
-
-        {activePanel === "story" ? (
-          <GameDrawer
-            id="story-feed"
-            title="Conversation Feed"
-            subtitle="Latest talks, memories, and city moments"
-            icon={MessageSquareText}
-            side="bottom"
-            onClose={() => setActivePanel(null)}
-          >
-            <ConversationFeed
-              conversations={cityConversations}
-              city={city}
-              gameMode={gameMode}
-              activeTasks={activeTasks}
-              onSelectCitizen={handleSelectCitizen}
-            />
-          </GameDrawer>
-        ) : null}
-      </section>
-
-      <MobilePlayDock activePanel={activePanel} onOpen={setActivePanel} />
-    </main>
-  );
-}
-
-function TopHeader({
-  cityName,
-  connectionStatus,
-  clock,
-  day,
-  period,
-  running,
-  speed,
-  gameMode,
-  activeTaskCount,
-  onModeChange,
-  onSpeed,
-  autoDirector,
-  onAutoDirector,
-  autoFollow,
-  onAutoFollow,
-  busy,
-  runAction,
-  onShowGuide,
-}: {
-  cityName: string | undefined;
-  connectionStatus: string;
-  clock: string;
-  day: number;
-  period: ReturnType<typeof periodInfo>;
-  running: boolean;
-  speed: SpeedKey;
-  gameMode: SimulationMode;
-  activeTaskCount: number;
-  onModeChange: (mode: SimulationMode) => void;
-  onSpeed: (next: SpeedKey) => void;
-  autoDirector: boolean;
-  onAutoDirector: (value: boolean) => void;
-  autoFollow: boolean;
-  onAutoFollow: (value: boolean) => void;
-  busy: boolean;
-  runAction: (action: () => Promise<unknown>) => Promise<unknown>;
-  onShowGuide: () => void;
-}) {
-  const PeriodIcon = period.icon;
-  const isStreaming = connectionStatus === "connected";
-  return (
-    <header className="sticky top-0 z-30 flex min-w-0 flex-col gap-3 border-b border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.88)] px-3 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:static lg:py-0">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="brand-bloom relative flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[rgb(var(--accent))] via-[rgb(125_211_252)] to-[rgb(var(--violet))] text-[#06121f] shadow-[0_0_24px_rgba(56,189,248,0.32)]">
-          <Building2 className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="truncate text-xl font-bold tracking-tight text-grad-neon">{cityName ?? "Navora"}</h1>
-            <Badge tone="accent">AgentCity</Badge>
-          </div>
-          <div className="mt-0.5 flex min-w-0 items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            {isStreaming ? (
-              <>
-                <Wifi className="h-3 w-3 text-[rgb(var(--success))]" />
-                <span className="live-dot text-[rgb(var(--success))]">live stream</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3 w-3 text-[rgb(var(--accent-2))]" />
-                <span>cloud actions</span>
-              </>
-            )}
-            <span className="opacity-60">·</span>
-            <span>
-              {gameMode === "manual"
-                ? activeTaskCount > 0
-                  ? `${activeTaskCount} player task running`
-                  : "manual waits for a task"
-                : speed === "paused"
-                  ? "autonomous paused"
-                  : `autonomous ${speed}`}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <div className="hidden min-w-0 items-center gap-3 lg:flex">
-        <ClockBlock day={day} time={clock} period={period} running={running} icon={PeriodIcon} />
-      </div>
-
-      <div className="flex w-full min-w-0 items-center gap-2 overflow-x-auto pb-1 scrollbar-thin sm:w-auto sm:pb-0">
-        <ModeControl mode={gameMode} busy={busy} onModeChange={onModeChange} />
-        <SpeedControl speed={speed} mode={gameMode} activeTaskCount={activeTaskCount} onSpeed={onSpeed} busy={busy} />
-        {gameMode === "autonomous" ? (
-          <>
-            <button
-              className={`btn-pill !hidden shrink-0 sm:!flex ${autoDirector ? "" : ""}`}
-              data-active={autoDirector}
-              onClick={() => onAutoDirector(!autoDirector)}
-              title="Auto Events creates occasional city incidents and celebrations"
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Auto Events
-            </button>
-            <button
-              className="btn-pill !hidden shrink-0 sm:!flex"
-              data-active={autoFollow}
-              onClick={() => onAutoFollow(!autoFollow)}
-              title="Follow interesting citizens automatically"
-            >
-              <UserRound className="h-3.5 w-3.5" />
-              Follow Citizen
-            </button>
-          </>
-        ) : null}
-        <button className="btn-pill shrink-0" onClick={onShowGuide} title="Show how to play AgentCity">
-          <HelpCircle className="h-3.5 w-3.5" />
-          How to Play
-        </button>
-        <Button
-          className="shrink-0"
-          size="sm"
-          variant="ghost"
-          disabled={busy || (gameMode === "manual" && activeTaskCount === 0)}
-          onClick={() => runAction(api.tick)}
-          title={gameMode === "manual" ? "Advance the active player task" : "Advance one 15-minute game tick"}
-        >
-          <Radio className="h-4 w-4" />
-          <span>{gameMode === "manual" ? "Step Task" : "Step 15m"}</span>
-        </Button>
-      </div>
-    </header>
-  );
-}
-
-function ModeControl({
-  mode,
-  busy,
-  onModeChange,
-}: {
-  mode: SimulationMode;
-  busy: boolean;
-  onModeChange: (mode: SimulationMode) => void;
-}) {
-  const choices: Array<{ mode: SimulationMode; label: string; detail: string; icon: ComponentType<{ className?: string }> }> = [
-    { mode: "manual", label: "Manual", detail: "tasks only", icon: MousePointerClick },
-    { mode: "autonomous", label: "Auto", detail: "city lives", icon: Sparkles },
-  ];
-
-  return (
-    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel-strong),0.85)] p-1 backdrop-blur">
-      {choices.map((choice) => {
-        const Icon = choice.icon;
-        const active = mode === choice.mode;
-        return (
-          <button
-            key={choice.mode}
-            disabled={busy}
-            onClick={() => onModeChange(choice.mode)}
-            className={`focus-ring flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition ${
-              active
-                ? "seg-active-warm"
-                : "text-[rgb(var(--muted-strong))] hover:bg-white/5"
-            }`}
-            title={`${choice.label}: ${choice.detail}`}
-          >
-            <Icon className="h-3 w-3" />
-            {choice.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function SpeedControl({
-  speed,
-  mode,
-  activeTaskCount,
-  onSpeed,
-  busy,
-}: {
-  speed: SpeedKey;
-  mode: SimulationMode;
-  activeTaskCount: number;
-  onSpeed: (next: SpeedKey) => void;
-  busy: boolean;
-}) {
-  const choices: Array<{ key: SpeedKey; label: string; icon: ComponentType<{ className?: string }> }> = mode === "manual" ? [
-    { key: "paused", label: "Pause", icon: Pause },
-    { key: "1x", label: "Run", icon: Play },
-  ] : [
-    { key: "paused", label: "Pause", icon: Pause },
-    { key: "1x", label: "1×", icon: Play },
-    { key: "2x", label: "2×", icon: Play },
-    { key: "4x", label: "4×", icon: Play },
-  ];
-  return (
-    <div className="flex shrink-0 items-center gap-1 rounded-full border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel-strong),0.85)] p-1 backdrop-blur">
-      {choices.map((choice) => {
-        const Icon = choice.icon;
-        const active = speed === choice.key;
-        return (
-          <button
-            key={choice.key}
-            disabled={busy || (mode === "manual" && choice.key !== "paused" && activeTaskCount === 0)}
-            onClick={() => onSpeed(choice.key)}
-            className={`focus-ring flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition ${
-              active
-                ? "seg-active"
-                : "text-[rgb(var(--muted-strong))] hover:bg-white/5"
-            }`}
-          >
-            <Icon className="h-3 w-3" />
-            {choice.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function ClockBlock({
-  day,
-  time,
-  period,
-  running,
-  icon: Icon,
-}: {
-  day: number;
-  time: string;
-  period: ReturnType<typeof periodInfo>;
-  running: boolean;
-  icon: ComponentType<{ className?: string }>;
-}) {
-  const [hh, mm] = time.split(":");
-  const minuteOfDay = (Number(hh) || 0) * 60 + (Number(mm) || 0);
-  const dayPct = Math.max(0, Math.min(100, (minuteOfDay / 1440) * 100));
-  return (
-    <div className="relative flex items-center gap-3 rounded-2xl border border-[rgba(var(--border),0.85)] bg-[rgba(var(--panel),0.85)] px-4 py-1.5 backdrop-blur">
-      <div className="relative grid h-10 w-10 place-items-center">
-        <div
-          className="day-arc absolute inset-0 rounded-full opacity-90"
-          style={{
-            WebkitMask:
-              "radial-gradient(circle, transparent 56%, black 58%)",
-            mask: "radial-gradient(circle, transparent 56%, black 58%)",
-          }}
-        />
-        <div className={`relative grid h-7 w-7 place-items-center rounded-full ${period.tint}`}>
-          <Icon className="h-3.5 w-3.5" />
-        </div>
-        <span
-          aria-hidden
-          className="absolute h-1.5 w-1.5 -translate-y-[18px] rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.85)]"
-          style={{ transform: `rotate(${(dayPct / 100) * 360}deg) translateY(-18px)` }}
-        />
-      </div>
-      <div className="leading-tight">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-2xl font-semibold tabular-nums">{time}</span>
-          <span className={`mb-0.5 inline-block h-2 w-2 rounded-full ${running ? "bg-[rgb(var(--success))] live-dot" : "bg-[rgb(var(--muted))]"}`} />
-        </div>
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-          <span>Day {day}</span>
-          <span>·</span>
-          <span className="text-[rgb(var(--muted-strong))]">{period.label}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MapPanelDock({
-  activePanel,
-  citizen,
-  conversationCount,
-  onOpen,
-}: {
-  activePanel: ActivePanel;
-  citizen: CitizenAgent | null;
-  conversationCount: number;
-  onOpen: (panel: ActivePanel) => void;
-}) {
-  const controls: Array<{
-    panel: Exclude<ActivePanel, null>;
-    label: string;
-    detail: string;
-    icon: ComponentType<{ className?: string }>;
-    count?: string;
-  }> = [
-    { panel: "city", label: "City", detail: "events", icon: Gauge },
-    { panel: "citizen", label: "Citizen", detail: citizen?.name ?? "select", icon: UserRound },
-    { panel: "story", label: "Talk", detail: "conversations", icon: MessageSquareText, count: String(conversationCount) },
-  ];
-
-  return (
-    <div className="pointer-events-auto absolute bottom-3 right-3 top-3 z-40 hidden w-[80px] flex-col items-stretch justify-center gap-2 sm:flex">
-      {controls.map((control) => {
-        const Icon = control.icon;
-        const active = activePanel === control.panel;
-        return (
-          <button
-            key={control.panel}
-            className={`focus-ring relative flex min-h-[80px] flex-col items-center justify-center gap-1 rounded-2xl border px-2 py-2 text-center shadow-[0_10px_28px_rgba(0,0,0,0.32)] backdrop-blur-md transition-all ${
-              active
-                ? "border-[rgba(56,189,248,0.85)] bg-[linear-gradient(140deg,rgba(56,189,248,0.22),rgba(167,139,250,0.14))] shadow-[0_0_28px_rgba(56,189,248,0.35)]"
-                : "border-[rgba(var(--border),0.65)] bg-[rgba(8,12,24,0.72)] hover:-translate-y-0.5 hover:border-[rgba(125,211,252,0.55)] hover:bg-[rgba(8,12,24,0.9)]"
-            }`}
-            onClick={() => onOpen(active ? null : control.panel)}
-          >
-            <Icon className={`h-5 w-5 shrink-0 transition ${active ? "text-[rgb(125,211,252)] drop-shadow-[0_0_8px_rgba(56,189,248,0.65)]" : "text-[rgb(var(--accent))]"}`} />
-            <span className="min-w-0">
-              <span className="block text-[11px] font-semibold leading-tight">{control.label}</span>
-              <span className="block max-w-[60px] truncate font-mono text-[8px] uppercase tracking-wide text-[rgb(var(--muted))]">
-                {control.detail}
-              </span>
-            </span>
-            {control.count ? <Badge className="px-1.5 py-0 text-[9px]" tone="accent">{control.count}</Badge> : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function GameDrawer({
-  id,
-  title,
-  subtitle,
-  icon: Icon,
-  side,
-  onClose,
-  children,
-}: {
-  id: string;
-  title: string;
-  subtitle: string;
-  icon: ComponentType<{ className?: string }>;
-  side: "left" | "right" | "bottom";
-  onClose: () => void;
-  children: ReactNode;
-}) {
-  const sideClass =
-    side === "left"
-      ? "lg:left-3 lg:right-auto lg:top-3 lg:bottom-3 lg:w-[360px]"
-      : side === "right"
-        ? "lg:left-auto lg:right-[92px] lg:top-3 lg:bottom-3 lg:w-[420px]"
-        : "lg:left-3 lg:right-[92px] lg:top-auto lg:bottom-3 lg:h-[44dvh] lg:min-h-[300px] lg:max-h-[520px] lg:w-auto";
-
-  return (
-    <aside
-      id={id}
-      className={`drawer-in fixed inset-x-2 bottom-20 z-50 flex max-h-[74dvh] min-h-0 flex-col overflow-hidden rounded-2xl border border-[rgba(var(--border),0.88)] bg-[rgba(8,12,24,0.95)] shadow-[0_28px_80px_rgba(0,0,0,0.62)] backdrop-blur-xl lg:absolute lg:inset-x-auto lg:max-h-none ${sideClass}`}
-    >
-      <div className="relative flex shrink-0 items-center justify-between gap-3 border-b border-[rgba(var(--border),0.7)] px-3 py-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[linear-gradient(140deg,rgba(56,189,248,0.22),rgba(167,139,250,0.14))] text-[rgb(125,211,252)] shadow-[inset_0_0_0_1px_rgba(125,211,252,0.4)]">
-            <Icon className="h-4 w-4" />
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">{title}</div>
-            <div className="truncate font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-              {subtitle}
-            </div>
-          </div>
-        </div>
-        <button className="btn-pill focus-ring px-2 py-2" onClick={onClose} title="Close panel">
-          <X className="h-4 w-4" />
-        </button>
-        <div className="gradient-divider absolute inset-x-0 bottom-0" aria-hidden />
-      </div>
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
-        {children}
-      </div>
-    </aside>
-  );
-}
-
-function MobileCitizenControls({
-  citizen,
-  busy,
-  runAction,
-  gameMode,
-  activeTaskCount,
-  onPrevious,
-  onNext,
-  onOpenProfile,
-}: {
-  citizen: CitizenAgent | null;
-  busy: boolean;
-  runAction: (action: () => Promise<unknown>) => Promise<unknown>;
-  gameMode: SimulationMode;
-  activeTaskCount: number;
-  onPrevious: () => void;
-  onNext: () => void;
-  onOpenProfile: () => void;
-}) {
-  return (
-    <div className="glass-panel order-2 scroll-mt-24 rounded-xl p-3 lg:hidden">
-      <div className="mb-3 flex items-center gap-3">
-        {citizen ? <CitizenAvatar citizen={citizen} small /> : <UserRound className="h-8 w-8 text-[rgb(var(--accent))]" />}
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold">{citizen?.name ?? "Choose a citizen"}</div>
-          <div className="truncate text-xs text-[rgb(var(--muted))]">
-            {citizen ? `${citizen.profession} · ${citizen.current_activity}` : "Tap a person or use Next Citizen"}
-          </div>
-        </div>
-        <Badge tone={citizen?.health && citizen.health < 65 ? "warning" : "accent"}>
-          {citizen ? `${Math.round(citizen.happiness)}%` : "ready"}
-        </Badge>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Button variant="secondary" size="sm" onClick={onPrevious}>
-          <ChevronLeft className="h-4 w-4" />
-          Previous
-        </Button>
-        <Button variant="secondary" size="sm" onClick={onNext}>
-          Next
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        <Button
-          className="col-span-1"
-          variant="default"
-          size="sm"
-          disabled={busy || (gameMode === "manual" && activeTaskCount === 0)}
-          onClick={() => runAction(api.tick)}
-        >
-          <Radio className="h-4 w-4" />
-          {gameMode === "manual" ? "Step Task" : "Step 15m"}
-        </Button>
-        <button className="btn-pill justify-center py-2.5 text-center" onClick={onOpenProfile}>
-          Open Profile
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function MobilePlayDock({
-  activePanel,
-  onOpen,
-}: {
-  activePanel: ActivePanel;
-  onOpen: (panel: ActivePanel) => void;
-}) {
-  const items: Array<{ panel: ActivePanel; label: string; icon: ComponentType<{ className?: string }> }> = [
-    { panel: null, label: "Map", icon: MapPin },
-    { panel: "citizen", label: "Student", icon: UserRound },
-    { panel: "city", label: "City", icon: Gauge },
-    { panel: "story", label: "Talk", icon: MessageSquareText },
-  ];
-  return (
-    <nav className="fixed inset-x-2 bottom-3 z-40 grid grid-cols-4 gap-1 rounded-2xl border border-[rgba(var(--border),0.9)] bg-[rgba(8,12,24,0.94)] p-1.5 shadow-[0_16px_42px_rgba(0,0,0,0.55)] backdrop-blur-md lg:hidden">
-      {items.map((item) => {
-        const Icon = item.icon;
-        const active = activePanel === item.panel;
-        return (
-          <button
-            key={item.label}
-            className={`focus-ring flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition ${
-              active
-                ? "bg-[linear-gradient(140deg,rgba(56,189,248,0.22),rgba(167,139,250,0.14))] text-[rgb(var(--foreground))] shadow-[inset_0_0_0_1px_rgba(125,211,252,0.35)]"
-                : "text-[rgb(var(--muted-strong))] hover:bg-white/5"
-            }`}
-            onClick={() => onOpen(item.panel)}
-          >
-            <Icon className={`h-4 w-4 ${active ? "text-[rgb(125,211,252)]" : "text-[rgb(var(--accent))]"}`} />
-            {item.label}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
-function HowToPlayOverlay({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="fade-up scrollbar-thin absolute left-2 right-2 top-2 z-20 max-h-[calc(100%-24px)] overflow-y-auto rounded-2xl border border-[rgba(var(--accent),0.55)] bg-[rgba(8,12,24,0.93)] p-3 shadow-[0_24px_60px_rgba(0,0,0,0.55)] backdrop-blur-md sm:left-4 sm:right-auto sm:top-4 sm:max-h-[calc(100%-92px)] sm:max-w-[430px] sm:p-4">
-      <div className="mb-3 flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-base font-semibold">
-            <HelpCircle className="h-5 w-5 text-[rgb(var(--accent))]" />
-            How to play AgentCity
-          </div>
-          <p className="mt-1 text-xs leading-relaxed text-[rgb(var(--muted-strong))]">
-            Start in Manual to give one student a task and follow the result. Switch to Auto when you want the students to live, talk, and react on their own.
-          </p>
-        </div>
-        <button className="btn-pill px-2 py-1" onClick={onClose}>
-          Close
-        </button>
-      </div>
-
-      <div className="grid gap-2 text-xs">
-        <HowToRow icon={MousePointerClick} title="Manual mode" body="The city waits. Assign a task, run it, then it pauses when the task is complete." />
-        <HowToRow icon={Play} title="Autonomous mode" body="Students follow routines, meet naturally, talk, remember, and form friendships while time runs." />
-        <HowToRow icon={MousePointerClick} title="Tap a student" body="The citizen drawer shows their thought, mood, money, needs, schedule, goals, memories, relationships, and conversations." />
-        <HowToRow icon={Target} title="Give a task" body="Choose a conversation target, ask a student to talk or study, then open Talk to read what happened." />
-        <HowToRow icon={MessageSquareText} title="Read the talk tab" body="Conversations show what two students discussed and whether they are strangers, acquaintances, friends, or trusted friends." />
-        <HowToRow icon={Sparkles} title="Create a situation" body="Use the event cards for flu, traffic, festival, school exam, food shortage, policy changes, or power outage." />
-        <HowToRow icon={Handshake} title="Watch relationships develop" body="Citizens who meet repeatedly become acquaintances, then friends, then trusted friends as memories accumulate." />
-      </div>
-    </div>
-  );
-}
-
-function HowToRow({
-  icon: Icon,
-  title,
-  body,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="flex gap-3 rounded-xl border border-[rgba(var(--border-soft),0.85)] bg-black/20 p-2.5">
-      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[rgb(var(--accent))]" />
-      <div>
-        <div className="font-semibold">{title}</div>
-        <p className="mt-0.5 leading-snug text-[rgb(var(--muted))]">{body}</p>
-      </div>
-    </div>
-  );
-}
-
-function HeroStats({ city }: { city: CityState | null }) {
-  const happy = Math.round(city?.metrics.average_happiness ?? 0);
-  const health = Math.round(city?.metrics.city_health ?? 0);
-  const sick = Number(city?.metrics.sick_count ?? 0);
-  const tone = happy >= 70 ? "success" : happy >= 50 ? "warning" : "danger";
-
-  return (
-    <div className="mb-3 grid grid-cols-2 gap-2">
-      <HeroStatCard
-        label="Happiness"
-        value={`${happy}%`}
-        progress={happy}
-        tone={tone}
-        icon={Sparkles}
-        delta={city?.metrics.average_happiness && city.metrics.average_happiness > 65 ? "rising" : "steady"}
-      />
-      <HeroStatCard
-        label="Health"
-        value={`${health}%`}
-        progress={health}
-        tone={health >= 70 ? "success" : "warning"}
-        icon={HeartPulse}
-        delta={sick > 0 ? `${sick} sick` : "steady"}
-      />
-      <HeroStatCard
-        label="People"
-        value={String(city?.metrics.population ?? 0)}
-        progress={Math.min(100, ((city?.metrics.population ?? 0) / 50) * 100)}
-        tone="accent"
-        icon={Users}
-        delta="active"
-      />
-      <HeroStatCard
-        label="Events"
-        value={String(city?.metrics.active_events ?? 0)}
-        progress={Math.min(100, (city?.metrics.active_events ?? 0) * 25)}
-        tone={(city?.metrics.active_events ?? 0) > 1 ? "warning" : "accent"}
-        icon={Activity}
-        delta={(city?.metrics.active_events ?? 0) > 0 ? "active" : "calm"}
-      />
-    </div>
-  );
-}
-
-function HeroStatCard({
-  label,
-  value,
-  progress,
-  tone,
-  icon: Icon,
-  delta,
-}: {
-  label: string;
-  value: string;
-  progress: number;
-  tone: ProgressTone;
-  icon: ComponentType<{ className?: string }>;
-  delta?: string;
-}) {
-  const cardTone = tone === "water" ? "accent" : tone;
-  return (
-    <div className="metric-card" data-tone={cardTone}>
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            <Icon className="h-3 w-3" />
-            {label}
-          </div>
-          <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-grad-accent">{value}</div>
-        </div>
-        {delta ? (
-          <span className="rounded-full border border-white/5 bg-black/30 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted-strong))]">
-            {delta}
-          </span>
-        ) : null}
-      </div>
-      <div className="mt-2">
-        <Progress value={progress} tone={tone} glow height={6} />
-      </div>
-    </div>
-  );
-}
-
-function CitySystems({ city }: { city: CityState | null }) {
-  return (
-    <div className="my-3 space-y-2">
-      <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">City Pulse</h2>
-        <Badge tone="violet">tick {city?.clock.tick ?? 0}</Badge>
-      </div>
-      {systemRows.map((row) => {
-        const Icon = row.icon;
-        const value = Number(city?.metrics[row.key as keyof CityState["metrics"]] ?? 0);
-        return (
-          <div key={row.key} className="rounded-md bg-black/15 px-2 py-1.5">
-            <div className="mb-1 flex items-center justify-between text-[11px]">
-              <span className="flex items-center gap-1.5">
-                <Icon className="h-3 w-3 text-[rgb(var(--muted))]" />
-                {row.label}
-              </span>
-              <span className="font-mono text-[rgb(var(--muted-strong))]">{Math.round(value)}</span>
-            </div>
-            <Progress value={value} tone={row.tone} height={5} />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function CitizenRoster({
-  citizens,
-  totalCitizens,
-  selectedCitizenId,
-  professionFilter,
-  onFilter,
-  onSelect,
-}: {
-  citizens: CitizenAgent[];
-  totalCitizens: number;
-  selectedCitizenId: string | null;
-  professionFilter: string;
-  onFilter: (filter: string) => void;
-  onSelect: (citizenId: string) => void;
-}) {
-  return (
-    <div className="my-3">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">Citizens</h2>
-        <Badge>
-          {citizens.length}/{totalCitizens}
-        </Badge>
-      </div>
-      <div className="mb-2 flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
-        {professionFilters.map((filter) => (
-          <button
-            key={filter}
-            className="btn-pill"
-            data-active={professionFilter === filter}
-            onClick={() => onFilter(filter)}
-          >
-            {filter}
-          </button>
-        ))}
-      </div>
-      <div className="space-y-1">
-        {citizens.slice(0, 25).map((citizen) => (
-          <button
-            key={citizen.citizen_id}
-            className={`flex min-h-14 w-full items-center gap-2 rounded-lg border px-2 py-2.5 text-left transition-all ${
-              selectedCitizenId === citizen.citizen_id
-                ? "border-[rgba(56,189,248,0.6)] bg-[rgba(56,189,248,0.12)] shadow-[0_0_18px_rgba(56,189,248,0.18)]"
-                : "border-transparent bg-black/15 hover:border-[rgba(var(--border),0.85)] hover:bg-black/25"
-            }`}
-            onClick={() => onSelect(citizen.citizen_id)}
-          >
-            <CitizenAvatar citizen={citizen} small />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-xs font-medium">{citizen.name}</span>
-              <span className="block truncate font-mono text-[10px] text-[rgb(var(--muted))]">
-                {citizen.profession} · {citizen.current_activity}
-              </span>
-            </span>
-            <span className="flex flex-col items-end gap-0.5">
-              <span className="font-mono text-[9px] text-[rgb(var(--muted))]">{Math.round(citizen.happiness)}%</span>
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${
-                  citizen.health < 55
-                    ? "bg-[rgb(var(--danger))]"
-                    : citizen.stress > 70
-                      ? "bg-[rgb(var(--warning))]"
-                      : "bg-[rgb(var(--success))]"
-                }`}
-              />
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CitizenSwitcher({
-  citizens,
-  selectedCitizenId,
-  onSelect,
-}: {
-  citizens: CitizenAgent[];
-  selectedCitizenId: string;
-  onSelect: (citizenId: string) => void;
-}) {
-  return (
-    <div className="mb-3 rounded-xl border border-[rgba(var(--border),0.82)] bg-black/20 p-2">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">
-          <Users className="h-3.5 w-3.5 text-[rgb(var(--accent))]" />
-          Students
-        </div>
-        <Badge tone="accent">{citizens.length}</Badge>
-      </div>
-      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-        {citizens.map((citizen) => {
-          const task = playerTaskFor(citizen);
-          const active = citizen.citizen_id === selectedCitizenId;
-          return (
-            <button
-              key={citizen.citizen_id}
-              className={`flex min-h-12 items-center gap-2 rounded-lg border px-2 py-2 text-left transition ${
-                active
-                  ? "border-[rgba(56,189,248,0.68)] bg-[rgba(56,189,248,0.13)]"
-                  : "border-[rgba(var(--border-soft),0.35)] bg-black/15 hover:border-[rgba(var(--accent),0.7)]"
-              }`}
-              onClick={() => onSelect(citizen.citizen_id)}
-            >
-              <CitizenAvatar citizen={citizen} small />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-semibold">{citizen.name}</span>
-                <span className="block truncate font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted))]">
-                  {task?.status === "active" ? "task active" : relationshipShort(citizen)}
-                </span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function SceneOverlay({
-  citizen,
-  city,
-  event,
-  hover,
-  gameMode,
-  activeTaskCount,
-}: {
-  citizen: CitizenAgent | null;
-  city: CityState | null;
-  event: CityEvent | null;
-  hover: HoverInfo;
-  gameMode: SimulationMode;
-  activeTaskCount: number;
-}) {
-  const statusText =
-    gameMode === "manual"
-      ? activeTaskCount > 0
-        ? `${activeTaskCount} manual task active`
-        : "Manual mode: assign a task"
-      : city?.clock.running
-        ? "Autonomous city running"
-        : "Autonomous paused";
-  return (
-    <>
-      <div className="pointer-events-none absolute left-2 right-2 top-2 z-10 overflow-hidden rounded-xl border border-[rgba(var(--border),0.62)] bg-[rgba(8,12,24,0.78)] p-2 shadow-2xl backdrop-blur-md sm:left-3 sm:right-auto sm:top-3 sm:max-w-[390px]">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[rgba(125,211,252,0.65)] to-transparent" />
-        <div className="mb-1 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            <Route className="h-3.5 w-3.5 text-[rgb(125,211,252)]" />
-            Live focus
-            <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-[rgb(125,211,252)] live-dot" />
-          </div>
-          <Badge tone={gameMode === "manual" && activeTaskCount === 0 ? "warning" : city?.clock.running ? "success" : "default"}>
-            {statusText}
-          </Badge>
-        </div>
-        <div className="line-clamp-1 text-sm font-semibold leading-snug">
-          {citizen ? `${citizen.name} is ${citizen.current_activity.toLowerCase()}` : "Navora is loading"}
-        </div>
-        <p className="mt-1 line-clamp-1 text-xs leading-snug text-[rgb(var(--muted))] sm:line-clamp-2">
-          {citizen?.current_thought ??
-            (gameMode === "manual"
-              ? "Manual mode stays still until you assign a task to a student."
-              : "Citizens move, work, react, remember, and form plans as the simulation runs.")}
-        </p>
-        {event ? (
-          <div className="mt-2 hidden items-start gap-2 rounded-lg bg-black/25 p-2 sm:flex">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[rgb(var(--warning))]" />
-            <div className="line-clamp-2 text-[11px] leading-snug text-[rgb(var(--muted-strong))]">
-              {event.description}
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      {hover ? <HoverTooltip hover={hover} /> : null}
-    </>
-  );
-}
-
-function HoverTooltip({ hover }: { hover: NonNullable<HoverInfo> }) {
-  return (
-    <div className="fade-up pointer-events-none absolute bottom-20 left-1/2 -translate-x-1/2 rounded-xl border border-[rgba(125,211,252,0.5)] bg-[rgba(8,12,24,0.94)] px-3 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.5),0_0_24px_rgba(56,189,248,0.18)] backdrop-blur">
-      {hover.kind === "location" ? (
-        <div className="flex items-center gap-2">
-          {locationIcon(hover.data.type)}
-          <div>
-            <div className="text-xs font-semibold">{hover.data.name}</div>
-            <div className="font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-              {hover.data.type.replaceAll("_", " ")} · cap {hover.data.capacity}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <UserRound className="h-3.5 w-3.5 text-[rgb(var(--accent))]" />
-          <div>
-            <div className="text-xs font-semibold">{hover.data.name}</div>
-            <div className="font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-              {hover.data.subtitle}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SceneLegend() {
-  const items: Array<{ icon: ComponentType<{ className?: string }>; label: string; color: string }> = [
-    { icon: HeartPulse, label: "Health", color: "text-[rgb(244,89,89)]" },
-    { icon: BookOpen, label: "School", color: "text-[rgb(96,165,250)]" },
-    { icon: ShoppingBag, label: "Market", color: "text-[rgb(251,146,60)]" },
-    { icon: Wheat, label: "Farm", color: "text-[rgb(132,204,22)]" },
-    { icon: PiggyBank, label: "Bank", color: "text-[rgb(167,139,250)]" },
-    { icon: Shield, label: "Police", color: "text-[rgb(56,189,248)]" },
-    { icon: FlaskConical, label: "Lab", color: "text-[rgb(74,222,128)]" },
-    { icon: Library, label: "Library", color: "text-[rgb(196,181,253)]" },
-    { icon: Factory, label: "Power", color: "text-[rgb(251,146,60)]" },
-    { icon: TreePine, label: "Park", color: "text-[rgb(74,222,128)]" },
-  ];
-  return (
-    <div className="fade-up absolute bottom-2 left-2 right-2 hidden gap-1.5 overflow-x-auto rounded-xl border border-[rgba(var(--border),0.7)] bg-[rgba(8,12,24,0.82)] p-2 backdrop-blur-md scrollbar-thin sm:flex">
-      {items.map((item) => {
-        const Icon = item.icon;
-        return (
-          <div
-            key={item.label}
-            className={`flex shrink-0 items-center gap-1.5 rounded-lg border border-[rgba(var(--border-soft),0.85)] bg-black/30 px-2 py-1 text-[10px] uppercase tracking-wide ${item.color}`}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="text-[rgb(var(--muted-strong))]">{item.label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function ActionPanel({
-  busy,
-  city,
-  gameMode,
-  runAction,
-}: {
-  busy: boolean;
-  city: CityState | null;
-  gameMode: SimulationMode;
-  runAction: (action: () => Promise<unknown>) => Promise<unknown>;
-}) {
-  const manualMode = gameMode === "manual";
-  return (
-    <div className="mt-4 space-y-5">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">Make Something Happen</h2>
-          <Badge tone={manualMode ? "default" : "warning"}>
-            {manualMode ? "auto only" : "agents react"}
-          </Badge>
-        </div>
-        <p className="text-xs leading-snug text-[rgb(var(--muted))]">
-          {manualMode
-            ? "Manual mode keeps the city quiet. Switch to Auto when you want festivals, outbreaks, and policy-wide reactions."
-            : "Pick an event to test the city. Citizens will move, think, talk, remember, and update relationships."}
-        </p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {eventButtons.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Button
-                key={item.event_type}
-                variant={item.tone}
-                size="sm"
-                className="min-h-12 justify-start px-2 py-2 text-left"
-                disabled={busy || manualMode}
-                onClick={() =>
-                  runAction(() => api.triggerEvent({ event_type: item.event_type, severity: "medium" }))
-                }
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span className="min-w-0">
-                  <span className="block truncate text-xs">{item.label}</span>
-                  <span className="block truncate font-normal text-[10px] opacity-80">{item.detail}</span>
-                </span>
-              </Button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">Mayor Tools</h2>
-          <Badge tone={city?.policy?.public_health_campaign ? "success" : "default"}>
-            {city?.policy?.public_health_campaign ? "campaign on" : "standard"}
-          </Badge>
-        </div>
-        <p className="text-xs leading-snug text-[rgb(var(--muted))]">
-          Change budgets and campaigns to help the city recover from events.
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <PolicyButton busy={busy || manualMode} label="Hospital" icon={HeartPulse} onClick={() => runAction(() => api.applyPolicy({ hospital_budget: 72 }))} />
-          <PolicyButton busy={busy || manualMode} label="School" icon={BookOpen} onClick={() => runAction(() => api.applyPolicy({ school_budget: 70 }))} />
-          <PolicyButton busy={busy || manualMode} label="Roads" icon={Bus} onClick={() => runAction(() => api.applyPolicy({ road_budget: 72 }))} />
-          <PolicyButton busy={busy || manualMode} label="Health Push" icon={Stethoscope} onClick={() => runAction(() => api.applyPolicy({ public_health_campaign: true }))} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PolicyButton({
-  busy,
-  label,
-  icon: Icon,
-  onClick,
-}: {
-  busy: boolean;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
-  onClick: () => void;
-}) {
-  return (
-    <Button className="min-h-11" variant="secondary" size="sm" disabled={busy} onClick={onClick}>
-      <Icon className="h-4 w-4" />
-      <span className="truncate">{label}</span>
-    </Button>
-  );
-}
-
-function CitizenPanel({
-  citizen,
-  memories,
-  relationships,
-  conversations,
-  citizenNames,
-  locationById,
-  tab,
-  onTab,
-  busy,
-  runAction,
-  onRefreshCitizen,
-  gameMode,
-  onTaskAssigned,
-}: {
-  citizen: CitizenAgent;
-  memories: Memory[];
-  relationships: Relationship[];
-  conversations: Conversation[];
-  citizenNames: Record<string, string>;
-  locationById: Record<string, Location>;
-  tab: InspectorTab;
-  onTab: (tab: InspectorTab) => void;
-  busy: boolean;
-  runAction: (action: () => Promise<unknown>) => Promise<unknown>;
-  onRefreshCitizen: () => Promise<void>;
-  gameMode: SimulationMode;
-  onTaskAssigned: (state: CityState) => void;
-}) {
-  const currentLocation = locationById[citizen.current_location_id]?.name ?? citizen.current_location_id;
-  const targetLocation =
-    Object.values(locationById).find(
-      (location) =>
-        citizen.target_x >= location.x &&
-        citizen.target_x <= location.x + location.width &&
-        citizen.target_y >= location.y &&
-        citizen.target_y <= location.y + location.height,
-    )?.name ?? `${citizen.target_x},${citizen.target_y}`;
-
-  return (
-    <div className="mb-4 space-y-4">
-      <div className="flex items-start gap-3">
-        <CitizenAvatar citizen={citizen} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-semibold leading-tight">{citizen.name}</h1>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                <Badge tone="accent">{citizen.profession}</Badge>
-                <Badge tone="violet">{citizen.mood}</Badge>
-                <Badge>Age {citizen.age}</Badge>
-              </div>
-            </div>
-            <div className="text-right font-mono text-sm">
-              <div className="text-[rgb(var(--accent-2))]">${Math.round(citizen.money)}</div>
-              <div className="text-xs text-[rgb(var(--muted))]">rep {Math.round(citizen.reputation)}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-[rgba(var(--border),0.85)] bg-gradient-to-br from-[rgba(56,189,248,0.06)] to-[rgba(167,139,250,0.04)] p-3">
-        <div className="mb-1 flex items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-          <Brain className="h-3.5 w-3.5" />
-          Current thought
-        </div>
-        <p className="text-sm leading-relaxed">{citizen.current_thought}</p>
-      </div>
-
-      <AssignTaskPanel
-        key={citizen.citizen_id}
-        citizen={citizen}
-        locations={Object.values(locationById)}
-        busy={busy}
-        runAction={runAction}
-        onRefreshCitizen={onRefreshCitizen}
-        gameMode={gameMode}
-        onTaskAssigned={onTaskAssigned}
-      />
-
-      <div className="grid grid-cols-3 gap-1 rounded-xl bg-black/30 p-1">
-        <InspectorTabButton active={tab === "life"} icon={Gauge} label="Life" onClick={() => onTab("life")} />
-        <InspectorTabButton active={tab === "memory"} icon={Brain} label="Memory" onClick={() => onTab("memory")} />
-        <InspectorTabButton active={tab === "social"} icon={MessageCircle} label="Talk" onClick={() => onTab("social")} />
-      </div>
-
-      {tab === "life" ? (
-        <LifeTab citizen={citizen} currentLocation={currentLocation} targetLocation={targetLocation} />
-      ) : null}
-      {tab === "memory" ? <MemoryTab memories={memories} citizen={citizen} /> : null}
-      {tab === "social" ? (
-        <SocialTab relationships={relationships} conversations={conversations} citizenNames={citizenNames} />
-      ) : null}
-    </div>
-  );
-}
-
-function AssignTaskPanel({
-  citizen,
-  locations,
-  busy,
-  runAction,
-  onRefreshCitizen,
-  gameMode,
-  onTaskAssigned,
-}: {
-  citizen: CitizenAgent;
-  locations: Location[];
-  busy: boolean;
-  runAction: (action: () => Promise<unknown>) => Promise<unknown>;
-  onRefreshCitizen: () => Promise<void>;
-  gameMode: SimulationMode;
-  onTaskAssigned: (state: CityState) => void;
-}) {
-  const [task, setTask] = useState("");
-  const playerTask = playerTaskFor(citizen);
-  const locationsById = useMemo(
-    () => Object.fromEntries(locations.map((location) => [location.location_id, location])),
-    [locations],
-  );
-  const quickTasks = [
-    "Ask Iris how she is doing",
-    "Say hi to everyone",
-    "Find someone who wants to study",
-    "Check if anyone needs help today",
-  ];
-
-  async function submitTask(event: FormEvent<HTMLFormElement>) {
+  async function speak(event: FormEvent) {
     event.preventDefault();
-    const trimmed = task.trim();
-    if (!trimmed) return;
-    const result = await runAction(() =>
-      api.assignTask(citizen.citizen_id, {
-        task: trimmed,
+    const target = nearby.find((citizen) => citizen.citizen_id === targetId);
+    if (!player || !target || !draft.trim() || flight.current) return;
+    const text = draft.trim();
+    const safety = checkPlayerText(text);
+    if (!safety.ok) {
+      setMessage(safety.message);
+      return;
+    }
+    const submission: OutgoingSpeech = {
+      id: crypto.randomUUID(),
+      actor: player,
+      target,
+      text,
+      status: "pending",
+    };
+    const existingIds = new Set(
+      cityConversations.map((c) => c.conversation_id),
+    );
+    await act(async () => {
+      // Only clear an accepted submission, never a draft entered during the request.
+      setDraft("");
+      setFilter("all");
+      setOutgoing(submission);
+      speechInput.current?.focus();
+      try {
+        const next = await api.speak(target.citizen_id, text);
+        await refreshCityConversations();
+        const confirmed = useGameStore
+          .getState()
+          .cityConversations.some(
+            (c) =>
+              !existingIds.has(c.conversation_id) &&
+              c.actor_ids.includes(player.citizen_id) &&
+              c.actor_ids.includes(target.citizen_id) &&
+              c.transcript.some(
+                (line) =>
+                  line.speaker_id === player.citizen_id && line.text === text,
+              ),
+          );
+        if (!confirmed)
+          throw new Error("This exchange was interrupted. No reply was saved.");
+        setOutgoing(null);
+        return next;
+      } catch (error) {
+        setOutgoing({
+          ...submission,
+          status: "failed",
+          error: error instanceof Error ? error.message : "No reply arrived.",
+        });
+        throw error;
+      }
+    });
+  }
+  function download() {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(exportSession(), null, 2)], {
+        type: "application/json",
       }),
     );
-    if (result && typeof result === "object" && "city_id" in result) {
-      onTaskAssigned(result as CityState);
-    }
-    await onRefreshCitizen();
-    setTask("");
-  }
-
-  async function closeTask() {
-    const result = await runAction(() => api.closeTask(citizen.citizen_id));
-    if (result && typeof result === "object" && "city_id" in result) {
-      onTaskAssigned(result as CityState);
-    }
-    await onRefreshCitizen();
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `navora-day-${city?.clock.day ?? 1}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setMessage("World snapshot downloaded.");
   }
 
   return (
-    <form
-      className="relative overflow-hidden rounded-xl border border-[rgba(var(--accent),0.45)] bg-[linear-gradient(150deg,rgba(56,189,248,0.10),rgba(167,139,250,0.06))] p-3 shadow-[inset_0_0_0_1px_rgba(125,211,252,0.08)]"
-      onSubmit={submitTask}
-    >
-      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-[rgba(125,211,252,0.6)] to-transparent" />
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Target className="h-4 w-4 text-[rgb(125,211,252)] drop-shadow-[0_0_6px_rgba(56,189,248,0.55)]" />
-            Give {citizen.name.split(" ")[0]} a task
-          </div>
-          <p className="mt-0.5 text-[11px] leading-snug text-[rgb(var(--muted))]">
-            {gameMode === "manual"
-              ? "Tell the citizen what you want. Their AI brain chooses who to talk to, where to go, and how to answer."
-              : "Tasks become AI-chosen goals, memories, and conversation triggers while the city keeps living."}
-          </p>
+    <main className="city-game">
+      <header className="game-header">
+        <div className="game-brand">
+          <span className="brand-mark">
+            <Compass size={24} />
+          </span>
+          <h1>
+            AgentCity<span>STORIES OF NAKAMEGURO</span>
+          </h1>
         </div>
-        <Badge tone={playerTask?.status === "active" ? "success" : playerTask ? "violet" : "default"}>
-          {playerTask?.status === "active" ? "active" : playerTask?.status === "completed" ? "completed" : "ready"}
-        </Badge>
-      </div>
-
-      {playerTask ? (
-        <div className="mb-2 rounded-lg border border-[rgba(var(--border),0.72)] bg-black/20 p-2 text-xs">
-          <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            {playerTask.status === "active" ? "Current player task" : "Last player task"}
-          </div>
-          <div className="leading-snug">{playerTask.task}</div>
-          {playerTask.plan_summary ? (
-            <div className="mt-1 rounded-md bg-[rgba(56,189,248,0.08)] px-2 py-1 text-[11px] leading-snug text-[rgb(var(--muted-strong))]">
-              {playerTask.plan_summary}
-            </div>
-          ) : null}
-          <div className="mt-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            <MapPin className="h-3 w-3" />
-            {locationsById[playerTask.location_id ?? ""]?.name ?? "Current location"}
-          </div>
-          {playerTask.status === "active" ? (
-            <Button
-              type="button"
-              className="mt-2 w-full"
-              variant="secondary"
-              size="sm"
+        <WorldClock city={city} />
+        <div className="header-actions">
+          <div className="mode-switch" aria-label="World mode">
+            <button
+              aria-pressed={city?.simulation_mode === "manual"}
               disabled={busy}
-              onClick={closeTask}
+              onClick={() => void act(() => api.setMode("manual"))}
             >
-              <X className="h-4 w-4" />
-              Close Task
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="mb-2 flex gap-1 overflow-x-auto pb-1 scrollbar-thin">
-        {quickTasks.map((quickTask) => (
+              Manual
+            </button>
+            <button
+              aria-pressed={city?.simulation_mode === "autonomous"}
+              disabled={busy}
+              onClick={() => {
+                setPanel(null);
+                setFilter("all");
+                setFocusedConversation(null);
+                void act(() => api.setMode("autonomous"));
+              }}
+            >
+              <Sparkles size={13} />
+              Auto
+            </button>
+          </div>
           <button
-            key={quickTask}
-            type="button"
-            className="btn-pill shrink-0"
-            onClick={() => setTask(quickTask)}
+            className="icon-button"
+            aria-label={city?.clock.running ? "Pause" : "Play"}
+            title={city?.clock.running ? (live ? "Pause conversations" : "Pause the city") : "Play: the city comes to life"}
+            onClick={() => {
+              if (city?.clock.running) return void pause();
+              // Play always does something: with no tasks waiting, it switches to Auto life.
+              const tasks = city?.citizens.some((c) => (c.personality.player_task as { status?: string } | undefined)?.status === "active");
+              void act(() => (city?.simulation_mode === "manual" && !tasks ? api.setMode("autonomous") : api.start()));
+            }}
           >
-            {quickTask}
+            <span>
+              {city?.clock.running ? <Pause size={18} /> : <Play size={18} />}
+            </span>
           </button>
-        ))}
-      </div>
-
-      <textarea
-        value={task}
-        onChange={(event) => setTask(event.target.value)}
-        maxLength={240}
-        rows={3}
-        className="min-h-[76px] w-full resize-none rounded-lg border border-[rgba(var(--border),0.85)] bg-[rgba(8,12,24,0.72)] px-3 py-2 text-sm leading-snug outline-none transition focus:border-[rgba(var(--accent),0.8)]"
-        placeholder="Example: Ask Iris if she wants to study together, then remember how she responds."
-      />
-
-      <Button
-        className="shine-btn mt-2 w-full"
-        type="submit"
-        size="sm"
-        disabled={busy || task.trim().length < 3}
-      >
-        <Target className="h-4 w-4" />
-        Assign Task
-      </Button>
-    </form>
-  );
-}
-
-function InspectorTabButton({
-  active,
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs transition ${
-        active
-          ? "bg-[rgba(56,189,248,0.18)] text-[rgb(125,211,252)] shadow-[inset_0_0_0_1px_rgba(56,189,248,0.4)]"
-          : "text-[rgb(var(--muted))] hover:bg-white/5"
-      }`}
-      onClick={onClick}
-    >
-      <Icon className="h-3.5 w-3.5" />
-      {label}
-    </button>
-  );
-}
-
-function LifeTab({
-  citizen,
-  currentLocation,
-  targetLocation,
-}: {
-  citizen: CitizenAgent;
-  currentLocation: string;
-  targetLocation: string;
-}) {
-  const visibleGoals = [...new Set([...citizen.short_term_goals, ...citizen.long_term_goals.slice(0, 2)])];
-
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <InfoPill icon={MapPin} label="At" value={currentLocation} />
-        <InfoPill icon={Route} label="Going" value={targetLocation} />
-        <InfoPill icon={BriefcaseBusiness} label="Activity" value={citizen.current_activity} wide />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <Need label="Health" value={citizen.health} tone={citizen.health < 50 ? "danger" : "success"} icon={HeartPulse} />
-        <Need label="Energy" value={citizen.energy} tone="water" icon={Wind} />
-        <Need label="Food" value={100 - citizen.hunger} tone={citizen.hunger > 70 ? "danger" : "warning"} icon={Coffee} />
-        <Need label="Calm" value={100 - citizen.stress} tone={citizen.stress > 65 ? "danger" : "accent"} icon={Sparkles} />
-      </div>
-
-      <SectionTitle label="Goals" count={visibleGoals.length} />
-      <div className="space-y-1">
-        {visibleGoals.map((goal, index) => (
-          <div key={`${goal}-${index}`} className="story-card rounded-md px-2 py-1.5 text-xs">
-            {goal}
-          </div>
-        ))}
-      </div>
-
-      <SectionTitle label="Schedule" count={citizen.daily_schedule.length} />
-      <div className="space-y-1">
-        {citizen.daily_schedule.slice(0, 5).map((slot) => (
-          <div
-            key={`${slot.start}-${slot.activity}`}
-            className="flex justify-between rounded-md bg-black/15 px-2 py-1.5 text-xs"
+          <select
+            className="speed-select"
+            aria-label="Time"
+            title="Live follows real Tokyo time; fast-forward speeds life up"
+            value={live ? "live" : String(speed)}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (value === "live") return void act(() => api.setTimeMode("live"));
+              setSpeed(Number(value));
+              if (live) void act(() => api.setTimeMode("fast"));
+            }}
           >
-            <span className="truncate">{String(slot.activity)}</span>
-            <span className="font-mono text-[rgb(var(--muted))]">{minutesLabel(Number(slot.start))}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-1.5">
-        {citizen.skills.slice(0, 4).map((skill) => (
-          <Badge key={skill} className="justify-center" tone="accent">
-            {skill}
-          </Badge>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MemoryTab({ citizen, memories }: { citizen: CitizenAgent; memories: Memory[] }) {
-  return (
-    <div className="space-y-3">
-      <div className="rounded-xl border border-[rgba(var(--border),0.85)] bg-black/20 p-3">
-        <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-          Semantic summary
+            <option value="live">🔴 Live</option>
+            <option value="1">⏩ 1x</option>
+            <option value="2">⏩ 2x</option>
+            <option value="4">⏩ 4x</option>
+          </select>
+          <button
+            className="icon-button"
+            aria-label="How to play"
+            title="How to play"
+            onClick={() => setWelcome(true)}
+          >
+            <span>
+              <CircleHelp size={18} />
+            </span>
+          </button>
         </div>
-        <p className="text-xs leading-relaxed">{citizen.memory_summary}</p>
-      </div>
-      <SectionTitle label="Recent memories" count={memories.length} />
-      <div className="space-y-2">
-        {memories.slice(0, 7).map((memory) => (
-          <div key={memory.memory_id} className="story-card rounded-md p-2">
-            <div className="mb-1 flex items-center justify-between font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-              <span>{memory.kind}</span>
-              <span>{Math.round(memory.importance * 100)}</span>
+      </header>
+
+      <div className={`game-workspace ${panel ? "with-panel" : ""}`}>
+        <section className={`world-stage ${playbackQueue.length ? "conversation-on-stage" : ""}`} aria-label="Nakameguro city map">
+          <GameCanvas
+            city={city}
+            selectedCitizenId={player?.citizen_id ?? selectedCitizenId}
+            onSelectCitizen={choose}
+          />
+          {pendingExchange && !playbackQueue.length && (
+            <div className="world-conversation-pending" role="status">
+              <LoaderCircle size={17} className="reply-spinner" />
+              <span>{pendingExchange.names}<small>Preparing conversation...</small></span>
             </div>
-            <div className="text-xs leading-snug">{memory.content}</div>
+          )}
+          {city?.encounter && !pendingExchange && !playbackQueue.length && (
+            <div className="world-encounter" role="status"><Footprints size={18} /><div>
+              <strong>{city.citizens.find((c) => c.citizen_id === city.encounter?.actor_id)?.name.split(" ")[0]} is approaching {city.citizens.find((c) => c.citizen_id === city.encounter?.target_id)?.name.split(" ")[0]}</strong>
+              <p>{city.encounter.reason}</p>
+            </div></div>
+          )}
+          <div className="world-caption">
+            <span className="map-pin">
+              <MapPin size={16} />
+            </span>
+            <div>
+              <strong>{city?.city_name ?? "Nakameguro"}</strong>
+              <span>{city ? `Meguro City, Tokyo · ${city.citizens.length} residents` : "Waking up..."}</span>
+            </div>
           </div>
-        ))}
-        {memories.length === 0 ? <EmptyLine text="No durable memories loaded yet." /> : null}
-      </div>
-    </div>
-  );
-}
-
-function SocialTab({
-  relationships,
-  conversations,
-  citizenNames,
-}: {
-  relationships: Relationship[];
-  conversations: Conversation[];
-  citizenNames: Record<string, string>;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="rounded-xl border border-[rgba(var(--accent),0.35)] bg-[rgba(56,189,248,0.08)] p-3 text-xs leading-relaxed text-[rgb(var(--muted-strong))]">
-        <div className="mb-1 flex items-center gap-2 font-semibold text-[rgb(var(--foreground))]">
-          <Handshake className="h-4 w-4 text-[rgb(var(--accent))]" />
-          How friendship forms
-        </div>
-        Citizens start as strangers. Repeated talks, shared events, and useful help raise familiarity, warmth, and trust.
-      </div>
-      <SectionTitle label="Recent conversations" count={conversations.length} />
-      <div className="space-y-2">
-        {conversations.slice(0, 5).map((conversation) => {
-          const speakers = conversation.actor_ids
-            .map((actorId) => citizenNames[actorId] ?? actorId)
-            .join(" and ");
-          return (
-            <div key={conversation.conversation_id} className="story-card rounded-md p-2 text-xs">
-              <div className="mb-1 flex items-center justify-between gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-                <span className="truncate">{speakers || "Conversation"}</span>
-                <span className="shrink-0">Day {conversation.game_day} · {minutesLabel(conversation.game_minute)}</span>
+          {city?.weather?.alert && alertSeen !== city.weather.alert.text && !playbackQueue.length && (
+            <div className="weather-alert" role="alert" data-kind={city.weather.alert.kind}>
+              <span aria-hidden="true">{city.weather.alert.kind === "earthquake" ? "🫨" : city.weather.icon}</span>
+              <p>{city.weather.alert.text}</p>
+              <button className="icon-button" aria-label="Dismiss alert" onClick={() => setAlertSeen(city.weather?.alert?.text ?? "")}><X size={15} /></button>
+            </div>
+          )}
+          <div className="world-state">
+            <span className={busy ? "thinking-dot" : "state-dot"} />
+            {playbackQueue.length ? playbackQueue[0].replay ? "Replaying conversation" : "In conversation" : busy
+              ? pendingExchange ? `${pendingExchange.names} are talking` : "Thinking..."
+              : city?.clock.running
+                ? "City is living"
+                : city?.simulation_mode === "autonomous" ? "Auto paused" : "A moment of stillness"}
+          </div>
+          {player && (
+            <div className="playing-banner">
+              <CitizenPortrait citizen={player} size={36} />
+              <div>
+                <small>YOU ARE</small>
+                <strong>{player.name}</strong>
               </div>
-              <p className="mb-2 leading-snug text-[rgb(var(--muted-strong))]">{conversation.summary}</p>
-              <div className="space-y-1.5">
-                {conversation.transcript.slice(0, 6).map((line, index) => (
-                  <div
-                    key={`${conversation.conversation_id}-${index}`}
-                    className="rounded-lg border border-[rgba(var(--border-soft),0.8)] bg-black/20 p-2"
+              <button
+                className="icon-button"
+                aria-label="Return to observer"
+                title="Return to observer"
+                onClick={() => void api.takeControl(null).then(setCity)}
+              >
+                <ArrowLeft size={18} />
+              </button>
+            </div>
+          )}
+          {!city && (
+            <div className="world-loading">{error || "Opening Nakameguro..."}</div>
+          )}
+          <div className="citizen-strip" aria-label="Citizens">
+            {city?.citizens.map((citizen) => (
+              <button
+                key={citizen.citizen_id}
+                aria-label={`Meet ${citizen.name}`}
+                aria-pressed={
+                  selected?.citizen_id === citizen.citizen_id &&
+                  panel === "citizens"
+                }
+                onClick={() => choose(citizen.citizen_id)}
+              >
+                <CitizenPortrait citizen={citizen} size={44} />
+                <span>
+                  <strong>{shortName(citizen)}</strong>
+                  <small>
+                    {citizen.citizen_id === player?.citizen_id
+                      ? "Playing as"
+                      : citizen.mood}
+                  </small>
+                </span>
+                {citizen.citizen_id === player?.citizen_id && (
+                  <span className="you-dot" />
+                )}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <nav className="game-nav" aria-label="Game views">
+          {(
+            [
+              { id: "city", icon: Compass, label: "City" },
+              { id: "create", icon: Wand2, label: "Create" },
+              { id: "citizens", icon: Users, label: "People" },
+              { id: "journal", icon: MessageCircle, label: "Talk" },
+              { id: "news", icon: Newspaper, label: "News" },
+              { id: "social", icon: Heart, label: "Bonds" },
+              { id: "events", icon: Vote, label: "Vote" },
+              { id: "badges", icon: Trophy, label: "Badges" },
+            ] as const
+          ).map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              aria-label={label}
+              aria-pressed={panel === id}
+              onClick={() => {
+                if (id === "journal") setFocusedConversation(null);
+                setPanel(panel === id ? null : id);
+              }}
+            >
+              <Icon size={21} />
+              <span>{label}</span>
+              {id === "journal" && cityConversations.length > 0 && (
+                <i>{cityConversations.length}</i>
+              )}
+              {id === "badges" && Object.keys(unlocked).length > 0 && (
+                <i>{Object.keys(unlocked).length}</i>
+              )}
+            </button>
+          ))}
+          <button
+            className="save-button"
+            onClick={download}
+            aria-label="Download world snapshot"
+            title="Download world snapshot"
+          >
+            <Download size={19} />
+            <span>Save</span>
+          </button>
+        </nav>
+
+        {panel && (
+          <aside
+            className="game-panel"
+            aria-label={
+              panel === "create" ? "Create a situation" : panel === "news" ? "Town news" : panel === "badges" ? "Badges" : panel === "events" ? "City events" : panel === "social" ? "Relationships" : panel === "journal"
+                ? "Conversations"
+                : panel === "city"
+                  ? "City"
+                  : "Citizen profile"
+            }
+          >
+            <header className="panel-header">
+              <div>
+                <small>
+                  {panel === "create" ? "YOU CONTROL THE WORLD" : panel === "news" ? "LIFE IN NAKAMEGURO" : panel === "badges" ? "TRY SOMETHING NEW" : panel === "events" ? "A NEIGHBORHOOD WITH SOMETHING AT STAKE" : panel === "social" ? "FEELINGS ARE NOT ALWAYS MUTUAL" : panel === "journal"
+                    ? "THE THREADS BETWEEN US"
+                    : panel === "city"
+                      ? "YOUR NEIGHBORHOOD"
+                      : "EVERYONE HAS A STORY"}
+                </small>
+                <h2>
+                  {panel === "create" ? "Create" : panel === "news" ? "Town news" : panel === "badges" ? "Your badges" : panel === "events" ? "City events" : panel === "social" ? "Bonds & feelings" : panel === "journal"
+                    ? "Conversations"
+                    : panel === "city"
+                      ? "Around town"
+                      : "The citizens"}
+                </h2>
+              </div>
+              <button
+                className="icon-button"
+                aria-label="Close panel"
+                onClick={() => setPanel(null)}
+              >
+                <X size={19} />
+              </button>
+            </header>
+
+            {panel === "badges" && <BadgesPanel unlocked={unlocked} />}
+
+            {panel === "news" && city && <NewsPanel city={city} onSelect={choose} />}
+
+            {panel === "create" && city && <GodPanel city={city} busy={busy} act={act} onMessage={setMessage} onFocus={(id) => void selectCitizen(id)} />}
+
+            {panel === "events" && city && <CityEventsPanel city={city} busy={busy} act={act} onTalk={(id) => {
+              setRecipient(id);
+              setFilter(id);
+              setFocusedConversation(null);
+              setPanel("journal");
+            }} />}
+
+            {panel === "social" && city && <SocialPanel city={city} relationships={cityBonds} conversations={cityConversations} onConversation={(id) => {
+              setFocusedConversation(id);
+              setFilter("all");
+              setPanel("journal");
+            }} />}
+
+            {panel === "citizens" && selected && (
+              <>
+                <div className="profile-picker">
+                  {city?.citizens.map((citizen) => (
+                    <button
+                      key={citizen.citizen_id}
+                      title={citizen.name}
+                      aria-label={`Select ${citizen.name}`}
+                      aria-pressed={citizen.citizen_id === selected.citizen_id}
+                      onClick={() => choose(citizen.citizen_id)}
+                    >
+                      <CitizenPortrait citizen={citizen} size={42} />
+                    </button>
+                  ))}
+                </div>
+                <div className="profile-heading">
+                  <CitizenPortrait citizen={selected} size={64} />
+                  <div>
+                    <h3>{selected.name}</h3>
+                    <p>
+                      {selected.age} years old · {selected.profession}
+                    </p>
+                    <span className="mood-label">{selected.mood}</span>
+                  </div>
+                </div>
+                <div className="profile-actions">
+                  <button
+                    className="primary-action"
+                    disabled={!sessionMemoryEnabled() || selected.age < 3}
+                    title={selected.age < 3 ? "Babies and toddlers can't be played yet" : undefined}
+                    onClick={() =>
+                      void api
+                        .takeControl(
+                          player?.citizen_id === selected.citizen_id
+                            ? null
+                            : selected.citizen_id,
+                        )
+                        .then(setCity)
+                    }
                   >
-                    <div className="mb-0.5 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--accent))]">
-                      {citizenNames[line.speaker_id] ?? line.speaker_id}
+                    <Footprints size={16} />
+                    {player?.citizen_id === selected.citizen_id
+                      ? "Return to AI"
+                      : `Play as ${shortName(selected)}`}
+                  </button>
+                  <button
+                    className="outline-action"
+                    onClick={() => {
+                      setFilter(selected.citizen_id);
+                      setPanel("journal");
+                    }}
+                  >
+                    <MessageCircle size={16} />
+                    Talks
+                  </button>
+                </div>
+                <div
+                  className="page-tabs"
+                  role="tablist"
+                  aria-label="Citizen details"
+                >
+                  {(
+                    [
+                      { id: "life", label: "Life", icon: Sun },
+                      { id: "act", label: "Act", icon: Hand },
+                      { id: "memories", label: "Memories", icon: BookOpen },
+                      { id: "bonds", label: "Bonds", icon: Heart },
+                    ] as const
+                  ).map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      role="tab"
+                      aria-selected={page === id}
+                      onClick={() => setPage(id)}
+                    >
+                      <Icon size={14} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  className="panel-scroll"
+                  role="tabpanel"
+                  key={`${selected.citizen_id}-${page}`}
+                >
+                  {page === "life" && (
+                    <>
+                      <div className="activity-line">
+                        <MapPin size={15} />
+                        <span>
+                          {
+                            city?.locations.find(
+                              (l) =>
+                                l.location_id === selected.current_location_id,
+                            )?.name
+                          }{" "}
+                          · {selected.current_activity}
+                        </span>
+                      </div>
+                      {player?.citizen_id !== selected.citizen_id && (
+                        <blockquote className="private-thought">
+                          {selected.current_thought}
+                        </blockquote>
+                      )}
+                      <CitizenNature citizen={selected} />
+                      {city && <LifeDetails citizen={selected} city={city} onSelect={choose} />}
+                      <div className="needs-grid">
+                        <Need
+                          label="Energy"
+                          value={selected.energy}
+                          tone="mint"
+                        />
+                        <Need
+                          label="Health"
+                          value={selected.health}
+                          tone="coral"
+                        />
+                        <Need
+                          label="Happiness"
+                          value={selected.happiness}
+                          tone="gold"
+                        />
+                        <Need
+                          label="Fullness"
+                          value={100 - selected.hunger}
+                          tone="blue"
+                        />
+                      </div>
+                      <div className="pocket-money">
+                        <span>{selected.age >= 18 ? "Money" : "Pocket money"}</span>
+                        <strong>${selected.money.toFixed(0)}</strong>
+                      </div>
+                      <h4>On their mind</h4>
+                      <ul className="goal-list">
+                        {selected.short_term_goals.map((goal, index) => (
+                          <li key={index}>
+                            <span />
+                            {goal}
+                          </li>
+                        ))}
+                      </ul>
+                      {player?.citizen_id === selected.citizen_id ? (
+                        <>
+                          <h4>Where next?</h4>
+                          <div className="destination-grid">
+                            {city?.locations.map((location) => (
+                              <button
+                                key={location.location_id}
+                                disabled={busy}
+                                onClick={() =>
+                                  void act(() =>
+                                    api.walkTo(location.location_id),
+                                  )
+                                }
+                              >
+                                <MapPin size={13} />
+                                {location.name}
+                                <ArrowRight size={13} />
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            className="primary-action full-width"
+                            onClick={() => {
+                              setFilter("all");
+                              setPanel("journal");
+                            }}
+                          >
+                            Start a conversation
+                            <MessageCircle size={16} />
+                          </button>
+                        </>
+                      ) : selected.age < 3 ? null : (
+                        <form
+                          className="task-form"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            if (taskDraft.trim().length < 3) return;
+                            const safety = checkPlayerText(taskDraft);
+                            if (!safety.ok) {
+                              setMessage(safety.message);
+                              return;
+                            }
+                            void act(async () => {
+                              const task = taskDraft;
+                              setTaskDraft("");
+                              try {
+                                return await api.assignTask(
+                                  selected.citizen_id,
+                                  { task },
+                                );
+                              } catch (error) {
+                                setTaskDraft((current) => current || task);
+                                throw error;
+                              }
+                            });
+                          }}
+                        >
+                          <label htmlFor="citizen-task">
+                            Ask {shortName(selected)} something
+                          </label>
+                          <textarea
+                            id="citizen-task"
+                            maxLength={320}
+                            minLength={3}
+                            required
+                            value={taskDraft}
+                            onChange={(event) =>
+                              setTaskDraft(event.target.value)
+                            }
+                            placeholder="Invite someone to work on your science project..."
+                          />
+                          <button
+                            className="primary-action"
+                            disabled={busy || taskDraft.trim().length < 3}
+                          >
+                            <Send size={14} />
+                            Give task
+                          </button>
+                        </form>
+                      )}
+                      {activeTask?.task && (
+                        <div className="task-status">
+                          <small>{activeTask.status}</small>
+                          <p>{activeTask.task}</p>
+                          {activeTask.status === "active" && (
+                            <button
+                              className="text-action"
+                              onClick={() =>
+                                void api
+                                  .closeTask(selected.citizen_id)
+                                  .then(setCity)
+                              }
+                            >
+                              Cancel task
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <h4>A typical day</h4>
+                      <ol className="schedule-list">
+                        {selected.daily_schedule.map((entry, index) => (
+                          <li key={index}>
+                            <time>{time(Number(entry.start))}</time>
+                            <span>{String(entry.activity)}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </>
+                  )}
+                  {page === "act" && city && (
+                    <ActionPanel key={selected.citizen_id} city={city} actor={selected} busy={busy} act={act} onMessage={setMessage} />
+                  )}
+                  {page === "memories" && (
+                    <>
+                      <h4>Private journal</h4>
+                      {memories.length === 0 ? (
+                        <Empty text="No memories yet." />
+                      ) : (
+                        memories.map((memory) => (
+                          <article
+                            className="memory-entry"
+                            key={memory.memory_id}
+                          >
+                            <div>
+                              <BookOpen size={14} />
+                              <span>{memory.kind.replaceAll("_", " ")}</span>
+                              {memory.importance >= 0.75 && (
+                                <span className="important-mark">
+                                  Important
+                                </span>
+                              )}
+                            </div>
+                            <p>{memory.content}</p>
+                            {Boolean(memory.extra.reflection) && (
+                              <details>
+                                <summary>Reflection</summary>
+                                <p>{String(memory.extra.reflection)}</p>
+                              </details>
+                            )}
+                          </article>
+                        ))
+                      )}
+                    </>
+                  )}
+                  {page === "bonds" && (
+                    <BondNetwork key={selected.citizen_id} citizens={city?.citizens ?? []} relationships={cityBonds} initialFocus={selected.citizen_id} />
+                  )}
+                </div>
+              </>
+            )}
+
+            {panel === "journal" && city && (
+              <>
+                <div className="conversation-filter">
+                  <label htmlFor="conversation-filter">Following</label>
+                  <select
+                    id="conversation-filter"
+                    value={filter}
+                    onChange={(event) => setFilter(event.target.value)}
+                  >
+                    <option value="all">Everyone</option>
+                    {city.citizens.map((citizen) => (
+                      <option
+                        key={citizen.citizen_id}
+                        value={citizen.citizen_id}
+                      >
+                        {citizen.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <AutonomyStatus city={city} pending={pendingExchange} busy={busy} onResume={() => void act(api.start)} />
+                <ConversationThread
+                  city={city}
+                  conversations={cityConversations}
+                  focusedConversation={focusedConversation}
+                  filter={filter}
+                  outgoing={outgoing}
+                  canEditOutgoing={
+                    !draft.trim() &&
+                    outgoing?.actor.citizen_id === player?.citizen_id &&
+                    nearby.some(
+                      (c) => c.citizen_id === outgoing?.target.citizen_id,
+                    )
+                  }
+                  onEditOutgoing={() => {
+                    if (!outgoing || draft.trim()) return;
+                    setDraft(outgoing.text);
+                    setRecipient(outgoing.target.citizen_id);
+                    setOutgoing(null);
+                    speechInput.current?.focus();
+                  }}
+                  onDismissOutgoing={() => setOutgoing(null)}
+                />
+                {player ? (
+                  <form className="speech-form" onSubmit={speak}>
+                    <div className="speaking-as">
+                      <CitizenPortrait citizen={player} size={28} />
+                      <strong>{shortName(player)}</strong>
+                      <ArrowRight size={13} />
+                      <select
+                        aria-label="Speak to"
+                        value={targetId}
+                        onChange={(event) => setRecipient(event.target.value)}
+                      >
+                        <option value="" disabled>
+                          {nearby.length ? "Choose someone" : "Nobody nearby"}
+                        </option>
+                        {nearby.map((citizen) => (
+                          <option
+                            key={citizen.citizen_id}
+                            value={citizen.citizen_id}
+                          >
+                            {citizen.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <div className="leading-snug">{line.text}</div>
+                    <div className="speech-input">
+                      <textarea
+                        ref={speechInput}
+                        aria-label="Your spoken words"
+                        maxLength={600}
+                        value={draft}
+                        onChange={(event) => setDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key === "Enter" &&
+                            !event.shiftKey &&
+                            !event.nativeEvent.isComposing
+                          ) {
+                            event.preventDefault();
+                            if (!busy && draft.trim())
+                              event.currentTarget.form?.requestSubmit();
+                          }
+                        }}
+                        placeholder={
+                          outgoing?.status === "pending"
+                            ? "Write your next message..."
+                            : "What do you say?"
+                        }
+                        disabled={
+                          !targetId || Boolean(city.policy.player_destination)
+                        }
+                      />
+                      <button
+                        className="primary-action"
+                        aria-label={
+                          outgoing?.status === "pending"
+                            ? "Waiting for reply"
+                            : "Say this"
+                        }
+                        disabled={
+                          busy ||
+                          !draft.trim() ||
+                          !targetId ||
+                          Boolean(city.policy.player_destination)
+                        }
+                      >
+                        {outgoing?.status === "pending" ? (
+                          <LoaderCircle className="reply-spinner" size={17} />
+                        ) : (
+                          <Send size={17} />
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="journal-footer">
+                    <BookOpen size={15} />
+                    <span>
+                      {cityConversations.length} conversations remembered
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {panel === "city" && city && (
+              <div className="panel-scroll">
+                <div className="chapter-heading">
+                  <span>CHAPTER {String(city.clock.day).padStart(2, "0")}</span>
+                  <h3>{weekday(city.clock.day)} in Nakameguro</h3>
+                  <p>{chapterLine(city.clock.day, city.clock.minute_of_day)}</p>
+                </div>
+                <h4>Weather forecast</h4>
+                <div className="forecast">
+                  {[0, 1, 2, 3].map((offset) => {
+                    const start = city.calendar_start ?? calendarStartFor(city.clock.day);
+                    const w = dayWeather(start, city.clock.day + offset);
+                    const d = calendarDay(start, city.clock.day + offset);
+                    const icon = { clear: "☀️", partly_cloudy: "⛅", cloudy: "☁️", fog: "🌫️", rain: "🌧️", heavy_rain: "🌧️", thunderstorm: "⛈️", snow: "🌨️", typhoon: "🌀" }[w.afternoonThunder ? "thunderstorm" : w.condition];
+                    return (
+                      <div key={offset} className="forecast-day" data-alert={w.condition === "typhoon" || w.heatwave || w.condition === "heavy_rain"}>
+                        <small>{offset === 0 ? "Today" : weekday(city.clock.day + offset).slice(0, 3)}</small>
+                        <span aria-hidden="true">{icon}</span>
+                        <strong>{Math.round(w.high)}°</strong>
+                        <small>{Math.round(w.low)}°</small>
+                        {d.holiday && <em title={d.holiday}>🎌</em>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <h4>Plans between people</h4>
+                {city.meetings?.length ? city.meetings.slice().reverse().map((meeting) => <div className="meeting-entry" key={meeting.id}>
+                  <strong>{meeting.actor_ids.map((id) => shortName(city.citizens.find((c) => c.citizen_id === id))).join(" & ")}</strong>
+                  <span>Day {meeting.game_day} · {time(meeting.game_minute)} · {city.locations.find((p) => p.location_id === meeting.location_id)?.name}</span>
+                  <p>{meeting.topic}</p><small>{meeting.status === "scheduled" ? "Agreed by both" : meeting.status === "completed" ? "Met as planned" : "Meeting missed"}</small>
+                </div>) : <p className="muted-copy">No shared plans yet.</p>}
+                <h4>Make something happen</h4>
+                <button
+                  className="event-choice"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() =>
+                      api.triggerEvent({
+                        event_type: "school_exam",
+                        severity: "low",
+                      }),
+                    )
+                  }
+                >
+                  <BookOpen />
+                  <span>
+                    <strong>Exam day</strong>
+                    <small>A reason to study together</small>
+                  </span>
+                  <ArrowRight size={16} />
+                </button>
+                <button
+                  className="event-choice"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(() =>
+                      api.triggerEvent({
+                        event_type: "city_festival",
+                        severity: "low",
+                      }),
+                    )
+                  }
+                >
+                  <Sparkles />
+                  <span>
+                    <strong>Neighborhood festival</strong>
+                    <small>Something to look forward to</small>
+                  </span>
+                  <ArrowRight size={16} />
+                </button>
+                <h4>Places & people</h4>
+                {city.locations.map((location) => (
+                  <div className="place-row" key={location.location_id}>
+                    <MapPin size={15} />
+                    <div>
+                      <strong>{location.name}</strong>
+                      <small>
+                        {city.citizens
+                          .filter(
+                            (citizen) =>
+                              citizen.current_location_id ===
+                              location.location_id,
+                          )
+                          .map(shortName)
+                          .join(", ") || "Quiet right now"}
+                      </small>
+                    </div>
+                    {player && (
+                      <button
+                        className="icon-button"
+                        disabled={busy}
+                        title={`Walk to ${location.name}`}
+                        aria-label={`Walk to ${location.name}`}
+                        onClick={() =>
+                          void act(() => api.walkTo(location.location_id))
+                        }
+                      >
+                        <Footprints size={17} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
-            </div>
-          );
-        })}
-        {conversations.length === 0 ? (
-          <EmptyLine text="No conversations yet. Keep auto mode on, assign a talk task, or step the city forward." />
-        ) : null}
-      </div>
-
-      <SectionTitle label="Relationships" count={relationships.length} />
-      <div className="space-y-2">
-        {relationships.slice(0, 8).map((relationship) => (
-          <div key={relationship.relationship_id} className="story-card rounded-md p-2 text-xs">
-            <div className="mb-1 flex justify-between gap-2">
-              <span className="truncate">{citizenNames[relationship.other_citizen_id] ?? relationship.other_citizen_id}</span>
-              <span className="font-mono text-[rgb(var(--muted))]">{relationshipStage(relationship)}</span>
-            </div>
-            <div className="mb-1 grid grid-cols-3 gap-1 font-mono text-[9px] uppercase tracking-wide text-[rgb(var(--muted))]">
-              <span>Trust {Math.round(relationship.trust)}</span>
-              <span>Warm {Math.round(relationship.warmth)}</span>
-              <span>Know {Math.round(relationship.familiarity)}</span>
-            </div>
-            <Progress value={(relationship.trust + relationship.warmth + relationship.familiarity) / 3} tone="accent" height={5} />
-            <p className="mt-1 line-clamp-2 text-[11px] text-[rgb(var(--muted))]">{relationship.notes}</p>
-          </div>
-        ))}
-        {relationships.length === 0 ? <EmptyLine text="No social history loaded yet." /> : null}
-      </div>
-    </div>
-  );
-}
-
-function ConversationFeed({
-  conversations,
-  city,
-  gameMode,
-  activeTasks,
-  onSelectCitizen,
-}: {
-  conversations: Conversation[];
-  city: CityState | null;
-  gameMode: SimulationMode;
-  activeTasks: Array<{ citizen: CitizenAgent; task: PlayerTask }>;
-  onSelectCitizen: (citizenId: string) => void;
-}) {
-  const citizenById = useMemo(
-    () => Object.fromEntries(city?.citizens.map((citizen) => [citizen.citizen_id, citizen]) ?? []),
-    [city?.citizens],
-  );
-  const locationById = useMemo(
-    () => Object.fromEntries(city?.locations.map((location) => [location.location_id, location]) ?? []),
-    [city?.locations],
-  );
-  const flowItems = useMemo(
-    () => buildConversationFlow(conversations, city?.events ?? []),
-    [city?.events, conversations],
-  );
-  const lineCount = flowItems.filter((item) => item.kind === "line").length;
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-[rgba(var(--accent),0.35)] bg-[rgba(56,189,248,0.08)] p-3">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            {gameMode === "manual" ? <MousePointerClick className="h-4 w-4 text-[rgb(var(--accent))]" /> : <Sparkles className="h-4 w-4 text-[rgb(var(--accent))]" />}
-            {gameMode === "manual" ? "Manual Follow Mode" : "Autonomous City Mode"}
-          </div>
-          <Badge tone={activeTasks.length > 0 ? "success" : "default"}>
-            {activeTasks.length > 0 ? `${activeTasks.length} task active` : "no active task"}
-          </Badge>
-        </div>
-        <p className="text-xs leading-relaxed text-[rgb(var(--muted-strong))]">
-          {gameMode === "manual"
-            ? "Manual mode is easiest to follow: assign one task, read the conversation here, then the task closes and the city pauses."
-            : "Autonomous mode lets the students create their own moments. Use this feed as the readable transcript of what they are saying."}
-        </p>
-        {activeTasks.length > 0 ? (
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {activeTasks.map(({ citizen, task }) => (
-              <button
-                key={citizen.citizen_id}
-                className="rounded-lg border border-[rgba(var(--border-soft),0.85)] bg-black/20 p-2 text-left text-xs hover:border-[rgba(var(--accent),0.75)]"
-                onClick={() => onSelectCitizen(citizen.citizen_id)}
-              >
-                <div className="mb-1 font-semibold">{citizen.name}</div>
-                <div className="line-clamp-2 text-[rgb(var(--muted-strong))]">{task.task}</div>
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <MessageSquareText className="h-4 w-4 text-[rgb(var(--accent))]" />
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-[rgb(var(--muted-strong))]">
-              Conversation Flow
-            </h2>
-            <Badge tone="accent">{lineCount}</Badge>
-          </div>
-          <div className="hidden text-[10px] uppercase tracking-wide text-[rgb(var(--muted))] sm:block">
-            oldest at top · newest at bottom
-          </div>
-        </div>
-
-        <div className="relative space-y-2 rounded-xl border border-[rgba(var(--border),0.8)] bg-black/20 p-3">
-          <div className="absolute bottom-4 left-[1.55rem] top-4 w-px bg-[rgba(var(--accent),0.28)]" />
-          {flowItems.map((item, index) => (
-            <ConversationFlowRow
-              key={item.id}
-              item={item}
-              index={index}
-              citizenById={citizenById}
-              locationById={locationById}
-              onSelectCitizen={onSelectCitizen}
-            />
-          ))}
-
-          {flowItems.length === 0 ? (
-            <div className="relative rounded-xl border border-[rgba(var(--border),0.85)] bg-black/20 p-4 text-sm leading-relaxed text-[rgb(var(--muted-strong))]">
-              No conversations yet. Assign a task like “Talk to Iris about today” or trigger a school exam,
-              then step time forward.
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ConversationFlowRow({
-  item,
-  index,
-  citizenById,
-  locationById,
-  onSelectCitizen,
-}: {
-  item: ConversationFlowItem;
-  index: number;
-  citizenById: Record<string, CitizenAgent | undefined>;
-  locationById: Record<string, Location | undefined>;
-  onSelectCitizen: (citizenId: string) => void;
-}) {
-  if (item.kind !== "line") {
-    const event = item.event;
-    const primary = event.actors[0] ? citizenById[event.actors[0]] : null;
-    const taskText = eventTaskText(event);
-    const planSummary = item.kind === "task" ? eventPlanSummary(event) : null;
-    return (
-      <div className="relative flex gap-3">
-        <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(var(--accent),0.5)] bg-[#071222] text-[rgb(var(--accent))]">
-          {item.kind === "task" ? <Target className="h-4 w-4" /> : <Handshake className="h-4 w-4" />}
-        </div>
-        <div className="min-w-0 flex-1 rounded-xl border border-[rgba(var(--accent),0.28)] bg-[rgba(56,189,248,0.08)] p-3">
-          <div className="mb-1 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-            <span>{item.kind === "task" ? "Task assigned" : "Task completed"}</span>
-            <span>Day {item.day}</span>
-            <span>{minutesLabel(item.minute)}</span>
-            {primary ? (
-              <button className="text-[rgb(var(--accent))] hover:underline" onClick={() => onSelectCitizen(primary.citizen_id)}>
-                {primary.name}
-              </button>
-            ) : null}
-          </div>
-          <p className="text-sm leading-relaxed">{taskText}</p>
-          {planSummary && planSummary !== taskText ? (
-            <p className="mt-1 rounded-md bg-[rgba(56,189,248,0.08)] px-2 py-1 text-[11px] leading-snug text-[rgb(var(--muted-strong))]">
-              Plan: {planSummary}
-            </p>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
-  const speaker = citizenById[item.line.speaker_id];
-  const listeners = item.conversation.actor_ids
-    .filter((actorId) => actorId !== item.line.speaker_id)
-    .map((actorId) => citizenById[actorId])
-    .filter((citizen): citizen is CitizenAgent => Boolean(citizen));
-  const locationName = item.conversation.location_id
-    ? locationById[item.conversation.location_id]?.name ?? item.conversation.location_id
-    : "City";
-  const stage = conversationRelationshipStage(item.conversation, citizenById);
-
-  return (
-    <div className="relative flex gap-3">
-      <div className="timeline-node relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[rgba(125,211,252,0.5)] bg-[#071222] font-mono text-[10px] text-[rgb(125,211,252)] shadow-[0_0_12px_rgba(56,189,248,0.25)]">
-        {index + 1}
-      </div>
-      <article className="min-w-0 flex-1 rounded-xl border border-[rgba(var(--border-soft),0.78)] bg-[rgba(6,11,22,0.72)] p-3 transition hover:border-[rgba(125,211,252,0.55)]">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            {speaker ? (
-              <button
-                className="inline-flex max-w-[11rem] items-center gap-1.5 rounded-full border border-[rgba(var(--border),0.8)] bg-black/25 px-2 py-1 text-xs font-semibold hover:border-[rgba(var(--accent),0.75)]"
-                onClick={() => onSelectCitizen(speaker.citizen_id)}
-              >
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: moodHex(speaker) }} />
-                <span className="truncate">{speaker.name}</span>
-              </button>
-            ) : (
-              <span className="text-xs font-semibold">{item.line.speaker_id}</span>
             )}
-            <span className="text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">to</span>
-            {listeners.map((listener) => (
-              <button
-                key={listener.citizen_id}
-                className="max-w-[9rem] truncate rounded-full border border-[rgba(var(--border),0.7)] bg-black/20 px-2 py-1 text-xs hover:border-[rgba(var(--accent),0.75)]"
-                onClick={() => onSelectCitizen(listener.citizen_id)}
-              >
-                {listener.name}
-              </button>
-            ))}
-          </div>
-          <Badge tone={stage === "friend" || stage === "trusted friend" ? "success" : "default"}>
-            {stage}
-          </Badge>
-        </div>
-        <div className="mb-2 flex flex-wrap items-center gap-2 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-          <span>Line {item.lineIndex + 1}</span>
-          <span>Day {item.day}</span>
-          <span>{minutesLabel(item.minute)}</span>
-          <span className="inline-flex items-center gap-1">
-            <MapPin className="h-3 w-3" />
-            {locationName}
-          </span>
-        </div>
-        {item.lineIndex === 0 ? (
-          <p className="mb-2 text-xs leading-relaxed text-[rgb(var(--muted))]">{item.conversation.summary}</p>
-        ) : null}
-        <p className="text-sm leading-relaxed">{item.line.text}</p>
-      </article>
-    </div>
-  );
-}
-
-function eventTaskText(event: CityEvent) {
-  return typeof event.payload?.task === "string" && event.payload.task.trim()
-    ? event.payload.task
-    : event.description;
-}
-
-function eventPlanSummary(event: CityEvent) {
-  return typeof event.payload?.plan_summary === "string" && event.payload.plan_summary.trim()
-    ? event.payload.plan_summary
-    : null;
-}
-
-function buildConversationFlow(conversations: Conversation[], events: CityEvent[]) {
-  const items: ConversationFlowItem[] = [];
-  for (const event of events) {
-    if (event.event_type === "player_task") {
-      items.push({ kind: "task", id: event.event_id, day: event.game_day, minute: event.game_minute, event });
-    }
-    if (event.event_type === "player_task_completed") {
-      items.push({ kind: "done", id: event.event_id, day: event.game_day, minute: event.game_minute, event });
-    }
-  }
-  for (const conversation of conversations) {
-    conversation.transcript.slice(0, 10).forEach((line, lineIndex) => {
-      items.push({
-        kind: "line",
-        id: `${conversation.conversation_id}-${lineIndex}`,
-        day: conversation.game_day,
-        minute: conversation.game_minute,
-        conversation,
-        line,
-        lineIndex,
-      });
-    });
-  }
-  const order = { task: 0, line: 1, done: 2 };
-  return items
-    .sort((a, b) => a.day - b.day || a.minute - b.minute || order[a.kind] - order[b.kind])
-    .slice(-120);
-}
-
-function CitizenAvatar({ citizen, small = false }: { citizen: CitizenAgent; small?: boolean }) {
-  const size = small ? "h-8 w-8" : "h-14 w-14";
-  return (
-    <span
-      className={`relative flex shrink-0 items-center justify-center rounded-xl border border-black/40 ${size}`}
-      style={{ background: `linear-gradient(150deg, ${professionHex(citizen.profession)} 30%, rgba(8,12,24,0.6))` }}
-    >
-      <UserRound className={small ? "h-4 w-4 text-black/85" : "h-7 w-7 text-black/85"} />
-      <span
-        className={`absolute rounded-full border border-black/50 ${
-          small ? "-right-0.5 -top-0.5 h-2.5 w-2.5" : "-right-1 -top-1 h-3.5 w-3.5"
-        }`}
-        style={{ background: moodHex(citizen) }}
-      />
-      <span className={`absolute bottom-0.5 right-1 font-mono ${small ? "text-[8px]" : "text-[10px]"} font-bold text-black/80`}>
-        {professionGlyph(citizen.profession)}
-      </span>
-    </span>
-  );
-}
-
-function InfoPill({
-  icon: Icon,
-  label,
-  value,
-  wide = false,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  wide?: boolean;
-}) {
-  return (
-    <div className={`tile-card p-2 ${wide ? "col-span-2" : ""}`}>
-      <div className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">
-        <Icon className="h-3 w-3" />
-        {label}
+          </aside>
+        )}
       </div>
-      <div className="truncate text-xs">{value}</div>
-    </div>
+      <footer className="game-footer">
+        <span>
+          <Check size={12} />
+          Local world
+        </span>
+        <span>{player ? `Playing as ${shortName(player)}` : "Observer"}</span>
+        <span>AgentCity · early access</span>
+      </footer>
+      {celebration.length > 0 && (
+        <button className="badge-toast" role="status" onClick={() => { setCelebration([]); setPanel("badges"); }}>
+          <span aria-hidden="true">{celebration[0].icon}</span>
+          <div>
+            <small>{celebration.length > 1 ? `${celebration.length} BADGES UNLOCKED` : "BADGE UNLOCKED"}</small>
+            <strong>{celebration.map((a) => a.title).join(" · ")}</strong>
+          </div>
+        </button>
+      )}
+      {welcome && <WelcomeGuide onClose={closeWelcome} />}
+      {(message || error) && (
+        <div className="game-toast" role="status">
+          <span>{message || error}</span>
+          <button
+            className="icon-button"
+            aria-label="Dismiss notification"
+            onClick={() => setMessage("")}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+    </main>
   );
 }
 
@@ -2198,186 +1182,252 @@ function Need({
   label,
   value,
   tone,
-  icon: Icon,
 }: {
   label: string;
   value: number;
-  tone: ProgressTone;
-  icon: ComponentType<{ className?: string }>;
+  tone: string;
 }) {
   return (
-    <div className="tile-card px-2 py-1.5">
-      <div className="mb-1 flex items-center justify-between font-mono text-[10px] text-[rgb(var(--muted))]">
-        <span className="flex items-center gap-1.5">
-          <Icon className="h-3 w-3" />
-          {label}
-        </span>
-        <span>{Math.round(value)}</span>
+    <div className="need">
+      <span>
+        {label}
+        <b>{Math.round(value)}%</b>
+      </span>
+      <meter
+        className={tone}
+        min="0"
+        max="100"
+        value={value}
+        aria-label={label}
+      />
+    </div>
+  );
+}
+function Empty({ text }: { text: string }) {
+  return (
+    <div className="empty-journal">
+      <MessageCircle size={28} />
+      <p>{text}</p>
+    </div>
+  );
+}
+function ConversationThread({
+  city,
+  conversations,
+  filter,
+  focusedConversation,
+  outgoing,
+  canEditOutgoing,
+  onEditOutgoing,
+  onDismissOutgoing,
+}: {
+  city: CityState;
+  conversations: Conversation[];
+  filter: string;
+  focusedConversation: string | null;
+  outgoing: OutgoingSpeech | null;
+  canEditOutgoing: boolean;
+  onEditOutgoing: () => void;
+  onDismissOutgoing: () => void;
+}) {
+  const viewport = useRef<HTMLDivElement>(null);
+  const [following, setFollowing] = useState(!focusedConversation);
+  const names = Object.fromEntries(
+    city.citizens.map((citizen) => [citizen.citizen_id, citizen]),
+  );
+  const entries = city.events
+    .filter((event) =>
+      [
+        "player_task",
+        "player_task_completed",
+        "task_unresolved",
+        "agent_cognition_blocked",
+        "invitation_unresolved",
+        "election_started",
+        "campaign_plan",
+        "campaign_approach",
+        "election_voting",
+        "election_cancelled",
+        "election_result",
+      ].includes(event.event_type),
+    )
+    .map((event) => ({
+      key: event.event_id,
+      day: event.game_day,
+      minute: event.game_minute,
+      timestamp: event.timestamp,
+      actors: event.actors,
+      event,
+      conversation: null as Conversation | null,
+    }));
+  for (const conversation of conversations) {
+    const event = city.events.find(
+      (event) => event.payload.conversation_id === conversation.conversation_id,
+    );
+    entries.push({
+      key: conversation.conversation_id,
+      day: conversation.game_day,
+      minute: conversation.game_minute,
+      timestamp: event?.timestamp ?? "",
+      actors: conversation.actor_ids,
+      event: null as never,
+      conversation,
+    });
+  }
+  const visible = entries
+    .filter((entry) => filter === "all" || entry.actors.includes(filter))
+    .sort(
+      (a, b) =>
+        a.day - b.day ||
+        a.minute - b.minute ||
+        a.timestamp.localeCompare(b.timestamp),
+    );
+  useEffect(() => {
+    if (following && viewport.current)
+      viewport.current.scrollTop = viewport.current.scrollHeight;
+  }, [visible.length, following, filter, outgoing?.id, outgoing?.status]);
+  useEffect(() => {
+    if (outgoing?.id && viewport.current)
+      viewport.current.scrollTop = viewport.current.scrollHeight;
+  }, [outgoing?.id]);
+  useEffect(() => {
+    if (!focusedConversation || !viewport.current) return;
+    const entry = Array.from(viewport.current.querySelectorAll<HTMLElement>("[data-conversation]"))
+      .find((el) => el.dataset.conversation === focusedConversation);
+    if (entry) {
+      viewport.current.scrollTop = entry.offsetTop - viewport.current.offsetTop;
+    }
+  }, [focusedConversation]);
+  return (
+    <div className="thread-wrapper">
+      <div
+        className="panel-scroll conversation-thread"
+        ref={viewport}
+        onScroll={() => {
+          const el = viewport.current;
+          if (el)
+            setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight < 70);
+        }}
+      >
+        {visible.length === 0 && !outgoing && (
+          <Empty text={city.simulation_mode === "autonomous" ? "No conversations in this view yet." : "The next conversation is still unwritten."} />
+        )}
+        {visible.map((entry) =>
+          entry.conversation ? (
+            <div className={`exchange ${focusedConversation === entry.key ? "focused-exchange" : ""}`} data-conversation={entry.key} key={entry.key}>
+              <div className="exchange-time">
+                <button className="replay-exchange" aria-label={`Replay conversation from day ${entry.day} at ${time(entry.minute)}`} title="Watch this conversation in the city" onClick={() => useGameStore.getState().replayConversation(entry.key)}><Play size={14} /></button>
+                <span>
+                  Day {entry.day} · {time(entry.minute)}
+                </span>
+                <span>
+                  {
+                    city.locations.find(
+                      (location) =>
+                        location.location_id ===
+                        entry.conversation?.location_id,
+                    )?.name
+                  }
+                </span>
+              </div>
+              {entry.conversation.encounter && <p className="exchange-context">{entry.conversation.encounter.reason}</p>}
+              {entry.conversation.transcript.map((line, index) => (
+                <article
+                  className="dialogue-line"
+                  key={`${entry.key}-${index}`}
+                >
+                  <CitizenPortrait
+                    citizen={
+                      names[line.speaker_id] ?? {
+                        citizen_id: line.speaker_id,
+                        name: "Citizen",
+                      }
+                    }
+                    size={32}
+                  />
+                  <div>
+                    <div className="speaker-name">
+                      <strong>{shortName(names[line.speaker_id])}</strong>
+                      <ArrowRight size={11} />
+                      <span>
+                        {entry.actors
+                          .filter((id) => id !== line.speaker_id)
+                          .map((id) => shortName(names[id]))
+                          .join(", ")}
+                      </span>
+                    </div>
+                    <p>{line.text}</p>
+                  </div>
+                </article>
+              ))}
+              <ConversationImpact conversation={entry.conversation} citizens={city.citizens} />
+            </div>
+          ) : (
+            <div className="task-divider" key={entry.key}>
+              <span>
+                {entry.event.event_type === "player_task"
+                  ? "TASK ASSIGNED"
+                  : entry.event.event_type === "player_task_completed"
+                    ? "COMPLETED"
+                    : ["task_unresolved", "invitation_unresolved"].includes(entry.event.event_type)
+                      ? "UNRESOLVED"
+                      : entry.event.event_type.replaceAll("_", " ").toUpperCase()}{" "}
+                · {time(entry.minute)}
+              </span>
+              <p>{entry.event.description}</p>
+            </div>
+          ),
+        )}
+        {outgoing && (
+          <div className="outgoing-exchange" aria-label="Outgoing message">
+            <article className="dialogue-line">
+              <CitizenPortrait citizen={outgoing.actor} size={32} />
+              <div>
+                <div className="speaker-name">
+                  <strong>{shortName(outgoing.actor)}</strong>
+                  <ArrowRight size={11} />
+                  <span>{shortName(outgoing.target)}</span>
+                </div>
+                <p>{outgoing.text}</p>
+              </div>
+            </article>
+            <div
+              className={`reply-status ${outgoing.status}`}
+              role="status"
+              aria-live="polite"
+            >
+              {outgoing.status === "pending" ? (
+                <>
+                  <LoaderCircle size={14} className="reply-spinner" />
+                  Waiting for {shortName(outgoing.target)}...
+                </>
+              ) : (
+                <span>{outgoing.error} Message not completed.</span>
+              )}
+            </div>
+            {outgoing.status === "failed" && (
+              <div className="failed-speech-actions">
+                <button
+                  className="outline-action"
+                  disabled={!canEditOutgoing}
+                  onClick={onEditOutgoing}
+                >
+                  Edit message
+                </button>
+                <button className="text-action" onClick={onDismissOutgoing}>
+                  Dismiss
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      <Progress value={value} tone={tone} height={5} />
+      {!following && (
+        <button className="latest-button" onClick={() => setFollowing(true)}>
+          Latest
+          <ChevronDown size={14} />
+        </button>
+      )}
     </div>
   );
-}
-
-function SectionTitle({ label, count }: { label: string; count: number }) {
-  return (
-    <div className="mb-1 mt-1 flex items-center justify-between">
-      <div className="font-mono text-[10px] uppercase tracking-wide text-[rgb(var(--muted))]">{label}</div>
-      <Badge>{count}</Badge>
-    </div>
-  );
-}
-
-function EmptyLine({ text }: { text: string }) {
-  return (
-    <div className="rounded-md border border-[rgba(var(--border),0.85)] bg-black/15 p-3 text-xs text-[rgb(var(--muted))]">
-      {text}
-    </div>
-  );
-}
-
-function playerTaskFor(citizen: CitizenAgent): PlayerTask | null {
-  const rawTask = citizen.personality?.player_task;
-  if (!rawTask || typeof rawTask !== "object") return null;
-  const taskData = rawTask as Record<string, unknown>;
-  const task = typeof taskData.task === "string" ? taskData.task : "";
-  if (!task) return null;
-  return {
-    task,
-    status: typeof taskData.status === "string" ? taskData.status : "active",
-    location_id: typeof taskData.location_id === "string" ? taskData.location_id : null,
-    target_citizen_id: typeof taskData.target_citizen_id === "string" ? taskData.target_citizen_id : null,
-    plan_summary: typeof taskData.plan_summary === "string" ? taskData.plan_summary : undefined,
-  };
-}
-
-function activePlayerTaskCount(citizens: CitizenAgent[]) {
-  return citizens.filter((citizen) => playerTaskFor(citizen)?.status === "active").length;
-}
-
-function relationshipShort(citizen: CitizenAgent) {
-  const friendCount = citizen.friend_ids.length;
-  if (friendCount > 0) return `${friendCount} friend${friendCount === 1 ? "" : "s"}`;
-  const knownCount = Object.values(citizen.relationship_scores).filter((score) => score >= 35).length;
-  return `${knownCount} known`;
-}
-
-function locationIcon(type: string) {
-  if (type === "home") return <Home className="h-3.5 w-3.5 text-[rgb(180,150,110)]" />;
-  if (type === "hospital") return <Stethoscope className="h-3.5 w-3.5 text-[rgb(244,89,89)]" />;
-  if (type === "school") return <BookOpen className="h-3.5 w-3.5 text-[rgb(96,165,250)]" />;
-  if (type === "bank") return <PiggyBank className="h-3.5 w-3.5 text-[rgb(167,139,250)]" />;
-  if (type === "market") return <ShoppingBag className="h-3.5 w-3.5 text-[rgb(251,146,60)]" />;
-  if (type === "restaurant") return <Coffee className="h-3.5 w-3.5 text-[rgb(251,146,60)]" />;
-  if (type === "pharmacy") return <Pill className="h-3.5 w-3.5 text-[rgb(165,243,252)]" />;
-  if (type === "farm") return <Wheat className="h-3.5 w-3.5 text-[rgb(132,204,22)]" />;
-  if (type === "police") return <Shield className="h-3.5 w-3.5 text-[rgb(56,189,248)]" />;
-  if (type === "bus_stop") return <Bus className="h-3.5 w-3.5 text-[rgb(165,243,252)]" />;
-  if (type === "lab") return <FlaskConical className="h-3.5 w-3.5 text-[rgb(74,222,128)]" />;
-  if (type === "library") return <Library className="h-3.5 w-3.5 text-[rgb(196,181,253)]" />;
-  if (type === "power") return <Factory className="h-3.5 w-3.5 text-[rgb(251,146,60)]" />;
-  if (type === "park") return <TreePine className="h-3.5 w-3.5 text-[rgb(74,222,128)]" />;
-  if (type === "city_hall") return <Banknote className="h-3.5 w-3.5 text-[rgb(252,211,77)]" />;
-  return <MapPin className="h-3.5 w-3.5 text-[rgb(var(--muted))]" />;
-}
-
-function professionHex(profession: string) {
-  const colors: Record<string, string> = {
-    Doctor: "rgb(239,68,68)",
-    Nurse: "rgb(244,114,182)",
-    Teacher: "rgb(96,165,250)",
-    Student: "rgb(134,239,172)",
-    Engineer: "rgb(251,191,36)",
-    Driver: "rgb(203,213,225)",
-    Shopkeeper: "rgb(251,146,60)",
-    Banker: "rgb(167,139,250)",
-    "Police Officer": "rgb(59,130,246)",
-    Farmer: "rgb(74,222,128)",
-    Mayor: "rgb(252,211,77)",
-    Scientist: "rgb(52,211,153)",
-    Researcher: "rgb(45,212,191)",
-    "Restaurant Cook": "rgb(251,113,133)",
-  };
-  return colors[profession] ?? "rgb(226,232,240)";
-}
-
-function moodHex(citizen: CitizenAgent) {
-  if (citizen.health < 55) return "rgb(244,89,89)";
-  if (citizen.stress > 68) return "rgb(251,191,36)";
-  if (citizen.happiness > 78) return "rgb(74,222,128)";
-  return "rgb(96,165,250)";
-}
-
-function relationshipStage(relationship: Relationship) {
-  if (relationship.trust >= 72 && relationship.warmth >= 70 && relationship.familiarity >= 65) {
-    return "trusted friend";
-  }
-  if (relationship.trust >= 58 && relationship.warmth >= 56 && relationship.familiarity >= 45) {
-    return "friend";
-  }
-  if (relationship.familiarity >= 24 || relationship.trust >= 45) {
-    return "acquaintance";
-  }
-  return "stranger";
-}
-
-function conversationRelationshipStage(
-  conversation: Conversation,
-  citizenById: Record<string, CitizenAgent | undefined>,
-) {
-  const [firstId, secondId] = conversation.actor_ids;
-  const score = firstId && secondId ? citizenById[firstId]?.relationship_scores?.[secondId] : undefined;
-  if (typeof score !== "number") return "new talk";
-  if (score >= 72) return "trusted friend";
-  if (score >= 58) return "friend";
-  if (score >= 35) return "acquaintance";
-  return "stranger";
-}
-
-function professionGlyph(profession: string) {
-  const glyphs: Record<string, string> = {
-    Doctor: "+",
-    Nurse: "+",
-    Teacher: "T",
-    Student: "S",
-    Engineer: "E",
-    Driver: "D",
-    Shopkeeper: "$",
-    Banker: "B",
-    "Police Officer": "P",
-    Farmer: "F",
-    Mayor: "M",
-    Scientist: "R",
-    Researcher: "R",
-    "Restaurant Cook": "C",
-  };
-  return glyphs[profession] ?? "·";
-}
-
-function minutesLabel(value: number) {
-  return `${Math.floor(value / 60).toString().padStart(2, "0")}:${(value % 60).toString().padStart(2, "0")}`;
-}
-
-function periodInfo(minute: number) {
-  const hour = minute / 60;
-  if (hour < 5) return { label: "Late night", icon: Moon, tint: "bg-[rgba(56,72,104,0.6)] text-[rgb(165,180,252)]" };
-  if (hour < 7) return { label: "Dawn", icon: Sunrise, tint: "bg-[rgba(244,114,182,0.18)] text-[rgb(244,114,182)]" };
-  if (hour < 12) return { label: "Morning", icon: Sun, tint: "bg-[rgba(252,211,77,0.18)] text-[rgb(252,211,77)]" };
-  if (hour < 17) return { label: "Afternoon", icon: Sun, tint: "bg-[rgba(251,146,60,0.18)] text-[rgb(251,146,60)]" };
-  if (hour < 19) return { label: "Dusk", icon: Sunset, tint: "bg-[rgba(244,114,182,0.2)] text-[rgb(244,114,182)]" };
-  if (hour < 22) return { label: "Evening", icon: Moon, tint: "bg-[rgba(167,139,250,0.18)] text-[rgb(196,181,253)]" };
-  return { label: "Night", icon: Moon, tint: "bg-[rgba(56,72,104,0.5)] text-[rgb(165,180,252)]" };
-}
-
-function citizenInterestScore(citizen: CitizenAgent) {
-  let score = 0;
-  if (citizen.health < 55) score += 3;
-  if (citizen.stress > 70) score += 2;
-  if (citizen.happiness > 80) score += 1;
-  if (citizen.profession === "Mayor") score += 1.5;
-  if (citizen.profession === "Doctor" || citizen.profession === "Police Officer") score += 1;
-  // Movement adds liveliness
-  if (citizen.x !== citizen.target_x || citizen.y !== citizen.target_y) score += 0.8;
-  // Random sprinkle for variety
-  return score + Math.random() * 1.4;
 }

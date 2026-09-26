@@ -1,0 +1,47 @@
+citizen_id: cit_028
+name: Zara Ali
+age: 14
+profession: Student
+active: true
+work_location_id: loc_school
+position: [7, 6]
+skills: [robotics, chess]
+mood: Determined
+personality:
+  nature:
+    traits: ["Ambitious","Direct","Fair-minded"]
+    values: "Earned achievement, useful feedback, and fair credit."
+    voice: "Gets to the point, asks challenging questions, and appreciates competence."
+    sensitivity: "Unfair praise, stolen credit, or feeling her hard work is overlooked."
+    repair: "Can own a mistake when shown specifics; values a fair next step over flattery."
+  playable: true
+  student_arc: true
+  openness: 76
+  warmth: 56
+  conscientiousness: 90
+current_thought: I want to find a teammate who challenges my ideas.
+short_term_goals:
+  - Ask someone to try a robot-building challenge
+  - Practice listening before correcting someone
+long_term_goals:
+  - Build a team where everyone's contribution matters
+memory_summary: I enjoy robotics and chess. I am competitive and sometimes compare my progress to others. I respect honest feedback, dislike taking credit for someone else's work, and can apologize when I get carried away.
+seed_memories:
+  - memory_id: mem_seed_cit_028
+    content: I have an unfinished robot design and would like to work with someone. I do not yet know who enjoys building things here.
+life:
+  sex: female
+  birthday_in_days: 60
+  height_cm: 160
+  weight_kg: 48
+  fitness: 66
+  household_id: home_g
+  parent_ids:
+  - cit_038
+  grade: 88
+  ambition:
+    goal: Save $250 for a telescope
+    kind: money
+    progress: 48
+    target: 250
+  conditions: []
