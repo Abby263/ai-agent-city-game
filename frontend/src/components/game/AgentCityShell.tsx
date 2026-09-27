@@ -369,10 +369,11 @@ export function AgentCityShell() {
     return () => { window.clearTimeout(firstTick); window.clearInterval(timer); };
   }, [live, city?.clock.running, city?.policy.player_destination, speed, act, tickOnce]);
 
-  // A paused or hidden game must not keep scheduling model calls.
+  // A paused or hidden game must not keep scheduling model calls. The timers already skip hidden tabs;
+  // this stops a running clock, but never cancels what is in flight, such as the reply to your own line.
   useEffect(() => {
     const hide = () => {
-      if (document.hidden) void api.pause().then(setCity);
+      if (document.hidden && useGameStore.getState().city?.clock.running && !flight.current) void api.pause().then(setCity);
     };
     document.addEventListener("visibilitychange", hide);
     return () => document.removeEventListener("visibilitychange", hide);
