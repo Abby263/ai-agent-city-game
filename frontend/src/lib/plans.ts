@@ -26,16 +26,29 @@ export function parsePlan(text: string, city: CityState): ParsedPlan | null {
   const day: number | null = mentions.length ? mentions[mentions.length - 1].day : null;
   const clock = [...t.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/g)]
     .find((match) => match[3] || match[2] || /\b(at|around|by)\s+$/.test(t.slice(0, match.index))) ?? null;
-  const worded = t.match(/\b(?:at|around|by)\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|noon)\b/)
-    ?? t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:at|o'clock|pm|tonight|sharp)\b/);
+  const hours = "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve";
+  // "half past six", "quarter to eight"
+  const around = t.match(new RegExp(`\\b(half|quarter) (past|to) (${hours})\\b`));
+  // "at six", "at six-thirty", "seven fifteen tonight"
+  const worded = t.match(new RegExp(`\\b(?:at|around|by)\\s+(${hours}|noon)(?:[\\s-](fifteen|thirty|forty[\\s-]five))?\\b`))
+    ?? t.match(new RegExp(`\\b(${hours})(?:[\\s-](fifteen|thirty|forty[\\s-]five))?\\s+(?:at|o'clock|pm|tonight|sharp)\\b`));
   let hour: number | null = null, minutes = 0;
   if (clock) {
     hour = Number(clock[1]);
     minutes = Number(clock[2] ?? 0);
     if (minutes > 59 || hour > 23 || (clock[3] && (hour < 1 || hour > 12))) return null;
     if (clock[3]) hour = hour % 12 + (clock[3] === "pm" ? 12 : 0);
-  } else if (worded) hour = numberWords[worded[1]];
-  if (hour !== null && hour < 12 && !clock?.[3] && !/\bam\b|morning/.test(t) && hour >= 1 && hour <= 9) hour += 12; // "seven" after work means 19:00
+  } else if (around) {
+    hour = numberWords[around[3]];
+    minutes = around[1] === "half" ? 30 : around[2] === "past" ? 15 : 45;
+    if (around[1] === "quarter" && around[2] === "to") hour = hour === 1 ? 12 : hour - 1;
+  } else if (worded) {
+    hour = numberWords[worded[1]];
+    minutes = !worded[2] ? 0 : worded[2] === "fifteen" ? 15 : worded[2] === "thirty" ? 30 : 45;
+  }
+  // "Morning, Mateo!" is a greeting, not a time of day.
+  const morning = /\bam\b|morning/.test(t.replace(/(^|[.!?]\s*)(good\s+)?morning\s*[,!.]/g, "$1"));
+  if (hour !== null && hour < 12 && !clock?.[3] && !morning && hour >= 1 && hour <= 9) hour += 12; // "seven" after work means 19:00
   if (day === null || hour === null || hour > 23) return null;
   const minute = hour * 60 + minutes;
   if (day === city.clock.day && minute <= city.clock.minute_of_day + 30) return null;

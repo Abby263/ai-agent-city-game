@@ -14,6 +14,7 @@ import type {
   SessionTaskPlanRequest,
   SessionTaskPlanResponse,
   SimulationMode,
+  SocialOutcome,
   TriggerEventPayload,
 } from "@/lib/types";
 import { bondChanges, bondLabel, bondSnapshot, conversationImpact, emptyFeelings, evolveRelationship } from "@/lib/social";
@@ -315,6 +316,7 @@ export async function sessionSpeak(
   } as CityEvent;
   applyAutonomousCognition(city, actor, target, source, response);
   markPlayerChat(actor.citizen_id, targetId);
+  keepPlayerMeeting(city, actor, targetId);
   actor.current_activity = `Talking with ${target.name}`;
   city.policy.player_lines = Number(city.policy.player_lines ?? 0) + 1;
   return saveAndReturn(city);
@@ -330,6 +332,14 @@ function recentChat(city: CityState, a: string, b: string) {
     .reverse()
     .flatMap((c) => c.transcript)
     .slice(-10);
+}
+
+/** Talking with someone where and when you agreed to meet them keeps that plan. */
+function keepPlayerMeeting(city: CityState, player: CitizenAgent, otherId: string) {
+  const now = cityMinute(city);
+  for (const meeting of city.meetings ?? [])
+    if (meeting.status === "scheduled" && meeting.actor_ids.includes(player.citizen_id) && meeting.actor_ids.includes(otherId)
+      && meeting.location_id === player.current_location_id && Math.abs(now - meetingMinute(meeting)) <= 60) meeting.kept = true;
 }
 
 /** Tags the newest exchange between the two as the player's own chat. */
@@ -570,6 +580,22 @@ export async function sessionTick(generateCognition: GenerateCognition, decideEl
   const player = city.citizens.find(
     (item) => item.citizen_id === city.policy.player_citizen_id,
   );
+  // Like everyone else, the resident you play sets off for a plan they agreed to, once. Choosing
+  // somewhere else in "Go to…" afterwards is respected: you can still stand someone up.
+  const appointment = player && !city.policy.player_destination ? meetingFor(city, player) : undefined;
+  if (player && appointment && !appointment.player_set_off) {
+    appointment.player_set_off = true;
+    if (player.current_location_id !== appointment.location_id) {
+      const place = city.locations.find((l) => l.location_id === appointment.location_id)!;
+      const others = appointment.actor_ids.filter((id) => id !== player.citizen_id).map((id) => findCitizen(city, id).name).join(" and ");
+      player.target_x = place.x + Math.floor(place.width / 2);
+      player.target_y = place.y + Math.floor(place.height / 2);
+      player.current_activity = `Going to meet ${others}`;
+      city.policy.player_destination = appointment.location_id;
+      addEvent(city, { event_type: "player_control", actors: [player.citizen_id], location_id: appointment.location_id, priority: 2,
+        description: `${player.name} set off for ${place.name} to meet ${others}, as agreed. Pick another place in "Go to…" to change plans.` });
+    }
+  }
   if (player && typeof city.policy.player_destination === "string") {
     moveToward(player, player.target_x, player.target_y, city);
     if (player.x === player.target_x && player.y === player.target_y) {
@@ -1311,14 +1337,16 @@ export async function sessionAct(actorId: string | null, targetId: string | null
     if (a.citizen_id === player) {
       response = await generate({ city: live, actor_id: a.citizen_id, target_id: b.citizen_id, require_conversation: true, task: "Respond to what the player's character just did.",
         player_utterance: `*${words}*`, prior_lines: recentChat(live, a.citizen_id, b.citizen_id), observations: [act.reaction || applied.headline], memories: [],
+        proposal: askedOf(act.proposal),
         private_memories: { [a.citizen_id]: privateMemoryContext(a), [b.citizen_id]: privateMemoryContext(b) } });
       if (isStale(live)) return { city: requireSessionCity(), headline: applied.headline, talked: false, story_id: storyId };
       applyAutonomousCognition(live, a, b, { event_id: newId("action"), location_id: b.current_location_id } as CityEvent, response, baseline);
       markPlayerChat(a.citizen_id, b.citizen_id);
+      keepPlayerMeeting(live, a, b.citizen_id);
       live.policy.player_lines = Number(live.policy.player_lines ?? 0) + 1;
     } else {
       const event = addEvent(live, { event_type: "player_action", actors: [a.citizen_id, b.citizen_id], location_id: b.current_location_id,
-        description: act.reaction || applied.headline, payload: { topic: applied.headline, kind: "chance" }, priority: 2 });
+        description: act.reaction || applied.headline, payload: { topic: applied.headline, kind: "chance", proposal: askedOf(act.proposal) }, priority: 2 });
       response = await runAutonomousCognition(live, event, generate, baseline);
       if (isStale(live)) return { city: requireSessionCity(), headline: applied.headline, talked: false, story_id: storyId };
     }
@@ -1335,6 +1363,11 @@ export async function sessionAct(actorId: string | null, targetId: string | null
     return { city: isStale(live) ? requireSessionCity() : saved, headline: applied.headline, talked: false, story_id: storyId,
       error: error instanceof Error ? error.message : "They could not react right now." };
   }
+}
+
+/** A proposal the target must answer yes or no (a breakup needs no one's consent). */
+function askedOf(proposal: unknown): SessionCognitionRequest["proposal"] {
+  return proposal === "date" || proposal === "engagement" || proposal === "marriage" || proposal === "move_in" ? proposal : "none";
 }
 
 /** A choice made in "What happens next?" continues that story instead of starting a new one. */
@@ -1659,7 +1692,12 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
   const now = cityMinute(city);
   for (const meeting of city.meetings ?? []) {
     if (meeting.status !== "scheduled") continue;
-    if (now > meetingMinute(meeting) + 60) {
+    if (now > meetingMinute(meeting) + 60 && meeting.kept) {
+      // The player's own meetings: they talked there in person, so the plan was kept.
+      meeting.status = "completed";
+      addEvent(city, { event_type: "meeting_kept", actors: meeting.actor_ids, location_id: meeting.location_id,
+        description: `${meeting.actor_ids.map((id) => findCitizen(city, id).name).join(" and ")} kept their plan to meet at ${locationName(city, meeting.location_id)}.`, priority: 1 });
+    } else if (now > meetingMinute(meeting) + 60) {
       meeting.status = "missed";
       const description = `The meeting about ${meeting.topic} at ${locationName(city, meeting.location_id)} did not happen. Nobody was forced to attend.`;
       addEvent(city, { event_type: "meeting_missed", actors: meeting.actor_ids, location_id: meeting.location_id, description, priority: 2 });
@@ -2018,6 +2056,7 @@ async function runAutonomousCognition(
     require_conversation: true,
     task: `Talk with ${target.name} about ${String(event.payload?.topic || "what brought you together").slice(0, 180)}.`,
     prior_lines: recentChat(city, actor.citizen_id, target.citizen_id),
+    proposal: askedOf(event.payload?.proposal),
     observations: [
       `Autonomous social moment: ${event.description}`,
       `${actor.name} and ${target.name} are ${relationshipLabelFromScore(relationshipScore)} at ${locationName(city, actor.current_location_id)}.`,
@@ -2601,7 +2640,8 @@ function strengthenRelationship(
           ? second
           : null;
     if (!owner) return relationship;
-    const outcome = response.participant_outcomes?.[owner.citizen_id];
+    const outcome = response.participant_outcomes?.[owner.citizen_id]
+      ?? playerSide(city, owner, owner === first ? second : first, response);
     const moodBefore = owner.mood;
     if (outcome?.mood) owner.mood = outcome.mood;
     if (outcome?.thought) owner.current_thought = outcome.thought;
@@ -2622,6 +2662,18 @@ function strengthenRelationship(
   });
   writeJson(RELATIONSHIPS_KEY, relationships);
   return impacts;
+}
+
+/**
+ * The AI never judges the resident you play, but the bond still has two sides: a conversation that went well
+ * warms you too, and a hostile one cools you. Only trust, warmth and familiarity move; your feelings stay yours.
+ */
+function playerSide(city: CityState, owner: CitizenAgent, other: CitizenAgent, response: SessionCognitionResponse): SocialOutcome | undefined {
+  if (owner.citizen_id !== city.policy.player_citizen_id) return undefined;
+  const effect = response.participant_outcomes?.[other.citizen_id]?.relationship_effect;
+  if (effect !== "positive" && effect !== "negative") return undefined;
+  return { relationship_effect: effect,
+    relationship_reason: effect === "positive" ? `A good conversation with ${other.name}.` : `A tense conversation with ${other.name}.` };
 }
 
 function isLocationTask(task: PlayerTaskData) {

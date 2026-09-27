@@ -280,6 +280,7 @@ def session_cognition(request: SessionCognitionRequest) -> SessionCognitionRespo
                 autonomous=request.conversation_mode == "autonomous",
                 meeting_locations=[{"location_id": p.location_id, "name": p.name} for p in request.city.locations],
                 meeting_now=request.city.clock.day * 1440 + request.city.clock.minute_of_day,
+                proposal=request.proposal,
             )
         else:
             result = cognition.client.generate(

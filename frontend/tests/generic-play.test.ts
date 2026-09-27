@@ -8,7 +8,7 @@ import { nextMoves } from "../src/lib/next-moves";
 import { agreedPlan, planTopic } from "../src/lib/plans";
 import {
   getSessionCity, saveSessionCity, seedSession, sessionAct, sessionApproach, sessionConversations, sessionMemories, sessionRelationships, sessionSetCharacterPrompt, sessionSetMode,
-  sessionTakeControl, sessionTick,
+  sessionSpeak, sessionTakeControl, sessionTick, sessionWalkTo,
 } from "../src/lib/session-simulation";
 import { activeStories } from "../src/lib/stories";
 import type { SessionCognitionRequest, SessionCognitionResponse, SocialOutcome } from "../src/lib/types";
@@ -214,4 +214,59 @@ test("only people awake and right there see an act, and odd residents never cras
   const memories = (who: string) => JSON.stringify(sessionMemories(who));
   assert.match(memories(awake.citizen_id), /I saw this happen/);
   assert.doesNotMatch(memories(asleep.citizen_id), /I saw this happen/);
+});
+
+test("a proposal is put to the person as a question, and their yes makes it official", async () => {
+  const [ava, mateo, yui, daichi] = ["Ava", "Mateo", "Yui", "Daichi"].map(id);
+  const requests: SessionCognitionRequest[] = [];
+  const ask = master({ headline: "Ava asked Mateo to be her boyfriend.", tone: "romantic", proposal: "date" });
+  await sessionTakeControl(ava);
+  await sessionApproach(mateo);
+  await sessionAct(ava, mateo, "take Mateo's hand and ask him to be her boyfriend", ask, talker({ [mateo]: { invitation_response: "accepted" } }, requests));
+  assert.equal(requests[0].proposal, "date", "Mateo is told a question is waiting for his answer");
+  assert.equal(getSessionCity()!.citizens.find((c) => c.citizen_id === mateo)!.life!.partner_id, ava);
+  // Between two residents, too; an ordinary act asks nothing.
+  await sessionAct(yui, daichi, "Yui asks Daichi out", master({ proposal: "date" }), talker({}, requests));
+  await sessionAct(yui, daichi, "Yui waves at Daichi", master({}), talker({}, requests));
+  assert.deepEqual(requests.slice(1).map((r) => r.proposal), ["date", "none"]);
+});
+
+test("your side of a bond grows from good conversations, but your feelings stay yours", async () => {
+  const [ava, mateo] = ["Ava", "Mateo"].map(id);
+  await sessionTakeControl(ava);
+  await sessionApproach(mateo);
+  const before = bond(ava, mateo), theirs = bond(mateo, ava).feelings?.affection ?? 0;
+  await sessionSpeak(mateo, "Was that you playing guitar last night?", talker({ [mateo]: { relationship_effect: "positive", relationship_reason: "She liked my music.",
+    feelings: { affection: 5, reason: "She liked my music." } } }));
+  const after = bond(ava, mateo);
+  assert.equal(after.warmth, before.warmth + 2);
+  assert.equal(after.trust, before.trust + 2);
+  assert.deepEqual(after.feelings, before.feelings, "the AI never decides how the player feels");
+  assert.equal(bond(mateo, ava).feelings?.affection, theirs + 5, "his are his");
+});
+
+test("the resident you play sets off for a plan once, and talking there keeps it", async () => {
+  const [ava, mateo] = ["Ava", "Mateo"].map(id);
+  const quiet = async () => ({ target_id: null, reason: "Nothing to say right now.", topic: "" });
+  await sessionTakeControl(ava);
+  await sessionSetMode("autonomous");
+  let city = getSessionCity()!;
+  const plan = { id: "m1", source_conversation_id: "c1", actor_ids: [ava, mateo], location_id: "loc_park", game_day: city.clock.day,
+    game_minute: city.clock.minute_of_day + 45, topic: "the song", status: "scheduled" as const };
+  city.meetings = [plan];
+  saveSessionCity(city);
+  city = await sessionTick(talker(), undefined, quiet);
+  assert.equal(city.policy.player_destination, "loc_park", "you head off like everyone else");
+  assert.match(city.events.at(-1)!.description + city.events.map((e) => e.description).join(" "), /set off for .* to meet Mateo/);
+  await sessionWalkTo("loc_library");
+  city = await sessionTick(talker(), undefined, quiet);
+  assert.notEqual(city.policy.player_destination, "loc_park", "changing your mind is respected");
+
+  // Kept: you talked with Mateo where and when you agreed.
+  city = await sessionApproach(mateo);
+  city.meetings = [{ ...plan, id: "m2", player_set_off: true, location_id: city.citizens.find((c) => c.citizen_id === mateo)!.current_location_id, game_minute: city.clock.minute_of_day }];
+  saveSessionCity(city);
+  await sessionSpeak(mateo, "Hi! I made it.", talker());
+  for (let i = 0; i < 6; i++) city = await sessionTick(talker(), undefined, quiet);
+  assert.equal(city.meetings!.find((m) => m.id === "m2")!.status, "completed");
 });

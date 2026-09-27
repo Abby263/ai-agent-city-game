@@ -20,6 +20,10 @@ export type MeetingPlan = {
 export type SocialMeeting = MeetingPlan & {
   id: string; source_conversation_id: string;
   status: "scheduled" | "completed" | "missed";
+  /** The resident you play talked with the others there, around the agreed time. */
+  kept?: boolean;
+  /** The resident you play has already been sent on their way to it (only once). */
+  player_set_off?: boolean;
 };
 export type EncounterContext = { kind: "chance" | "planned"; reason: string; topic: string; meeting_id?: string };
 export const cityMinute = (city: CityState) => city.clock.day * 1440 + city.clock.minute_of_day;

@@ -248,3 +248,28 @@ def test_agent_initialization_failure_is_sanitized(api, monkeypatch, payload, tu
 def test_prior_history_has_a_request_limit(api, payload):
     payload["prior_lines"] = [{"speaker_id": "ava", "text": "Hello"}] * 13
     assert api.post("/cognition/session", json=payload).status_code == 422
+
+
+@pytest.mark.parametrize("proposal,asked", [("date", True), ("none", False)])
+def test_a_proposal_made_by_action_is_put_to_the_target_as_a_question(api, monkeypatch, payload, turn, proposal, asked):
+    client = CitizenCognitionClient(Settings(_env_file=None))
+    client.client = object()
+    prompts = []
+
+    def invoke(*args, **kwargs):
+        prompts.append(str(args) + str(kwargs))
+        return {"structured_response": {**turn, "spoken_line": "Yes, I'd love that.", "invitation_response": "accepted" if asked else "none"}}
+
+    monkeypatch.setattr(client.deep_agents, "prepare_citizen_agent", lambda citizen: SimpleNamespace(invoke=invoke))
+    monkeypatch.setattr(routes.cognition, "client", client)
+    payload.update(player_utterance="*takes Noah's hand and asks him to be her boyfriend*", proposal=proposal)
+    response = api.post("/cognition/session", json=payload)
+    assert response.status_code == 200
+    assert len(prompts) == 1  # only the target speaks after a player's line
+    assert ("Ava is asking you to be their partner and start dating" in prompts[0]) is asked
+    assert response.json()["participant_outcomes"]["noah"]["invitation_response"] == ("accepted" if asked else "none")
+
+
+def test_only_real_proposals_are_accepted(api, payload):
+    payload.update(proposal="breakup")
+    assert api.post("/cognition/session", json=payload).status_code == 422
