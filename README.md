@@ -37,6 +37,18 @@ Deployment URL: [ai-agent-city-game.vercel.app](https://ai-agent-city-game.verce
 
 Your world resumes in the same browser through localStorage. Save downloads a JSON snapshot for inspection/backup; importing snapshots and cross-device saves are not implemented. Closing or hiding the tab stops new simulation work. An already-sent provider request may still finish and incur charges; interrupted results are discarded.
 
+### Phone Layout
+
+The game fits the visible phone viewport, including browser chrome and safe areas. Portrait inspectors sit below the city; landscape inspectors sit beside it. Cinematic subtitles have their own space and the camera reframes on rotation. The chat composer reserves touch-sized space for voice and Send controls. When the software keyboard reduces the viewport, the open panel takes priority so typing remains accessible.
+
+### Conversation Privacy
+
+In the default browser-memory mode, each browser profile keeps its own world and conversation history. Opening the public URL in another browser does not load your saved game. Anyone with access to your browser profile or an exported world snapshot can read that history; clearing site data removes that browser's saved world.
+
+AI is not offline: requests send game context, messages and relevant memories to the backend and configured AI provider. Natural voices also send spoken text for speech generation. This is not end-to-end encrypted messaging, and browser-local storage is not account authentication. Do not enter sensitive personal information. Provider retention and processing are subject to that provider's account settings and terms.
+
+The optional server-memory mode and shared simulation endpoints do not implement per-user authorization. They must not be used for private multi-user saves without adding authentication and user-scoped storage. Citizen memory boundaries prevent in-game knowledge leakage; they are not a user privacy or access-control guarantee.
+
 ## License
 
 AgentCity is released under the [PolyForm Noncommercial License 1.0.0](LICENSE).

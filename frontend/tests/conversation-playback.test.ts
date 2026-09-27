@@ -4,7 +4,24 @@ import { newExchanges, subtitleDuration } from "../src/lib/conversation-playback
 import { arrivals, buildings, isWalkable, walkingRoute } from "../src/game/three/layout";
 import type { Conversation } from "../src/lib/types";
 import * as THREE from "three";
-import { conversationCameraOffset, conversationStaging } from "../src/game/three/conversation-camera";
+import { conversationCameraOffset, conversationDistance, conversationStaging } from "../src/game/three/conversation-camera";
+
+test("phone conversation framing keeps both speakers inside the visible canvas", () => {
+  for (const aspect of [0.35, 0.5, 0.85, 1.5, 2.5]) {
+    const target = new THREE.Vector3(0, 0.9, 0);
+    const heads = [new THREE.Vector3(-1, 1.35, 0), new THREE.Vector3(1, 1.35, 0)];
+    const camera = new THREE.PerspectiveCamera(42, aspect, 0.1, 1000);
+    const offset = conversationCameraOffset(target, heads, new THREE.Group(), conversationDistance(6.4, aspect), true);
+    camera.position.copy(target).add(offset);
+    camera.lookAt(target);
+    camera.updateMatrixWorld();
+    for (const head of heads) {
+      const projected = head.clone().project(camera);
+      assert.ok(Math.abs(projected.x) < 0.8 && Math.abs(projected.y) < 0.8, `Speaker cropped at aspect ${aspect}`);
+    }
+  }
+  assert.equal(conversationDistance(6.4, 1.5), 6.4, "Wide shots should retain their close framing");
+});
 
 const exchange = (id: string, minute = 360): Conversation => ({
   conversation_id: id, game_day: 1, game_minute: minute, location_id: "loc_homes",

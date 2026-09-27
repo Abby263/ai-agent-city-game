@@ -93,7 +93,31 @@ function chapterLine(day: number, minute: number) {
   return "Evening settles over Nakameguro. Windows glow one by one.";
 }
 
+function usePhoneViewport() {
+  const root = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => {
+      // Follow browser chrome and the keyboard, but do not undo accessibility zoom.
+      if (!root.current || viewport.scale !== 1) return;
+      root.current.style.setProperty("--game-height", `${viewport.height}px`);
+      root.current.style.setProperty("--game-offset", `${viewport.offsetTop}px`);
+      root.current.dataset.keyboard = String(window.innerHeight - viewport.height > 140);
+    };
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => {
+      viewport.removeEventListener("resize", update);
+      viewport.removeEventListener("scroll", update);
+    };
+  }, []);
+  return root;
+}
+
 export function AgentCityShell() {
+  const viewport = usePhoneViewport();
   const {
     city,
     selectedCitizenId,
@@ -499,7 +523,7 @@ export function AgentCityShell() {
   }
 
   return (
-    <main className="city-game">
+    <main className="city-game" ref={viewport}>
       <header className="game-header">
         <div className="game-brand">
           <span className="brand-mark">

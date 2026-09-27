@@ -8,7 +8,7 @@ import { arrivals, citizenPoint, walkablePoint, walkingRoute } from "./layout";
 import type { CityState } from "@/lib/types";
 import type { ConversationFrame, InlineTalk } from "@/lib/conversation-playback";
 import { speechLevel } from "@/lib/speech-level";
-import { conversationCameraOffset, conversationStaging } from "./conversation-camera";
+import { conversationCameraOffset, conversationDistance, conversationStaging } from "./conversation-camera";
 import { skyAt } from "./sky";
 import { makeAtmosphere } from "./atmosphere";
 import { makeTraffic } from "./traffic";
@@ -393,12 +393,12 @@ export class CityRenderer {
     const spot = arrivals[locationId];
     if (!spot) return;
     this.mode = "orbit";
-    this.focusTarget = new THREE.Vector3(spot.x, this.height > this.width * 1.05 ? -2.5 : 0.8, spot.z - 1.5);
+    this.focusTarget = new THREE.Vector3(spot.x, 0.8, spot.z - 1.5);
     const offset = this.camera.position.clone().sub(this.controls.target).setLength(16);
     offset.y = Math.max(offset.y, 7);
     this.shotPosition = this.focusTarget.clone().add(offset.setLength(16));
   }
-  /** Frames two people talking, leaving room below for the chat panel on narrow screens. */
+  /** Frames the pair inside the actual visible canvas, not behind a phone sheet. */
   focusPair(ids: string[], onlyIfHidden = false) {
     let models = ids.map((id) => this.people.get(id)).filter((m) => m !== undefined);
     if (!models.length) return;
@@ -409,14 +409,11 @@ export class CityRenderer {
       return Math.abs(this.vector.x) < 0.8 && this.vector.y > -0.1 && this.vector.y < 0.85;
     })) return;
     const center = models.reduce((sum, m) => sum.add(m.root.position), new THREE.Vector3()).multiplyScalar(1 / models.length);
-    // On narrow screens the chat sheet covers the lower part, so frame them higher and wider.
-    // Portrait screens show the chat as a bottom sheet, so the pair sits in the top third of the view.
-    const covered = this.width < 761 || this.height > this.width * 1.05;
-    const distance = covered ? 16 : 10;
+    const distance = conversationDistance(10, this.camera.aspect);
     this.mode = "orbit";
-    this.focusTarget = new THREE.Vector3(center.x, covered ? -3.6 : 0.7, center.z);
+    this.focusTarget = new THREE.Vector3(center.x, 0.7, center.z);
     const offset = this.camera.position.clone().sub(this.controls.target).setLength(distance);
-    offset.y = Math.max(offset.y, distance * (covered ? 0.32 : 0.45));
+    offset.y = Math.max(offset.y, distance * 0.45);
     this.shotPosition = this.focusTarget.clone().add(offset.setLength(distance));
   }
   private holdInPlace(id: string) {
@@ -428,14 +425,15 @@ export class CityRenderer {
   focusConversation() {
     if (!this.conversationCenter) return;
     this.focusTarget = this.conversationCenter.clone();
-    // Leave the lower part of the frame for subtitles, including portrait screens.
+    // Compact layouts reserve a separate subtitle area; centre people in the remaining canvas.
     const cinematic = this.conversation?.phase !== "arrival";
-    this.focusTarget.y = cinematic ? -0.25 : -1.2;
+    const compact = window.matchMedia("(max-width: 760px), (max-width: 1024px) and (max-height: 500px)").matches;
+    this.focusTarget.y = compact ? 0.9 : cinematic ? -0.25 : -1.2;
     const heads = this.conversation?.actorIds.flatMap((id) => {
       const model = this.people.get(id);
       return model?.destination ? [new THREE.Vector3(model.destination.x, 1.35, model.destination.z)] : [];
     }) ?? [];
-    const distance = cinematic ? (this.width < 600 ? 7.4 : 6.4) : (this.width < 600 ? 14 : 11);
+    const distance = conversationDistance(cinematic ? 6.4 : 11, this.camera.aspect);
     const offset = conversationCameraOffset(this.focusTarget, heads, this.town.root, distance, cinematic);
     this.shotPosition = this.focusTarget.clone().add(offset);
   }
@@ -521,6 +519,8 @@ export class CityRenderer {
       Math.round(this.width * ratio),
       Math.round(this.height * ratio),
     );
+    if (this.conversationCenter) this.focusConversation();
+    else if (this.inline) this.focusPair(this.inline.actorIds);
   }
   private project(point: THREE.Vector3, element: HTMLElement, lift = 0) {
     this.vector.copy(point);

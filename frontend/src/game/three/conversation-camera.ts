@@ -1,6 +1,11 @@
 import * as THREE from "three";
 import { walkablePoint, type Point } from "./layout";
 
+/** Preserve horizontal room for both speakers when the visible canvas is narrow. */
+export function conversationDistance(base: number, aspect: number) {
+  return base * Math.max(1, 0.85 / Math.max(0.25, aspect));
+}
+
 export function conversationStaging(origin: Point, town: THREE.Object3D) {
   let best: { center: Point; points: Point[] } | undefined;
   let height = Infinity;
