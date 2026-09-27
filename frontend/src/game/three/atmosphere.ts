@@ -74,10 +74,11 @@ export function makeAtmosphere(art: Art, lampHeads: THREE.Vector3[]) {
     night = Math.max(night, darkness * 0.45);
     starMaterial.opacity = Math.max(0, night - 0.35) / 0.65;
     moonMaterial.opacity = Math.max(0, night - 0.3) / 0.7;
-    poolMaterial.opacity = night * 0.2;
+    poolMaterial.opacity = night * 0.3;
     stars.visible = moon.visible = pools.visible = night > 0.3;
-    for (const material of glass) material.emissiveIntensity = night * 0.85;
-    lamps.emissiveIntensity = 0.15 + night * 1.1;
+    // Above 1 at night, so bloom makes lit windows and lamps glow.
+    for (const material of glass) material.emissiveIntensity = night * 2.1;
+    lamps.emissiveIntensity = 0.15 + night * 2.8;
     clouds.forEach((cloud, i) => {
       if (animate) cloud.position.x += cloud.userData.speed * dt * (1 + wind * 6);
       if (cloud.position.x > 125) cloud.position.x = -35;

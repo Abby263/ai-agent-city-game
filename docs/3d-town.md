@@ -23,10 +23,13 @@ flowchart LR
   Layout[Authored locations and A-star grid] --> Renderer
   Renderer --> Models[Animated citizen models and name buttons]
   Renderer --> Town[Instanced buildings, trees, props and ground]
-  Models --> Frame[Toon lighting and soft shadows]
+  Models --> Frame[Toon lighting, soft shadows, contact shadows]
   Town --> Frame
-  Frame --> Ink[Depth-curvature ink pass]
-  Ink --> Screen[WebGL canvas]
+  Horizon[Sky dome, city to the horizon, Mt Fuji] --> Frame
+  Frame --> AO[Ambient occlusion]
+  AO --> Ink[Ink outlines and conversation depth blur]
+  Ink --> Grade[Bloom, ACES tone mapping, vignette]
+  Grade --> Screen[WebGL canvas]
   Screen --> Select[Raycast selection]
   Select --> World
 ```
@@ -37,8 +40,34 @@ flowchart LR
 - `materials.ts`: shared toon materials, geometry, procedural signage, and texture ownership.
 - `town.ts`: buildings, rooftops, windows, awnings, garden boxes, market produce, benches, lamps, bikes, schoolyard, pond, river, bridges, and drifting petals.
 - `citizen.ts`: distinct palette-based student models, walking cycles, idle motion, selection rings, and accessible DOM name buttons.
-- `ink-pass.ts`: depth-based crease outlines, tone mapping, and output color conversion.
+- `post.ts`: the HDR frame pipeline (below).
+- `quality.ts`: graphics presets, device detection and automatic step-down.
+- `sky.ts`: the colour script and a sky dome (horizon to zenith, sun glow).
+- `horizon.ts`: the world beyond the town: ground to the horizon, tree clumps, low-rise streets, a skyline with night windows, the river continuing both ways and Mt Fuji in the west.
 - `renderer.ts`: camera, lighting, selection, resizing, visibility, frame budget, and cleanup.
+
+## The Frame
+
+Each frame is rendered in HDR and finished in `post.ts`, using [postprocessing](https://github.com/pmndrs/postprocessing) (Zlib) and [N8AO](https://github.com/N8python/n8ao) (ISC):
+
+1. **Scene** with toon materials, sun shadows and soft contact shadows under people and vehicles (`Art.contactShadow`).
+2. **Ambient occlusion** (N8AO), tinted towards the sky so it reads as shade: it grounds buildings, trees and people.
+3. **Ink**: the depth-curvature outlines, plus the soft background blur during conversations.
+4. **Bloom** that grows at night, so lit windows, lamps, headlights and the distant skyline glow; **ACES** tone mapping; a light vignette.
+
+The approach was informed by studying how browser games get a lot from Three.js (the view-only [spiderbench](https://github.com/xikhar/spiderbench) demo: AO, bloom, a sky model, aerial perspective, contact shadows, quality presets, shader warm-up). No code or assets from it are used; everything here is our own implementation on open-source libraries.
+
+Distant buildings use one instanced toon material with windows computed from world position (lit at night, a third to a half of them) and their own distance haze towards the horizon colour, so silhouettes stay readable while the town keeps crisp fog. Shaders are compiled up front (`renderer.compileAsync`) so nothing stutters the first time it appears.
+
+## Graphics Quality
+
+| Preset | Pixel ratio | Anti-aliasing | Ambient occlusion | Shadow map |
+|---|---|---|---|---|
+| high (desktop) | up to 1.75 | 4× MSAA | full resolution | 2048 |
+| medium (phones) | up to 1.35 | 2× MSAA | half resolution | 2048 |
+| low (weak devices) | 1 | none | off | 1024 |
+
+The preset is chosen from the device (CPU cores, memory, touch screen). If the median frame takes longer than 45 ms for five seconds, the town steps down one preset and remembers it for the next visit. Force one with `?q=low`, `?q=medium` or `?q=high`.
 
 ## Simulation Boundary
 
@@ -46,7 +75,7 @@ The existing 40-by-40 simulation remains authoritative. The renderer maps locati
 
 Lighting follows the simulation clock through a colour script in `sky.ts`: peach sunrise, blue day, golden hour, lavender dusk and deep-blue night. The sun arcs from the river (east) to the west, and the sky eases between 15-minute ticks instead of jumping. After dark, `atmosphere.ts` lights window glass and street lamps with emissive materials, adds soft lamp light pools, stars and a moon. None of these are real lights, so night costs almost nothing. Clouds drift and cast moving shadows by day.
 
-`traffic.ts` runs a yellow school bus and two cars in the right-hand lane around the central block. The bus pauses at the bus shelter. Every vehicle stops for pedestrians in front of it and queues behind the vehicle ahead. Traffic is decorative: it never blocks simulation movement, and it stays parked when reduced motion is on.
+`traffic.ts` runs a yellow city bus and two cars in the right-hand lane around the central block. The bus pauses at the bus shelter. Every vehicle stops for pedestrians in front of it and queues behind the vehicle ahead. Traffic is decorative: it never blocks simulation movement, and it stays parked when reduced motion is on.
 
 Blossom petals, clouds, river ripples and traffic are visual effects, not weather or transport simulation. Interiors and Blender/glTF asset loading are not implemented in this revision.
 

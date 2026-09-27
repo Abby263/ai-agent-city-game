@@ -46,7 +46,7 @@ function makeVehicle(art: Art, bus: boolean, color: number): Vehicle {
   if (bus) {
     art.box(body, 0, 0.3 + height + 0.04, 0, width * 0.94, 0.08, length * 0.96, 0xf6e7c1);
     art.box(body, 0, 0.55, 0, width + 0.02, 0.06, length, 0x3d4a52);
-    art.sign(body, "SCHOOL BUS", width / 2 + 0.02, 0.3 + height * 0.32, 0, length * 0.62, 0.2, "#f2c14e", "#34424a").rotation.y = Math.PI / 2;
+    art.sign(body, "CITY BUS", width / 2 + 0.02, 0.3 + height * 0.32, 0, length * 0.62, 0.2, "#f2c14e", "#34424a").rotation.y = Math.PI / 2;
   }
   for (const x of [-1, 1])
     for (const z of [-1, 1]) {
@@ -54,6 +54,7 @@ function makeVehicle(art: Art, bus: boolean, color: number): Vehicle {
       wheel.rotation.z = Math.PI / 2;
     }
   body.traverse((o) => { if (o instanceof THREE.Mesh) o.receiveShadow = false; });
+  art.contactShadow(root, width * 1.45, length * 1.2, 0.42);
   return { root, body, distance: 0, speed: bus ? 2.1 : 2.6, length, bus, dwell: 0, stopped: 0 };
 }
 
