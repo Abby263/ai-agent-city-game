@@ -94,6 +94,7 @@ TASK_PLAN_SCHEMA: dict[str, Any] = {
 
 class PrivateExchangeState(TypedDict):
     lines: list[dict[str, str]]
+    previous_lines: list[dict[str, str]]
     turn_results: dict[str, list[dict[str, Any]]]
     meeting_offer: dict[str, Any] | None
     meeting_plan: dict[str, Any] | None
@@ -350,20 +351,20 @@ class CitizenCognitionClient:
         def continue_exchange(state: PrivateExchangeState) -> str:
             last_id = state["lines"][-1]["speaker_id"]
             last = state["turn_results"][last_id][-1]
-            if player_utterance or last.get("end_conversation") or len(state["lines"]) - len(prior) >= (4 if autonomous else 6):
+            if player_utterance or last.get("end_conversation") or len(state["lines"]) >= 6:
                 return END
             return "target_reply" if last_id == actor["citizen_id"] else "actor_follow_up"
 
         graph_builder.add_conditional_edges("target_reply", continue_exchange)
         graph_builder.add_conditional_edges("actor_follow_up", continue_exchange)
-        # Lines both people just heard in an ongoing chat are shared context, so replies stay continuous.
+        # Past exchanges remain recallable, but never masquerade as turns in this exchange.
         ids = {str(actor["citizen_id"]), str(target["citizen_id"])}
         prior = [{"speaker_id": str(line["speaker_id"]), "text": str(line["text"])[:600]} for line in (prior_lines or [])[-10:] if str(line.get("speaker_id")) in ids]
-        initial_lines = prior + ([{"speaker_id": str(actor["citizen_id"]), "text": player_utterance}] if player_utterance else [])
-        final_state = graph_builder.compile().invoke({"lines": initial_lines, "turn_results": {}, "meeting_offer": None,
+        initial_lines = [{"speaker_id": str(actor["citizen_id"]), "text": player_utterance}] if player_utterance else []
+        final_state = graph_builder.compile().invoke({"lines": initial_lines, "previous_lines": prior, "turn_results": {}, "meeting_offer": None,
             "meeting_plan": None, "meeting_locations": meeting_locations or [], "meeting_now": meeting_now})
 
-        lines = final_state["lines"][len(prior):]
+        lines = final_state["lines"]
         actor_id = str(actor["citizen_id"])
         target_id = str(target["citizen_id"])
         errors = self._conversation_errors(
@@ -433,6 +434,7 @@ class CitizenCognitionClient:
             observations=observations,
             private_memories=private_memories,
             public_transcript=state["lines"],
+            previous_lines=state["previous_lines"],
             event_context=event_context,
             turn_goal=turn_goal,
             enforce_task_alignment=enforce_task_alignment,
@@ -481,12 +483,20 @@ class CitizenCognitionClient:
         event_context: str,
         turn_goal: str,
         enforce_task_alignment: bool,
+        previous_lines: list[dict[str, str]] | None = None,
         meeting_offer: dict[str, Any] | None = None,
         meeting_locations: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         prompt: dict[str, Any] = {
             "city_time": city_time,
-            "speaker": speaker,
+            # Do not re-inject old task payloads, thoughts and concatenated transcript summaries.
+            # Private memory below is the single source of recalled experiences.
+            "speaker": {key: speaker[key] for key in (
+                "citizen_id", "name", "age", "profession", "life", "mood", "skills",
+                "current_activity", "current_location_id", "short_term_goals", "long_term_goals",
+                "family_ids", "friend_ids", "relationship_scores", "reputation",
+                "money", "health", "hunger", "energy", "stress", "happiness",
+            ) if key in speaker},
             "listener": {
                 "citizen_id": listener["citizen_id"],
                 "name": listener["name"],
@@ -516,12 +526,18 @@ class CitizenCognitionClient:
             "own_nature": speaker.get("personality", {}).get("nature", {}),
             "observations": observations,
             "private_memories_for_speaker_only": private_memories,
+            "previous_exchange_lines_background_only": previous_lines or [],
             "public_transcript_so_far": public_transcript,
             "public_meeting_offer": meeting_offer,
             "meeting_locations": meeting_locations or [],
             "event_context": event_context,
             "rules": [
                 "Write exactly one spoken line for the speaker.",
+                "Answer or acknowledge the latest partner turn in the ACTIVE exchange before adding anything else. A question in a past memory is not a question being asked now.",
+                "When the other person changes subject, follow that change. Only return to an older topic with an explicit spoken transition, after addressing the current one.",
+                "Do not repeat greetings, invitations or agreements already made. Build on them; ask a specific follow-up only when genuinely useful. An unanswered old question can stay unanswered.",
+                "Do not invent details to fill memory gaps (such as a gift's contents). Ask if it matters now; otherwise leave the detail unknown.",
+                "Before finalizing, check that your line makes sense as the immediate reply to latest_partner_turn, rather than to a line retrieved from history.",
                 "When it fits your wishes, you may propose meeting again at a specific listed place and time within the next day, at least 30 city minutes from now. Say the place, time and purpose out loud. Do not propose at every encounter.",
                 "Only emit meeting_action if your spoken line explicitly proposes, accepts or declines that meeting. Accept only a public_meeting_offer from the OTHER person and copy its place/day/minute exactly. You may decline or leave it undecided. A proposal alone is not a shared plan.",
                 f"You are {speaker['name']}; every use of 'I' must refer to {speaker['name']}, not {listener['name']}.",
@@ -540,6 +556,16 @@ class CitizenCognitionClient:
                 "Do not repeat the same factual answer you already gave earlier in this conversation.",
                 "Memory must be written from the speaker's first-person perspective.",
             ],
+            "active_turn": {
+                "number": len(public_transcript) + 1,
+                "latest_partner_turn": next((
+                    {"number": i + 1, **line} for i, line in reversed(list(enumerate(public_transcript)))
+                    if line["speaker_id"] == str(listener["citizen_id"])
+                ), None),
+                "your_previous_turn": next((line for line in reversed(public_transcript) if line["speaker_id"] == str(speaker["citizen_id"])), None),
+                "remaining_turns_including_this_one": 6 - len(public_transcript),
+                "instruction": "This is the live conversational frontier. Reply here, not to a past exchange. Near the turn limit, prefer a natural acknowledgement or clear next step over opening a new topic.",
+            },
         }
         result = self.deep_agents.generate_private_turn(citizen=speaker, prompt=prompt)
         if enforce_task_alignment and self._line_is_off_task(str(result.get("spoken_line", "")), task, speaker, listener):

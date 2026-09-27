@@ -136,8 +136,10 @@ class DeepAgentRuntime:
         system_prompt = (
             f"You are {name}, citizen id {citizen_id}, a {profession} in AgentCity. "
             "You must preserve private memory boundaries. You can only reason from "
-            "your own memory and public transcript lines spoken to you. Return the "
-            "requested structured response exactly; do not "
+            "your own memory and public transcript lines spoken to you. "
+            "Active dialogue takes priority over remembered dialogue. Answer the latest partner turn; "
+            "past questions, tasks and invitations are not pending requests unless raised again out loud. "
+            "Return the requested structured response exactly; do not "
             "narrate as the city or another citizen. Feelings are directional and need not be mutual. "
             "All current residents are adults, aged 18 or older. Act your actual age and nature, not a generic student. "
             "Needs, health, money, work, hobbies, family, ambitions and moods shape what you say. "
@@ -188,6 +190,7 @@ def inspect_current_task() -> str:
             "turn_goal": context.get("turn_goal", ""),
             "rules": context.get("rules", []),
             "public_transcript_so_far": context.get("public_transcript_so_far", []),
+            "active_turn": context.get("active_turn", {}),
         }
     )
 

@@ -66,13 +66,13 @@ def test_exchange_has_a_hard_turn_limit(monkeypatch):
 
 
 def test_autonomous_exchange_has_followups_without_task_keyword_retries(monkeypatch):
-    client, prompts = setup_client(monkeypatch, [{"spoken_line": f"Natural line {i}"} for i in range(4)])
+    client, prompts = setup_client(monkeypatch, [{"spoken_line": f"Natural line {i}"} for i in range(6)])
     def unexpected_alignment(*args):
         raise AssertionError("Autonomous small talk is not a player-task keyword match")
     monkeypatch.setattr(client, "_line_is_off_task", unexpected_alignment)
     result = exchange(client, autonomous=True)
-    assert len(prompts) == 4
-    assert [line["speaker_id"] for line in result.conversation["lines"]] == ["ava", "noah", "ava", "noah"]
+    assert len(prompts) == 6
+    assert [line["speaker_id"] for line in result.conversation["lines"]] == ["ava", "noah"] * 3
 
 
 def test_emotional_outcomes_stay_directional_and_private(monkeypatch):
@@ -142,5 +142,35 @@ def test_ongoing_chat_remembers_what_was_just_said(monkeypatch):
              {"speaker_id": "someone_else", "text": "I should never be shared."}]
     result = exchange(client, player_utterance="What should we cook tonight?", prior_lines=prior)
     heard = prompts[0][1]["public_transcript_so_far"]
-    assert [line["text"] for line in heard] == ["Hey Noah!", "Hi Ava, what's up?", "What should we cook tonight?"]
+    assert [line["text"] for line in heard] == ["What should we cook tonight?"]
+    assert prompts[0][1]["previous_exchange_lines_background_only"] == prior[:2]
+    assert prompts[0][1]["active_turn"]["latest_partner_turn"]["text"] == "What should we cook tonight?"
     assert [line["text"] for line in result.conversation["lines"]] == ["What should we cook tonight?", "Ha, the same answer as last time: curry, obviously."]
+
+
+def test_topic_change_keeps_gift_history_out_of_active_ramen_exchange(monkeypatch):
+    turns = ["Want to get ramen?", "Yes! Which place?", "The cafe by the station?",
+             "Sounds good. Shall we go at six?", "Six works. See you there!", "See you at six."]
+    client, prompts = setup_client(monkeypatch, [{"spoken_line": line} for line in turns])
+    prior = [{"speaker_id": "ava", "text": "I brought you a gift."},
+             {"speaker_id": "noah", "text": "What's in the box?"}]
+    result = client.generate_private_exchange(
+        actor={"citizen_id": "ava", "name": "Ava", "age": 21, "profession": "Lab assistant",
+               "memory_summary": "STALE_SUMMARY", "current_thought": "STALE_THOUGHT",
+               "personality": {"player_task": {"task": "STALE_TASK"}}},
+        target={"citizen_id": "noah", "name": "Noah", "age": 21, "profession": "Gym instructor"},
+        city_time="Day 1, 18:00", task="Invite Noah for ramen", observations=[],
+        actor_memories=["I gave Noah a gift."], target_memories=["Ava gave me a gift."],
+        event_context="", autonomous=True, prior_lines=prior,
+    )
+    for i, (_, prompt) in enumerate(prompts):
+        assert prompt["previous_exchange_lines_background_only"] == prior
+        assert [line["text"] for line in prompt["public_transcript_so_far"]] == turns[:i]
+        active = prompt["active_turn"]
+        assert active["number"] == i + 1
+        assert active["remaining_turns_including_this_one"] == 6 - i
+        assert (active["latest_partner_turn"]["text"] if i else active["latest_partner_turn"]) == (turns[i - 1] if i else None)
+        assert (active["your_previous_turn"]["text"] if i > 1 else active["your_previous_turn"]) == (turns[i - 2] if i > 1 else None)
+        assert "STALE_" not in str(prompt)
+    assert len(result.conversation["lines"]) == 6
+    assert "What's in the box?" not in result.participant_memories["ava"]

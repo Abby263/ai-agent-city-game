@@ -153,6 +153,60 @@ test("a refusal never creates a companion journey", async () => {
     false,
   );
 });
+test("task listeners never receive the initiator's private instructions", async () => {
+  const secret = "PRIVATE_REASON: I want to compare loan fees without telling Mateo";
+  await sessionAssignTask(actorId, { task: `Go to the bank with Mateo. ${secret}` }, async () => plan);
+  let called = false;
+  await sessionTick(async (request) => {
+    called = true;
+    assert.ok(request.private_memories![actorId].join(" ").includes(secret));
+    assert.ok(!request.private_memories![targetId].join(" ").includes(secret));
+    return reply();
+  });
+  assert.ok(called);
+});
+
+test("same-minute dialogue stays chronological and excludes other places, people and future chats", async () => {
+  await sessionTakeControl(actorId);
+  const city = getSessionCity()!;
+  const location = city.citizens.find((c) => c.citizen_id === actorId)!.current_location_id;
+  const conversation = (text: string, extra = {}) => ({ ...reply().conversation!,
+    conversation_id: text, game_day: city.clock.day, game_minute: city.clock.minute_of_day,
+    location_id: location, transcript: [{ speaker_id: actorId, text }], ...extra });
+  storage.set("agentcity.v12.conversations", JSON.stringify([
+    conversation("FUTURE", { game_minute: city.clock.minute_of_day + 1 }),
+    conversation("SOMEONE_ELSE", { actor_ids: [actorId, "cit_011"] }),
+    conversation("OTHER_PLACE", { location_id: "loc_bank" }),
+    conversation("Newest: ramen invitation"), conversation("Middle: gift"), conversation("Oldest: greeting"),
+  ]));
+  await sessionSpeak(targetId, "Which ramen place?", async (request) => {
+    assert.deepEqual(request.prior_lines?.map((line) => line.text), ["Oldest: greeting", "Middle: gift", "Newest: ramen invitation"]);
+    const result = reply();
+    result.conversation!.transcript[0].text = "Which ramen place?";
+    return result;
+  });
+});
+
+test("memory retrieval deduplicates experiences and recalls the listener without copying their private memory", async () => {
+  await sessionTakeControl(actorId);
+  const memories = Array.from({ length: 9 }, (_, i) => ({
+    memory_id: `m${i}`, citizen_id: actorId, content: `Other recent experience ${i}`,
+    created_at: "Day 1 06:00", related_citizen_id: "cit_011", extra: {},
+  }));
+  const shared = { ...memories[0], content: "I gave Mateo a gift", related_citizen_id: targetId };
+  storage.set(`agentcity.v12.memory.${actorId}`, JSON.stringify([...memories, shared, { ...shared, memory_id: "duplicate" }]));
+  storage.set(`agentcity.v12.memory.${targetId}`, JSON.stringify([{ ...shared, citizen_id: targetId, content: "PRIVATE_MATEO_FEELING" }]));
+  await sessionSpeak(targetId, "Want ramen?", async (request) => {
+    const recalled = request.private_memories![actorId].join(" ");
+    assert.equal(recalled.split("I gave Mateo a gift").length - 1, 1);
+    assert.ok(!recalled.includes("PRIVATE_MATEO_FEELING"));
+    assert.ok(request.private_memories![targetId].join(" ").includes("PRIVATE_MATEO_FEELING"));
+    assert.ok(!recalled.includes("Other recent experience 8"), "memory window remains bounded");
+    const result = reply();
+    result.conversation!.transcript[0].text = "Want ramen?";
+    return result;
+  });
+});
 test("pause invalidates a pending response and its memories", async () => {
   await sessionAssignTask(
     actorId,

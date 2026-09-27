@@ -6,11 +6,27 @@
   person answers in their own words and voice, and the two of you face each other where you stand.
 - The camera does not move after replies and the Talk panel stays open. Tap 👀 to frame the two of you; a new chat
   frames you once only if you are off-screen.
-- Chats are continuous: the recent lines between you (last two city hours) are shared with the AI, so replies follow
-  on from what was just said. A back-and-forth shows as one thread in Talk.
+- Chats are continuous: up to ten recent lines between this pair at the current location (last two city hours)
+  are recalled in chronological order, including when several exchanges share the same game minute.
+  A back-and-forth shows as one thread in Talk.
 - When a chat agrees on a day and time ("Friday around seven at the food court"), a **📅 Add to plans** button saves
   it as a real meet-up both residents remember.
 - Sleeping residents don't answer. In live mode at night, a card suggests fast-forwarding instead.
+
+## Memory And Multi-Turn Dialogue
+
+- Earlier exchanges are explicitly background, separate from the active transcript. Each turn identifies the
+  latest partner line, the speaker's previous line and the remaining turn budget. Changing subject should not
+  reopen an old gift question or repeat an invitation already answered.
+- Each resident receives only their own private experiences and feelings. Retrieval prioritizes experiences
+  involving the current partner, deduplicates identical memories and limits the recalled experience window to six.
+  Old thoughts, task payloads and accumulated transcript summaries are not re-injected as current dialogue.
+- Listeners do not receive the initiator's private task instructions. They react to what was actually said.
+  Remembered statements remain reports, not proof that an invitation or event happened.
+- AI-led exchanges can use up to six spoken turns, with either resident able to end earlier. Player-led chat
+  generates one reply and returns control to you. No extra critic-model call is needed for continuity.
+- Action-driven exchanges retain their initiating context in Talk and cinematic playback. Existing browser
+  history is preserved; these changes affect future replies, not past dialogue. Model errors remain possible.
 
 ## Voices
 

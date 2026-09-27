@@ -3,7 +3,7 @@ import { beforeEach, test } from "node:test";
 import { actionBlocked } from "../src/lib/actions";
 import { nextChoices } from "../src/lib/choices";
 import { createInitialCity } from "../src/lib/initial-city";
-import { getSessionCity, seedSession, sessionApproach, sessionCreateSituation, sessionPerformAction, sessionTakeControl } from "../src/lib/session-simulation";
+import { getSessionCity, seedSession, sessionApproach, sessionConversations, sessionCreateSituation, sessionPerformAction, sessionTakeControl } from "../src/lib/session-simulation";
 import { activeStories } from "../src/lib/stories";
 import type { SessionCognitionRequest, SessionCognitionResponse } from "../src/lib/types";
 
@@ -75,4 +75,19 @@ test("a choice continues its story instead of starting a new one", async () => {
   assert.ok(story.beats.some((b) => b.icon === "👉" && b.text.startsWith("You chose:")));
   assert.ok(story.beats.at(-1)!.conversation_id, "their reaction is in the same story");
   assert.equal(story.latest, `action_${choice.action}`, "the next choices follow the latest move");
+});
+
+test("successive actions retain dialogue as history but carry their own current topic", async () => {
+  const [ava, mateo] = ["Ava", "Mateo"].map(id);
+  const requests: SessionCognitionRequest[] = [];
+  const generate = async (request: SessionCognitionRequest) => { requests.push(request); return talk(request); };
+  const gift = await sessionPerformAction(ava, mateo, "gift", "A small wrapped gift", generate);
+  assert.ok(gift.talked);
+  const first = sessionConversations()[0];
+  assert.equal(first.encounter?.reason, gift.outcome.reason);
+  const invitation = await sessionPerformAction(ava, mateo, "ask_out", "Let's go for ramen", generate);
+  assert.ok(invitation.talked);
+  assert.deepEqual(requests[1].prior_lines, first.transcript);
+  assert.notEqual(requests[0].task, requests[1].task);
+  assert.equal(sessionConversations()[0].encounter?.reason, invitation.outcome.reason);
 });

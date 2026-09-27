@@ -179,19 +179,6 @@ export function sessionConversations(citizenId?: string) {
     .slice(0, citizenId ? 50 : 80);
 }
 
-function recentConversationFacts(citizenId?: string) {
-  const conversations = sessionConversations(citizenId)
-    .slice(0, 8)
-    .sort((a, b) => a.game_day - b.game_day || a.game_minute - b.game_minute);
-  return conversations.map((conversation) => {
-    const turns = conversation.transcript
-      .slice(0, 8)
-      .map((line) => `${line.speaker_id}: ${line.text}`)
-      .join(" | ");
-    return `Day ${conversation.game_day} ${clockLabel(conversation.game_minute)}: ${conversation.summary} Transcript: ${turns}`;
-  });
-}
-
 function clockLabel(minuteOfDay: number) {
   const hour = Math.floor(minuteOfDay / 60);
   const minute = minuteOfDay % 60;
@@ -311,8 +298,8 @@ export async function sessionSpeak(
     observations: [],
     memories: [],
     private_memories: {
-      [actor.citizen_id]: privateMemoryContext(actor),
-      [targetId]: privateMemoryContext(target),
+      [actor.citizen_id]: privateMemoryContext(actor, targetId),
+      [targetId]: privateMemoryContext(target, actor.citizen_id),
     },
   });
   if (isStale(city)) return requireSessionCity();
@@ -331,8 +318,10 @@ export async function sessionSpeak(
 function recentChat(city: CityState, a: string, b: string) {
   const now = city.clock.day * 1440 + city.clock.minute_of_day;
   return sessionConversations(a)
-    .filter((c) => c.actor_ids.includes(b) && now - (c.game_day * 1440 + c.game_minute) <= 120)
-    .sort((x, y) => x.game_day - y.game_day || x.game_minute - y.game_minute)
+    .filter((c) => c.actor_ids.length === 2 && c.actor_ids.includes(b) && c.location_id === findCitizen(city, a).current_location_id
+      && now >= c.game_day * 1440 + c.game_minute && now - (c.game_day * 1440 + c.game_minute) <= 120)
+    // Storage is newest first, including ties. A stable time sort would keep tied exchanges backwards.
+    .reverse()
     .flatMap((c) => c.transcript)
     .slice(-10);
 }
@@ -1327,7 +1316,7 @@ export async function sessionPerformAction(actorId: string, targetId: string, ac
     if (actorId === live.policy.player_citizen_id) {
       const response = await generate({ city: live, actor_id: actorId, target_id: targetId, require_conversation: true, task: "Respond to the player's action and words.",
         player_utterance: outcome.utterance, prior_lines: recentChat(live, actorId, targetId), observations: [outcome.reason], memories: [],
-        private_memories: { [actorId]: privateMemoryContext(liveActor), [targetId]: privateMemoryContext(liveTarget) } });
+        private_memories: { [actorId]: privateMemoryContext(liveActor, targetId), [targetId]: privateMemoryContext(liveTarget, actorId) } });
       if (isStale(live)) return { city: requireSessionCity(), outcome, talked: false };
       applyAutonomousCognition(live, liveActor, liveTarget, { event_id: newId("action"), location_id: liveTarget.current_location_id } as CityEvent, response);
       markPlayerChat(actorId, targetId);
@@ -1821,6 +1810,7 @@ async function runTaskCognition(
     require_conversation: true,
     task: task.task,
     observations: buildTaskObservations(city, citizen, target, task),
+    prior_lines: recentChat(city, citizen.citizen_id, target.citizen_id),
     memories: scopedPrivateMemoryContext(citizen, task.task, target),
     private_memories: {
       [citizen.citizen_id]: scopedPrivateMemoryContext(
@@ -1828,11 +1818,7 @@ async function runTaskCognition(
         task.task,
         target,
       ),
-      [target.citizen_id]: scopedPrivateMemoryContext(
-        target,
-        task.task,
-        citizen,
-      ),
+      [target.citizen_id]: privateMemoryContext(target, citizen.citizen_id),
     },
   });
   applyCognition(city, citizen, target, task, response);
@@ -1896,14 +1882,19 @@ function privateFeelingContext(citizen: CitizenAgent, targetId?: string) {
     .map((bond) => `My private feelings toward ${names.get(bond.other_citizen_id) ?? bond.other_citizen_id}: ${JSON.stringify(bond.feelings ?? emptyFeelings())}. Trust: ${bond.trust}. Last experience: ${bond.history?.at(-1)?.reason}. These are my feelings, not evidence of their intentions.`);
 }
 
-function privateMemoryContext(citizen: CitizenAgent) {
+function privateMemoryContext(citizen: CitizenAgent, targetId?: string) {
+  const seen = new Set<string>();
   const memories = sessionMemories(citizen.citizen_id)
+    .filter((memory) => {
+      const key = memory.content.trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => Number(b.related_citizen_id === targetId && Boolean(targetId)) - Number(a.related_citizen_id === targetId && Boolean(targetId)))
     .slice(0, 6)
-    .map((memory) => `${citizen.name} private memory: ${memory.content}`);
-  const conversations = recentConversationFacts(citizen.citizen_id)
-    .slice(-6)
-    .map((fact) => `${citizen.name} private conversation memory: ${fact}`);
-  return [...electionNotice(getSessionCity()!), ...privateFeelingContext(citizen), ...memories, ...conversations];
+    .map((memory) => `${citizen.name} past private experience (${memory.created_at}; not a current request): ${memory.content}`);
+  return [...electionNotice(getSessionCity()!), ...privateFeelingContext(citizen, targetId), ...memories];
 }
 
 function scopedPrivateMemoryContext(
@@ -1928,13 +1919,6 @@ function scopedPrivateMemoryContext(
       (memory) =>
         `${citizen.name} private memory relevant to current task: ${memory.content}`,
     );
-  const conversations = recentConversationFacts(citizen.citizen_id)
-    .filter((fact) => memoryRelevantToCurrentTask(fact, currentTask, target))
-    .slice(0, 4)
-    .map(
-      (fact) =>
-        `${citizen.name} private conversation history relevant to current task: ${fact}`,
-    );
   return [
     `${citizen.name} current active task, highest priority: ${currentTask}`,
     "Prior memories are background only. Do not continue a prior task or repeat a prior topic unless the current active task explicitly asks for it.",
@@ -1942,7 +1926,6 @@ function scopedPrivateMemoryContext(
     ...electionNotice(getSessionCity()!),
     ...privateFeelingContext(citizen, target?.citizen_id),
     ...relevant,
-    ...conversations,
   ];
 }
 
@@ -1975,6 +1958,7 @@ async function runAutonomousCognition(
     required_target_id: target.citizen_id,
     require_conversation: true,
     task: `Talk with ${target.name} about ${String(event.payload?.topic || "what brought you together").slice(0, 180)}.`,
+    prior_lines: recentChat(city, actor.citizen_id, target.citizen_id),
     observations: [
       `Autonomous social moment: ${event.description}`,
       `${actor.name} and ${target.name} are ${relationshipLabelFromScore(relationshipScore)} at ${locationName(city, actor.current_location_id)}.`,
@@ -1982,10 +1966,10 @@ async function runAutonomousCognition(
       "Let them talk like real people of their ages. The conversation should reveal whether they are strangers, acquaintances, friends, family, or at odds.",
       "Respect a wish for privacy or a refusal. A conversation may end without becoming friends. Only make a future plan if both genuinely want it.",
     ],
-    memories: privateMemoryContext(actor),
+    memories: [],
     private_memories: {
-      [actor.citizen_id]: privateMemoryContext(actor),
-      [target.citizen_id]: privateMemoryContext(target),
+      [actor.citizen_id]: privateMemoryContext(actor, target.citizen_id),
+      [target.citizen_id]: privateMemoryContext(target, actor.citizen_id),
     },
   });
   applyAutonomousCognition(city, actor, target, event, response);
@@ -2068,7 +2052,7 @@ function applyAutonomousCognition(
     location_id: conversation.location_id ?? actor.current_location_id,
     actor_ids: [actor.citizen_id, target.citizen_id],
     transcript: conversation.transcript.slice(0, 8),
-    encounter: sourceEvent.event_type === "social_opportunity" ? {
+    encounter: ["social_opportunity", "player_action"].includes(sourceEvent.event_type) ? {
       kind: sourceEvent.payload?.kind === "planned" ? "planned" : "chance",
       reason: sourceEvent.description, topic: String(sourceEvent.payload?.topic ?? ""),
       meeting_id: typeof sourceEvent.payload?.meeting_id === "string" ? sourceEvent.payload.meeting_id : undefined,
