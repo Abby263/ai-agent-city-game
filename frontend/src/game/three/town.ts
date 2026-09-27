@@ -320,17 +320,7 @@ export function makeTown(art: Art) {
       i % 4 === 0,
       0.8 + random(i + 66) * 0.6,
     );
-  for (let i = 0; i < 26; i++) {
-    const h = 7 + random(i) * 9;
-    const mountain = new THREE.Mesh(
-      art.geometry(new THREE.ConeGeometry(10, h, 5)),
-      art.material(i % 2 ? 0x90b4af : 0xa8c2b2),
-    );
-    mountain.position.set(-22 + i * 6, h / 2 - 1, -23 - random(i + 100) * 12);
-    root.add(mountain);
-    mountain.receiveShadow = false;
-    mountain.castShadow = false;
-  }
+
 
   // Riverside with two bridges. Water remains outside the playable navigation grid.
   art.box(root, 45, -0.12, 19, 7, 0.16, 72, 0x63b0ba);

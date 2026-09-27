@@ -22,6 +22,44 @@ export class Art {
     this.ramp.needsUpdate = true;
     this.textures.push(this.ramp);
   }
+  private blob?: { geometry: THREE.PlaneGeometry; materials: Map<number, THREE.MeshBasicMaterial> };
+  /**
+   * A soft dark patch on the ground under something (a person, a car): the contact shadow that stops it
+   * looking pasted on. Created lazily, shared by everyone, never picked by clicks.
+   */
+  contactShadow(parent: THREE.Object3D, width: number, depth: number, opacity = 0.34) {
+    if (!this.blob) {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 64;
+      const ctx = canvas.getContext("2d")!;
+      const gradient = ctx.createRadialGradient(32, 32, 2, 32, 32, 31);
+      gradient.addColorStop(0, "rgba(0,0,0,1)");
+      gradient.addColorStop(0.55, "rgba(0,0,0,0.55)");
+      gradient.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 64, 64);
+      const texture = new THREE.CanvasTexture(canvas);
+      this.textures.push(texture);
+      const geometry = this.geometry(new THREE.PlaneGeometry(1, 1));
+      geometry.rotateX(-Math.PI / 2);
+      this.blob = { geometry, materials: new Map() };
+      this.blob.materials.set(-1, new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, color: 0x0e1622 }));
+    }
+    const key = Math.round(opacity * 100);
+    let material = this.blob.materials.get(key);
+    if (!material) {
+      material = this.blob.materials.get(-1)!.clone();
+      material.opacity = opacity;
+      this.blob.materials.set(key, material);
+    }
+    const mesh = new THREE.Mesh(this.blob.geometry, material);
+    mesh.scale.set(width, 1, depth);
+    mesh.position.y = 0.03;
+    mesh.renderOrder = 1;
+    mesh.raycast = () => {};
+    parent.add(mesh);
+    return mesh;
+  }
   geometry<T extends THREE.BufferGeometry>(geometry: T): T {
     this.geometries.push(geometry);
     return geometry;
@@ -137,6 +175,7 @@ export class Art {
   }
   dispose() {
     this.materials.forEach((m) => m.dispose());
+    this.blob?.materials.forEach((m) => m.dispose());
     this.textures.forEach((t) => t.dispose());
     this.geometries.forEach((g) => g.dispose());
   }

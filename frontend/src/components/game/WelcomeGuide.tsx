@@ -5,8 +5,9 @@ import { useEffect, useRef } from "react";
 const steps = [
   { icon: "🗾", title: "A real Tokyo neighbourhood", text: "Nakameguro runs on real Tokyo time, date and weather. Night here is night in Tokyo." },
   { icon: "🏘️", title: "Meet the neighbours", text: "Tap a face at the bottom to see how someone lives: family, job, feelings, health and memories." },
-  { icon: "✋", title: "Make anyone do anything", text: "Open a person, choose Act, and have them hug, help, argue with or ask out someone else. Then watch the reaction." },
-  { icon: "🪄", title: "Play god", text: "Use Create to make it rain, shake the ground, drop money on the street or start a fire, and see who does the right thing." },
+  { icon: "✋", title: "Make anyone do anything", text: "Tap anyone and write what happens, in your own words. They react in theirs, and remember it." },
+  { icon: "🪄", title: "Play god", text: "Use Create to make anything happen: change the weather, hold an election, or write any situation you like." },
+  { icon: "📜", title: "Rewrite anyone", text: "Every resident follows a prompt. Open Prompt on anyone to read it and change who they are." },
   { icon: "🏆", title: "Collect badges", text: "Try new things to earn badges. Can you collect them all?" },
 ];
 

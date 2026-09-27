@@ -3,13 +3,15 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Art } from "./materials";
 import { makeTown } from "./town";
 import { CitizenModel } from "./citizen";
-import { InkPass } from "./ink-pass";
+import { PostPipeline } from "./post";
+import { FrameMonitor, initialQuality, lowerQuality, type QualityPreset } from "./quality";
+import { makeHorizon } from "./horizon";
 import { arrivals, citizenPoint, walkablePoint, walkingRoute } from "./layout";
 import type { CityState } from "@/lib/types";
 import type { ConversationFrame, InlineTalk } from "@/lib/conversation-playback";
 import { speechLevel } from "@/lib/speech-level";
 import { conversationCameraOffset, conversationDistance, conversationStaging, sightLinesClear } from "./conversation-camera";
-import { skyAt } from "./sky";
+import { makeSkyDome, skyAt } from "./sky";
 import { makeAtmosphere } from "./atmosphere";
 import { makeTraffic } from "./traffic";
 import { makeTrain } from "./train";
@@ -26,7 +28,8 @@ const overcast = new THREE.Color(0x9aa5ad), snowSky = new THREE.Color(0xdfe6ec),
 export class CityRenderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
-  readonly camera = new THREE.PerspectiveCamera(42, 1, 0.1, 420);
+  // Far enough for the skyline and Mt Fuji on the horizon.
+  readonly camera = new THREE.PerspectiveCamera(42, 1, 0.1, 1200);
   readonly controls: OrbitControls;
   private readonly art = new Art();
   private readonly town: ReturnType<typeof makeTown>;
@@ -39,7 +42,13 @@ export class CityRenderer {
   private readonly tint = new THREE.Color();
   private readonly shake = new THREE.Vector3();
   private season = "";
-  private readonly ink: InkPass;
+  private post: PostPipeline;
+  private quality: QualityPreset = initialQuality();
+  private readonly monitor = new FrameMonitor(() => this.degrade());
+  private readonly skyDome = makeSkyDome(1000);
+  private readonly horizon: ReturnType<typeof makeHorizon>;
+  /** How dark it is right now (0 day .. 1 night), for bloom and the immediate redraw after a resize. */
+  private night = 0;
   private readonly people = new Map<string, CitizenModel>();
   private readonly names = document.createElement("div");
   private readonly signs: Array<{
@@ -93,9 +102,7 @@ export class CityRenderer {
       alpha: false,
       powerPreference: "high-performance",
     });
-    this.renderer.setPixelRatio(
-      Math.min(devicePixelRatio, innerWidth < 761 ? 1.35 : 1.75),
-    );
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, this.quality.pixelRatio));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
@@ -113,13 +120,14 @@ export class CityRenderer {
     host.appendChild(this.renderer.domElement);
     this.names.className = "world-label-layer";
     host.appendChild(this.names);
-    this.scene.background = new THREE.Color(0xc3dfeb);
-    this.scene.fog = new THREE.Fog(0xc3dfeb, 52, 140);
+    // The sky dome draws the sky; fog fades the town into its horizon colour.
+    this.scene.fog = new THREE.Fog(0xcfe4ef, 52, 140);
+    this.scene.add(this.skyDome.dome);
     this.scene.add(this.ambient);
     this.sun.position.set(-15, 32, 18);
     this.sun.target.position.set(20, 0, 20);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(this.quality.shadowMap, this.quality.shadowMap);
     Object.assign(this.sun.shadow.camera, {
       left: -34,
       right: 34,
@@ -136,13 +144,15 @@ export class CityRenderer {
     this.scene.add(fill);
     this.town = makeTown(this.art);
     this.scene.add(this.town.root, this.town.dynamic);
+    this.horizon = makeHorizon(this.art);
+    this.scene.add(this.horizon.root);
     this.atmosphere = makeAtmosphere(this.art, this.town.lampHeads);
     this.traffic = makeTraffic(this.art);
     this.train = makeTrain(this.art);
     this.incidents = makeIncidents(this.art);
     this.scene.add(this.incidents.root);
     this.scene.add(this.atmosphere.root, this.traffic.root, this.train.root, this.weatherFx.root);
-    this.ink = new InkPass(this.camera);
+    this.post = new PostPipeline(this.renderer, this.scene, this.camera, this.quality, Math.max(1, host.clientWidth), Math.max(1, host.clientHeight));
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.09;
@@ -195,6 +205,8 @@ export class CityRenderer {
     this.intersection.observe(host);
     document.addEventListener("visibilitychange", this.visibility);
     this.resume();
+    // Compile every shader now, in parallel where the driver allows, instead of stuttering the first time each appears.
+    this.renderer.compileAsync(this.scene, this.camera).catch(() => {});
     // Development-only handle for inspecting the scene from the browser console.
     if (process.env.NODE_ENV !== "production") (window as unknown as { __agentcityRenderer?: CityRenderer }).__agentcityRenderer = this;
   }
@@ -295,7 +307,12 @@ export class CityRenderer {
     if (w?.condition === "snow") skyColor.lerp(snowSky, 0.4 * (1 - sky.night));
     if (w?.heatwave) skyColor.lerp(heatSky, 0.25 * (1 - sky.night));
     if (fx.flash) skyColor.lerp(lightningSky, fx.flash * 0.8);
-    (this.scene.background as THREE.Color).copy(skyColor);
+    // Overhead the sky keeps its colour; grey days wash it out towards the clouds.
+    const zenith = sky.zenith.clone().lerp(overcast.clone().multiplyScalar(0.85 - sky.night * 0.6), gloom * 0.8);
+    if (fx.flash) zenith.lerp(lightningSky, fx.flash * 0.6);
+    this.skyDome.update(sky, skyColor, zenith, gloom);
+    this.horizon.update(skyColor, sky.night, gloom);
+    this.night = sky.night;
     (this.scene.fog as THREE.Fog).color.copy(skyColor);
     this.atmosphere.update(sky.night, dt, animate, w?.clouds ?? 0.45, Math.min(1, (w?.precipitation ?? 0) * 1.1), w?.wind ?? 0.1);
     groundTint(w, this.tint);
@@ -519,13 +536,12 @@ export class CityRenderer {
     this.camera.aspect = this.width / this.height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.width, this.height);
-    const buffer = this.renderer.getDrawingBufferSize(new THREE.Vector2());
-    this.ink.resize(buffer.x, buffer.y);
+    this.post.setSize(this.width, this.height);
     if (this.conversationCenter) this.focusConversation();
     else if (this.inline) this.focusPair(this.inline.actorIds);
     // Resizing clears the canvas. Draw at once: if the loop is paused (hidden tab, pane or scrolled away), the stage's
     // green background would otherwise show through with stale name tags until the loop happens to resume.
-    if (this.alive && this.width > 1 && this.height > 1) this.ink.render(this.renderer, this.scene, this.camera);
+    if (this.alive && this.width > 1 && this.height > 1) this.post.render(0, this.night);
     this.resume();
   }
   private project(point: THREE.Vector3, element: HTMLElement, lift = 0) {
@@ -545,6 +561,7 @@ export class CityRenderer {
     if (!this.alive || document.hidden || !this.onScreen) return;
     this.frame = requestAnimationFrame(this.render);
     if (now - this.last < 1000 / 30) return;
+    this.monitor.sample(now, now - this.last);
     const dt = Math.min((now - this.last) / 1000 || 0.033, 0.08);
     this.last = now;
     this.seconds += dt;
@@ -621,8 +638,9 @@ export class CityRenderer {
     );
     const fog = this.scene.fog as THREE.Fog;
     const haze = 1 - (this.weather?.fog ?? 0) * 0.55;
-    fog.near = Math.max(52, cameraDistance * 0.95) * haze;
-    fog.far = Math.max(160, cameraDistance * 2.6) * haze;
+    // The town stays crisp; the distance beyond it has its own haze (horizon.ts).
+    fog.near = Math.max(70, cameraDistance * 1.1) * haze;
+    fog.far = Math.max(230, cameraDistance * 3) * haze;
     const occupied: Array<{ x: number; y: number; w: number }> = [];
     const models = [...this.people.values()].sort(
       (a, b) =>
@@ -671,14 +689,30 @@ export class CityRenderer {
       else sign.element.hidden = true;
     }
     this.camera.position.add(this.shake);
-    this.ink.render(this.renderer, this.scene, this.camera, this.conversation && this.conversation.phase !== "arrival" ? cameraDistance : 0);
+    this.skyDome.dome.position.copy(this.camera.position);
+    this.post.render(dt, this.night, this.conversation && this.conversation.phase !== "arrival" ? cameraDistance : 0);
     this.camera.position.sub(this.shake);
     this.host.dataset.rendered = "true";
   };
+  /** The town can't keep up: drop one quality level (remembered for next time) and rebuild the frame pipeline. */
+  private degrade() {
+    const next = lowerQuality(this.quality.level);
+    if (!next || !this.alive) return;
+    this.quality = next;
+    this.post.dispose();
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, next.pixelRatio));
+    this.sun.shadow.map?.dispose();
+    this.sun.shadow.map = null;
+    this.sun.shadow.mapSize.set(next.shadowMap, next.shadowMap);
+    this.post = new PostPipeline(this.renderer, this.scene, this.camera, next, this.width, this.height);
+    this.fit();
+    this.monitor.reset(performance.now());
+  }
   private resume() {
     if (!this.alive || document.hidden || !this.onScreen) return;
     cancelAnimationFrame(this.frame);
     this.last = performance.now();
+    this.monitor.reset(this.last);
     this.frame = requestAnimationFrame(this.render);
   }
   private stop() {
@@ -787,7 +821,9 @@ export class CityRenderer {
     this.atmosphere.dispose();
     this.weatherFx.dispose();
     this.incidents.dispose();
-    this.ink.dispose();
+    this.post.dispose();
+    this.horizon.dispose();
+    this.skyDome.dispose();
     this.art.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();

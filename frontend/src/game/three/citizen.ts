@@ -146,6 +146,8 @@ export class CitizenModel {
     this.ring.rotation.x = -Math.PI / 2;
     this.ring.position.y = 0.09;
     this.root.add(this.ring);
+    // A soft contact shadow keeps them standing on the street rather than floating over it.
+    art.contactShadow(this.root, 0.95, 0.95, 0.4);
     this.label = document.createElement("button");
     this.label.type = "button";
     this.label.className = "citizen-nameplate";
