@@ -1981,6 +1981,9 @@ select {
     grid-template-rows: auto minmax(0, 1fr);
   }
   .game-footer { display: none; }
+  .badge-toast { width: calc(100% - 24px); max-width: 460px; border-radius: 8px; }
+  .badge-toast > div { min-width: 0; }
+  .badge-toast strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .game-header { display: flex; flex-wrap: wrap; padding: 6px 12px; gap: 4px 8px; }
   .game-brand h1 { font-size: 18px; }
   .game-brand h1 span { display: none; }
