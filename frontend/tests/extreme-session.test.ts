@@ -5,12 +5,12 @@ import { createInitialCity } from "../src/lib/initial-city";
 import { acceptMeeting, type MeetingPlan } from "../src/lib/encounters";
 import { currentElection, recordBallot, tallyElection, type ElectionDecision } from "../src/lib/elections";
 import { parsePlan } from "../src/lib/plans";
-import { scenarioCatalog, type ScenarioRequest } from "../src/lib/scenarios";
+import type { ActInterpretation } from "../src/lib/acts";
 import {
   getSessionCity, saveSessionCity, seedSession, sessionAdvanceAutoElection,
   sessionAssignTask, sessionCastVote, sessionCloseTask, sessionConversations,
-  sessionCreateSituation, sessionElectionPhase, sessionMemories, sessionNextBallot,
-  sessionOpenBallots, sessionPause, sessionPerformAction, sessionRelationships,
+  sessionAct, sessionElectionPhase, sessionMemories, sessionNextBallot,
+  sessionOpenBallots, sessionPause, sessionRelationships,
   sessionSetMode, sessionStart, sessionStartElection, sessionStartElectionAuto,
   sessionTakeControl, sessionTick,
 } from "../src/lib/session-simulation";
@@ -90,9 +90,6 @@ const talk = async (request: SessionCognitionRequest) => response(request);
 const noTalk = async (): Promise<SessionCognitionResponse> => { throw new Error("Unexpected cognition call"); };
 const assign = (text = "Discuss today's plans with Mateo") => sessionAssignTask(actorId, { task: text }, async () => plan);
 const startElection = () => sessionStartElectionAuto(actorId, targetId, async () => decision);
-const scenarioRequest = (kind: ScenarioRequest["kind"]): ScenarioRequest => ({
-  kind, location_id: "loc_homes", citizen_ids: [actorId, targetId], amount: 125,
-});
 
 test("task target normalization removes self, missing residents and duplicates", async () => {
   await sessionAssignTask(actorId, { task: "Have a conversation" }, async () => ({
@@ -174,61 +171,71 @@ test("pausing a pending planner and restarting does not install its late task", 
   assert.deepEqual(snapshot(), before);
 });
 
-for (const spec of scenarioCatalog) {
-  test(`catalogue ${spec.kind}: successful reaction creates one observable story`, async () => {
+/** The game master's reading of the player's words, fixed for each test. */
+const reading = (overrides: Partial<ActInterpretation>) => async (): Promise<ActInterpretation> => ({
+  allowed: true, refusal: "", headline: "Something happened.", target_id: targetId, involved_ids: [actorId, targetId], location_id: "",
+  tone: "neutral", intensity: 1, harm: 0, money: 0, proposal: "none", closes_location: false, reaction: "What just happened.", target_memory: "", ...overrides,
+});
+const acts: Array<[string, string | null, string | null, string, Partial<ActInterpretation>]> = [
+  ["a gift", actorId, targetId, "gives Mateo a small wrapped gift", { tone: "warm", money: 20, headline: "Ava gave Mateo a small gift." }],
+  ["a shove", actorId, targetId, "shoves Mateo", { tone: "hostile", harm: 1, headline: "Ava shoved Mateo." }],
+  ["a burst pipe", null, null, "a water pipe bursts at the homes", { tone: "tense", closes_location: true, location_id: "loc_homes", headline: "A water pipe burst at Aobadai Homes." }],
+];
+const waitFor = async (ready: () => unknown) => { for (let i = 0; !ready() && i < 200; i++) await new Promise((resolve) => setTimeout(resolve, 0)); };
+
+for (const [label, actor, target, words, read] of acts) {
+  test(`${label}: a successful reaction creates one observable story`, async () => {
     let calls = 0;
-    const result = await sessionCreateSituation(scenarioRequest(spec.kind), async (request) => { calls++; return response(request); });
-    assert.equal(calls, 1, "fixture supplies awake residents for a reaction");
+    const result = await sessionAct(actor, target, words, reading(read), async (request) => { calls++; return response(request); });
+    assert.equal(calls, 1);
     assert.equal(result.talked, true);
     assert.equal(sessionConversations().length, 1);
     const story = result.city.stories!.find((s) => s.id === result.story_id)!;
-    assert.equal(story.kind, spec.kind);
     assert.ok(story.beats.some((b) => b.conversation_id));
-    assert.equal(result.city.encounter, null);
   });
 
-  test(`catalogue ${spec.kind}: failed reaction retains mechanics without fabricated dialogue`, async () => {
+  test(`${label}: a failed reaction keeps its effects without fabricated dialogue`, async () => {
     let before: ReturnType<typeof snapshot> | undefined;
-    const result = await sessionCreateSituation(scenarioRequest(spec.kind), async () => {
+    const result = await sessionAct(actor, target, words, reading(read), async () => {
       before = snapshot();
-      throw new Error("Scenario service unavailable");
+      throw new Error("Reaction service unavailable");
     });
     assert.ok(before, "reaction was attempted");
     assert.equal(result.talked, false);
-    assert.equal(result.error, "Scenario service unavailable");
+    assert.equal(result.error, "Reaction service unavailable");
     assert.deepEqual(snapshot(), before);
     assert.ok(result.city.stories!.some((s) => s.id === result.story_id));
     assert.equal(sessionConversations().length, 0);
   });
 
-  test(`catalogue ${spec.kind}: pause and restart discard late reaction side effects`, async () => {
+  test(`${label}: pause and restart discard late reaction side effects`, async () => {
     const gate = deferred<SessionCognitionResponse>();
-    let request!: SessionCognitionRequest;
-    const pending = sessionCreateSituation(scenarioRequest(spec.kind), (r) => { request = r; return gate.promise; });
-    assert.ok(request);
+    let request: SessionCognitionRequest | undefined;
+    const pending = sessionAct(actor, target, words, reading(read), (r) => { request = r; return gate.promise; });
+    await waitFor(() => request);
     await sessionPause();
     await sessionSetMode("autonomous");
     const before = snapshot();
-    gate.resolve(response(request));
+    gate.resolve(response(request!));
     const result = await pending;
     assert.equal(result.talked, false);
-    assert.deepEqual(snapshot(), before, "stale scenario must not write conversations, memories or bonds");
+    assert.deepEqual(snapshot(), before, "a stale reaction must not write conversations, memories or bonds");
   });
 }
 
 for (const controlled of [false, true]) {
   for (const settle of ["resolve", "reject"] as const) {
-    test(`${controlled ? "player" : "NPC"} action interrupted by pause discards ${settle} response`, async () => {
+    test(`${controlled ? "player" : "NPC"} act interrupted by pause discards ${settle} response`, async () => {
       if (controlled) await sessionTakeControl(actorId);
       const money = citizen().money;
       const gate = deferred<SessionCognitionResponse>();
-      let request!: SessionCognitionRequest;
-      const pending = sessionPerformAction(actorId, targetId, "gift", "A small gift", (r) => { request = r; return gate.promise; });
-      assert.ok(request);
-      assert.equal(citizen().money, money - 20, "mechanics intentionally commit before optional dialogue");
+      let request: SessionCognitionRequest | undefined;
+      const pending = sessionAct(actorId, targetId, "gives Mateo a small gift", reading({ tone: "warm", money: 20 }), (r) => { request = r; return gate.promise; });
+      await waitFor(() => request);
+      assert.equal(citizen().money, money - 20, "effects intentionally commit before the optional reaction");
       await sessionPause();
       const before = snapshot();
-      if (settle === "resolve") gate.resolve(response(request));
+      if (settle === "resolve") gate.resolve(response(request!));
       else gate.reject(new Error("Late action service failure"));
       const result = await pending;
       assert.equal(result.talked, false);
@@ -237,21 +244,15 @@ for (const controlled of [false, true]) {
   }
 }
 
-test("overlapping gifts charge once per action without overspending or stale dialogue", async () => {
-  await sessionTakeControl(actorId);
+test("gifts never overspend: the giver hands over only what they have", async () => {
   const city = getSessionCity()!;
-  city.citizens.find((c) => c.citizen_id === actorId)!.money = 60;
+  city.citizens.find((c) => c.citizen_id === actorId)!.money = 30;
   saveSessionCity(city);
-  const gates = Array.from({ length: 3 }, () => deferred<SessionCognitionResponse>());
-  const requests: SessionCognitionRequest[] = [];
-  const pending = gates.map((gate, i) => sessionPerformAction(actorId, targetId, "gift", `Gift ${i}`, (r) => {
-    requests[i] = r; return gate.promise;
-  }));
-  await assert.rejects(sessionPerformAction(actorId, targetId, "gift", "Fourth gift", noTalk), /money/i);
-  for (let i = gates.length - 1; i >= 0; i--) { gates[i].resolve(response(requests[i])); await pending[i]; }
+  const receiver = citizen(targetId).money;
+  await sessionAct(actorId, targetId, "gives Mateo $20", reading({ tone: "warm", money: 20 }), async (r) => response(r));
+  await sessionAct(actorId, targetId, "gives Mateo another $20", reading({ tone: "warm", money: 20 }), async (r) => response(r));
   assert.equal(citizen().money, 0);
-  assert.equal(sessionConversations().length, 1);
-  assert.equal((await Promise.all(pending)).filter((r) => r.talked).length, 1);
+  assert.equal(citizen(targetId).money, receiver + 30);
 });
 
 const malformedReplies: Array<[string, (r: SessionCognitionResponse) => unknown]> = [
@@ -262,49 +263,38 @@ const malformedReplies: Array<[string, (r: SessionCognitionResponse) => unknown]
   ["numeric dialogue", (r) => ({ ...r, conversation: { ...r.conversation, transcript: [{ speaker_id: actorId, text: 42 }] } })],
   ["missing listener", (r) => ({ ...r, conversation: { ...r.conversation, transcript: [{ speaker_id: actorId, text: "Hello" }] } })],
   ["numeric relationship reason", (r) => ({ ...r, participant_outcomes: { [actorId]: { relationship_reason: 42 } } })],
+  ["numeric next intention", (r) => ({ ...r, participant_outcomes: { [targetId]: { next_intention: 7 } } })],
 ];
 for (const [label, corrupt] of malformedReplies) {
-  test(`malformed action response: ${label} leaves no partial cognition writes`, async () => {
+  test(`malformed reaction: ${label} leaves no partial cognition writes`, async () => {
     await sessionTakeControl(actorId);
     let before!: ReturnType<typeof snapshot>;
-    const result = await sessionPerformAction(actorId, targetId, "meet", "", async (request) => {
+    const result = await sessionAct(actorId, targetId, "waves at Mateo", reading({}), async (request) => {
       before = snapshot();
       return corrupt(response(request)) as SessionCognitionResponse;
     });
     assert.equal(result.talked, false);
     assert.ok(result.error);
-    assert.deepEqual(snapshot(), before, "mechanics may persist, but rejected cognition must be atomic");
+    assert.deepEqual(snapshot(), before, "effects may persist, but rejected cognition must be atomic");
   });
 }
 
-test("malformed scenario amount must not persist non-finite money", async () => {
-  for (const amount of [NaN, Infinity, -Infinity, "100", null, {}]) {
-    const before = snapshot();
-    await assert.rejects(sessionCreateSituation({ ...scenarioRequest("drop_money"), amount: amount as number }), /finite number/);
-    assert.deepEqual(snapshot(), before, `invalid amount ${String(amount)} must not change any persisted state`);
+test("whatever the game master returns, money and feelings stay finite and in range", async () => {
+  for (const bad of [NaN, Infinity, -Infinity, -50, "100", null, {}]) {
+    const numbers = bad as number;
+    await sessionAct(actorId, targetId, "does something odd", reading({ money: numbers, intensity: numbers, harm: numbers, tone: "hostile" }), async (r) => response(r));
+    const city = getSessionCity()!;
+    for (const c of city.citizens) for (const key of ["money", "health", "stress"] as const) assert.ok(Number.isFinite(c[key]) && c[key] >= 0, `${c.name}.${key} stays finite`);
+    for (const r of sessionRelationships()) for (const key of ["trust", "warmth", "familiarity"] as const) assert.ok(Number.isFinite(r[key]), `bond ${key} stays finite`);
   }
 });
 
-test("valid scenario amounts retain their default and bounds", async () => {
-  for (const [amount, expected] of [[undefined, 100], [-10, 1], [0, 1], [125, 125], [10000, 5000]] as const) {
-    resetCity();
-    const before = getSessionCity()!.citizens.reduce((sum, c) => sum + c.money, 0);
-    const { city, result } = await sessionCreateSituation({ ...scenarioRequest("drop_money"), amount });
-    const after = city.citizens.reduce((sum, c) => sum + c.money, 0);
-    const gain = result.headline.includes("handed") ? Math.round(expected * 0.1) : expected;
-    assert.equal(after - before, gain);
-  }
-});
-
-test("repeated scenarios keep incident identities unique at the same tick", async () => {
-  const tick = getSessionCity()!.clock.tick;
+test("repeated closures keep one incident per place", async () => {
   for (let i = 0; i < 6; i++) {
-    await sessionCreateSituation({ ...scenarioRequest("fire"), location_id: i % 2 ? "loc_bank" : "loc_homes" });
-    await sessionCreateSituation(scenarioRequest("accident"));
+    await sessionAct(null, null, "a pipe bursts", reading({ closes_location: true, location_id: i % 2 ? "loc_bank" : "loc_homes", involved_ids: [actorId] }), async (r) => response(r));
   }
   const incidents = getSessionCity()!.incidents!;
-  assert.equal(getSessionCity()!.clock.tick, tick);
-  assert.equal(incidents.length, 12);
+  assert.equal(incidents.length, 2);
   assert.equal(new Set(incidents.map((i) => i.id)).size, incidents.length);
 });
 
@@ -420,15 +410,23 @@ test("failed automatic campaign can retry without consuming a turn or inventing 
   assert.equal(sessionConversations().length, 1);
 });
 
-test("social timeout pauses once and restart clears error without fabricated dialogue", async () => {
+test("a slow AI reply doesn't freeze the town; Auto pauses only if the AI keeps failing", async () => {
   await sessionSetMode("autonomous");
-  const city = await sessionTick(noTalk, undefined, async () => { throw new DOMException("Timed out", "TimeoutError"); });
-  assert.equal(city.clock.running, false);
+  const timeout = async () => { throw new DOMException("Timed out", "TimeoutError"); };
+  for (const attempt of [1, 2]) {
+    const city = await sessionTick(noTalk, undefined, timeout);
+    assert.equal(city.clock.running, true, `failure ${attempt} is skipped, not a pause`);
+    assert.equal(city.policy.autonomy_error, undefined);
+    assert.ok(city.events.some((e) => e.event_type === "conversation_fizzled"));
+  }
+  const city = await sessionTick(noTalk, undefined, timeout);
+  assert.equal(city.clock.running, false, "the third failure in a row pauses Auto");
   assert.match(String(city.policy.autonomy_error), /too long/);
-  assert.equal(sessionConversations().length, 0);
+  assert.equal(sessionConversations().length, 0, "no dialogue is ever invented");
   const resumed = await sessionStart();
   assert.equal(resumed.clock.running, true);
   assert.equal(resumed.policy.autonomy_error, undefined);
+  assert.equal(resumed.policy.autonomy_failures, 0);
 });
 
 test("meeting validation rejects malformed schedules and enforces exact day-wrap boundaries", () => {
@@ -463,7 +461,8 @@ test("a leading count does not hide the later explicitly scheduled time", () => 
 });
 
 test("stress fixture relationships retain finite bounded values", async () => {
-  for (let i = 0; i < 12; i++) await sessionCreateSituation(scenarioRequest(i % 2 ? "rivalry" : "love_spark"));
+  for (let i = 0; i < 12; i++)
+    await sessionAct(actorId, targetId, i % 2 ? "picks a fight" : "flirts outrageously", reading({ tone: i % 2 ? "hostile" : "romantic", intensity: 3 }), async (r) => response(r));
   for (const relation of sessionRelationships())
     for (const value of [relation.trust, relation.warmth, relation.familiarity, ...Object.values(relation.feelings ?? {})])
       assert.ok(Number.isFinite(value) && value >= 0 && value <= 100, String(value));

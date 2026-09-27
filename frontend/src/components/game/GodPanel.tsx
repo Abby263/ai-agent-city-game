@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Play } from "lucide-react";
+import { Play, Wand2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { scenarioCatalog, type ScenarioKind } from "@/lib/scenarios";
 import { conditionFromWmo, type WeatherOverride } from "@/lib/weather";
 import { liveElection } from "@/lib/elections";
-import { useGameStore } from "@/lib/store";
 import type { CityState } from "@/lib/types";
 
 const skies: Array<{ condition: WeatherOverride["condition"]; icon: string; label: string }> = [
@@ -29,16 +27,11 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
   /** Close the panel and fly the camera to where it's happening. */
   onStarted: (ids: string[], locationId?: string) => void;
 }) {
-  const [open, setOpen] = useState<ScenarioKind | null>(null);
-  // An opened card's form can land below the fold; bring all of it into view.
+  const [open, setOpen] = useState(false);
+  // The opened election form can land below the fold; bring all of it into view.
   useEffect(() => {
     if (open) document.querySelector(".scenario-card[data-open='true']")?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [open]);
-  const [place, setPlace] = useState("loc_park");
-  const [first, setFirst] = useState(city.citizens[0]?.citizen_id ?? "");
-  const [second, setSecond] = useState(city.citizens[1]?.citizen_id ?? "");
-  const [amount, setAmount] = useState(100);
-  const people = city.citizens.filter((c) => c.age >= 5);
   const watching = city.simulation_mode === "autonomous" && city.clock.running;
 
   const sky = (condition: WeatherOverride["condition"] | null) => act(() => api.setWeather(condition));
@@ -50,19 +43,6 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
     onMessage(`Live from Tokyo: ${Math.round(data.current.temperature_2m)}°C, ${condition.replace("_", " ")}. Nakameguro has the same sky for the next six hours.`);
     return api.setWeather(condition, { temp_c: data.current.temperature_2m, source: "tokyo" });
   });
-  const create = (kind: ScenarioKind) => {
-    const spec = scenarioCatalog.find((s) => s.kind === kind)!;
-    const people = spec.needs.includes("pair") ? [first, second] : spec.needs.includes("person") ? [first] : [];
-    setOpen(null);
-    // Go there straight away; the reaction plays as soon as it's ready and the story card keeps track.
-    onStarted(people, spec.needs.includes("place") ? place : undefined);
-    void act(async () => {
-      const { city: next, result, talked, error } = await api.createSituation({ kind, location_id: place, citizen_ids: [first, second], amount });
-      onMessage(`${spec.icon} ${result.headline} ${talked ? "Watch their reaction." : error ? `(${error})` : "Follow it in “Happening now”."}`);
-      if (result.focus_id) useGameStore.getState().focusOn([result.focus_id]);
-      return next;
-    });
-  };
   const candidates = city.citizens;
   const [candidateA, setCandidateA] = useState(candidates[0]?.citizen_id ?? "");
   const [candidateB, setCandidateB] = useState(candidates[1]?.citizen_id ?? "");
@@ -77,6 +57,20 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
       return next;
     });
   };
+  // Anything at all, in the player's words: the game master decides who it happens to and where.
+  const [idea, setIdea] = useState("");
+  const anything = () => {
+    const text = idea.trim();
+    if (!text) return;
+    setIdea("");
+    void act(async () => {
+      const { city: next, headline, talked, error, story_id } = await api.act(null, null, text);
+      onMessage(`✨ ${headline} ${talked ? "Watch their reaction." : error ? `(${error})` : "Follow it in “Happening now”."}`);
+      const story = next.stories?.find((s) => s.id === story_id);
+      if (story) onStarted(story.focus_ids, story.location_id ?? undefined);
+      return next;
+    });
+  };
   const watch = () => act(async () => {
     await api.setMode("autonomous");
     return api.start();
@@ -84,10 +78,17 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
 
   return (
     <div className="panel-scroll god-panel">
-      <p className="god-intro">You control the world. Change the sky or set up a situation, then watch how everyone reacts, each in their own way.</p>
+      <p className="god-intro">You control the world. Write anything that happens, change the sky or hold an election, then watch how everyone reacts, each in their own way.</p>
       <button className="primary-action full-width" disabled={busy || watching} onClick={() => void watch()}>
         <Play size={16} /> {watching ? "The city is live" : "Watch how they react"}
       </button>
+
+      <h4>Make anything happen</h4>
+      <form className="anything-form" onSubmit={(e) => { e.preventDefault(); anything(); }}>
+        <textarea value={idea} maxLength={400} rows={3} onChange={(e) => setIdea(e.target.value)} aria-label="Describe anything that happens"
+          placeholder="Anything at all. e.g. “Kenji finds Haruto's manga sketchbook”, “a water pipe bursts at the library”, “Yui gets a job offer in Osaka”" />
+        <button className="primary-action full-width" type="submit" disabled={busy || !idea.trim()}><Wand2 size={15} /> Make it happen</button>
+      </form>
 
       <h4>Weather & nature</h4>
       <div className="sky-grid">
@@ -102,46 +103,13 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
         <button className="text-action" disabled={busy || !city.weather_override} onClick={() => void sky(null)}>Back to normal</button>
       </div>
 
-      <h4>Create a situation</h4>
-      <div className="scenario-list">
-        {scenarioCatalog.map((s) => (
-          <div key={s.kind} className="scenario-card" data-open={open === s.kind}>
-            <button className="scenario-head" onClick={() => setOpen(open === s.kind ? null : s.kind)} aria-expanded={open === s.kind}>
-              <span aria-hidden="true">{s.icon}</span>
-              <span><strong>{s.title}</strong><small>{s.blurb}</small></span>
-            </button>
-            {open === s.kind && (
-              <div className="scenario-form">
-                {s.needs.includes("place") && (
-                  <label>Where<select value={place} onChange={(e) => setPlace(e.target.value)}>
-                    {city.locations.map((l) => <option key={l.location_id} value={l.location_id}>{l.name} ({city.citizens.filter((c) => c.current_location_id === l.location_id).length} here)</option>)}
-                  </select></label>
-                )}
-                {(s.needs.includes("person") || s.needs.includes("pair")) && (
-                  <label>{s.needs.includes("pair") ? "First person" : "Who"}<select value={first} onChange={(e) => setFirst(e.target.value)}>
-                    {people.map((c) => <option key={c.citizen_id} value={c.citizen_id}>{c.name} ({c.age})</option>)}
-                  </select></label>
-                )}
-                {s.needs.includes("pair") && (
-                  <label>Second person<select value={second} onChange={(e) => setSecond(e.target.value)}>
-                    {people.map((c) => <option key={c.citizen_id} value={c.citizen_id}>{c.name} ({c.age})</option>)}
-                  </select></label>
-                )}
-                {s.needs.includes("amount") && (
-                  <label>Amount (${amount})<input type="range" min={10} max={2000} step={10} value={amount} onChange={(e) => setAmount(Number(e.target.value))} /></label>
-                )}
-                <button className="primary-action full-width" disabled={busy} onClick={() => void create(s.kind)}>{s.icon} Make it happen</button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-      <div className="scenario-card" data-open={open === ("election" as ScenarioKind)}>
-        <button className="scenario-head" onClick={() => setOpen(open === ("election" as ScenarioKind) ? null : ("election" as ScenarioKind))}>
+      <h4>Hold an election</h4>
+      <div className="scenario-card" data-open={open}>
+        <button className="scenario-head" aria-expanded={open} onClick={() => setOpen(!open)}>
           <span aria-hidden="true">🗳️</span>
           <span><strong>Neighbourhood election</strong><small>Two residents campaign for the neighbourhood association. Everyone gets a secret ballot.</small></span>
         </button>
-        {open === ("election" as ScenarioKind) && (
+        {open && (
           <div className="scenario-form">
             {running ? <p className="muted-copy">An election is already running. Follow it in “Happening now”.</p> : <>
               <label>First candidate<select value={candidateA} onChange={(e) => setCandidateA(e.target.value)}>

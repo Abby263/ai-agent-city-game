@@ -175,7 +175,7 @@ export type CityState = {
   /** Absolute city minute until which residents stay at the evacuation area after a strong earthquake. */
   evacuation_until?: number;
   /** Fires and accidents the player created; fires close the building until they end. */
-  incidents?: import("./scenarios").Incident[];
+  incidents?: import("./incidents").Incident[];
   /** Storylines the player set in motion, with every beat that followed. */
   stories?: import("./stories").Story[];
   departed?: DepartedCitizen[];
@@ -255,6 +255,8 @@ export type Conversation = {
   impacts?: ConversationImpact[];
   /** The player spoke in this exchange; it plays inline in Talk rather than as a cutscene. */
   player_chat?: boolean;
+  /** What each person wants to do next because of this exchange; offered to the player as "what happens next". */
+  intentions?: Record<string, string>;
 };
 
 export type BondSnapshot = Feelings & {
@@ -352,6 +354,8 @@ export type SocialOutcome = {
   mood?: string;
   thought?: string;
   feelings?: Partial<Feelings> & { reason?: string };
+  /** What this person now wants to do because of the exchange, in their own words. */
+  next_intention?: string;
 };
 
 export type Feelings = {

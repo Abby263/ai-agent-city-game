@@ -3,9 +3,7 @@ import test from "node:test";
 import { calendarDay, calendarStartFor, holidayOn } from "../src/lib/calendar";
 import { conditionFromWmo, dayWeather, temperatureAt, weatherAt } from "../src/lib/weather";
 import { routineStop } from "../src/lib/routine";
-import { applyScenario, honesty } from "../src/lib/scenarios";
 import type { LifeNews } from "../src/lib/life";
-import type { BondChange } from "../src/lib/scenarios";
 import { createInitialCity } from "../src/lib/initial-city";
 
 test("the calendar follows Japan, with day 1 on a Monday", () => {
@@ -58,35 +56,3 @@ test("weather changes where people go", () => {
   assert.equal(routineStop(priya, 1, 600, { evacuating: true }).location_id, "loc_school");
 });
 
-test("playing god: dropped money is handed in or kept, with consequences", () => {
-  const city = createInitialCity();
-  const news: LifeNews[] = [];
-  const bonds: BondChange[] = [];
-  for (const c of city.citizens) { c.current_location_id = "loc_homes"; c.current_activity = "Chatting"; }
-  const before = city.citizens.reduce((sum, c) => sum + c.money, 0);
-  const result = applyScenario(city, { kind: "drop_money", location_id: "loc_homes", amount: 200 }, { sink: (n) => news.push(n), adjustBonds: (b) => bonds.push(...b), cityMinute: 1800 });
-  assert.ok(result.focus_id);
-  assert.ok(["honesty", "temptation"].includes(news[0].kind));
-  const after = city.citizens.reduce((sum, c) => sum + c.money, 0);
-  assert.ok(after === before + 20 || after === before + 200, "either a 10% reward or the whole amount");
-  assert.ok(honesty(city.citizens.find((c) => c.name.startsWith("Ava"))!) > 70);
-});
-
-test("playing god: fires close buildings, love sparks only between adults", () => {
-  const city = createInitialCity();
-  const news: LifeNews[] = [];
-  const tools = { sink: (n: LifeNews) => news.push(n), adjustBonds: () => undefined, cityMinute: 1800 };
-  applyScenario(city, { kind: "fire", location_id: "loc_mall" }, tools);
-  assert.equal(city.incidents?.[0].kind, "fire");
-  const [ava, noah] = ["Ava", "Noah"].map((n) => city.citizens.find((c) => c.name.startsWith(n))!.citizen_id);
-  applyScenario(city, { kind: "love_spark", citizen_ids: [ava, noah] }, tools);
-  assert.equal(news.at(-1)?.kind, "spark");
-  // Keep the safety guard covered with an explicit hypothetical minor, not the shipped cast.
-  city.citizens.find((c) => c.citizen_id === ava)!.age = 17;
-  applyScenario(city, { kind: "love_spark", citizen_ids: [ava, noah] }, tools);
-  assert.equal(news.at(-1)?.kind, "friendship");
-  const [yui, daichi] = ["Yui", "Daichi"].map((n) => city.citizens.find((c) => c.name.startsWith(n))!.citizen_id);
-  applyScenario(city, { kind: "love_spark", citizen_ids: [yui, daichi] }, tools);
-  assert.equal(news.at(-1)?.kind, "spark");
-  assert.equal(city.encounter?.target_id, daichi);
-});

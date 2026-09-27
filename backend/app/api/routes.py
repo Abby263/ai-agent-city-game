@@ -18,6 +18,7 @@ from app.cognition.errors import CognitionUnavailableError, CognitionValidationE
 from app.cognition.pipeline import CognitionPipeline
 from app.cognition.elections import ElectionDecision, ElectionDecisionRequest, decide_election
 from app.cognition.encounters import SocialDecision, SocialDecisionRequest, decide_social
+from app.cognition.actions import ActInterpretation, ActRequest, interpret
 from app.config import get_settings
 from app.database import get_db
 from app.models import CitizenORM, ConversationORM, MemoryORM, RelationshipORM
@@ -68,6 +69,14 @@ def _reject_unsafe_player_text(*texts: str | None) -> None:
     if message := unsafe_player_text_message(*texts):
         raise HTTPException(status_code=400, detail=message)
 
+
+def _reject_unsafe_prompts(*citizens) -> None:
+    """Character prompts the player rewrote get the same checks as anything else the player types."""
+    for citizen in citizens:
+        personality = getattr(citizen, "personality", None) or {}
+        if personality.get("prompt_edited") and (message := unsafe_player_text_message(str(personality.get("prompt") or ""))):
+            raise HTTPException(status_code=400, detail=f"{citizen.name}'s character prompt: {message}")
+
 settings = get_settings()
 engine = SimulationEngine(settings)
 cognition = CognitionPipeline(settings)
@@ -76,6 +85,7 @@ cognition = CognitionPipeline(settings)
 @router.post("/cognition/election", response_model=ElectionDecision)
 def election_decision(request: ElectionDecisionRequest) -> ElectionDecision:
     _reject_unsafe_player_text(*(candidate.platform for candidate in request.candidates))
+    _reject_unsafe_prompts(request.citizen)
     if not settings.real_llm_enabled:
         raise HTTPException(status_code=503, detail="An AI provider key is required for independent election decisions.")
     try:
@@ -175,8 +185,30 @@ def get_citizen_conversations(citizen_id: str, db: Session = Depends(get_db)) ->
 
 @router.post("/cognition/social", response_model=SocialDecision)
 def social_decision(request: SocialDecisionRequest) -> SocialDecision:
+    _reject_unsafe_prompts(request.citizen)
     try:
         return decide_social(cognition.client.deep_agents, request)
+    except CognitionUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except CognitionValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.get("/cognition/rules")
+def cognition_rules() -> dict[str, str]:
+    """The fixed rules every resident follows, shown read-only next to their editable character prompt."""
+    from app.cognition.deep_agents import GAME_RULES
+    from app.safety import CITIZEN_SAFETY_RULES
+    return {"game_rules": GAME_RULES.strip(), "safety_rules": CITIZEN_SAFETY_RULES.strip()}
+
+
+@router.post("/cognition/act", response_model=ActInterpretation)
+def act_interpretation(request: ActRequest) -> ActInterpretation:
+    """Reads a free-text action or situation the player wrote and returns bounded effects."""
+    _reject_unsafe_player_text(request.text)
+    _reject_unsafe_prompts(*(c for c in (request.actor, request.target) if c))
+    try:
+        return interpret(cognition.client, request)
     except CognitionUnavailableError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except CognitionValidationError as error:
@@ -189,6 +221,7 @@ def session_cognition(request: SessionCognitionRequest) -> SessionCognitionRespo
     actor = next((citizen for citizen in request.city.citizens if citizen.citizen_id == request.actor_id), None)
     if not actor:
         raise HTTPException(status_code=404, detail="Actor citizen not found in session state")
+    _reject_unsafe_prompts(*(c for c in request.city.citizens if c.citizen_id in {request.actor_id, request.target_id, request.required_target_id}))
 
     requested_target_id = request.target_id or request.required_target_id
     target = (

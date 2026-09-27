@@ -24,15 +24,16 @@ import type { DecideElection, Election, ElectionDecision, ElectionDecisionReques
 import { assertPlayerTextSafe } from "./safety";
 import { validateCognition } from "./cognition-validation";
 import { isWeekend, routineStop, weekday, type RoutineContext } from "./routine";
+import { agreedPlan } from "./plans";
+import { MAX_PROMPT } from "./character-prompt";
+import { actBlocked, actRequest, applyAct, resolveProposal, type ActInterpretation, type ActRequest, type BondChange } from "./acts";
 import { calendarDay, calendarStartFor, realCityTime } from "./calendar";
 import { dayWeather, weatherAt, type WeatherOverride } from "./weather";
 import { weatherEffects } from "./life";
-import { activeIncidents, applyScenario, type BondChange, type ScenarioRequest } from "./scenarios";
-import { actionBlocked, actions as actionCatalog, performAction, type ActionId, type ActionOutcome } from "./actions";
+import { activeIncidents } from "./incidents";
 import { addBeat, beatForConversation, beatForNews, startStory } from "./stories";
-import { scenarioCatalog } from "./scenarios";
 import type { LifeNews } from "./life";
-import { bedRest, careNeeded, caregiverFor, ensureLife, gatheringFor, healthCap, lifeDay, lifeTick, recordMeal, relatives, shiftLife } from "./life";
+import { bedRest, careNeeded, caregiverFor, ensureLife, gatheringFor, healthCap, lifeDay, lifeTick, recordMeal, relationName, relatives, shiftLife } from "./life";
 import type { BondLookup, LifeFactory, LifeSink } from "./life";
 
 const SESSION_VERSION = "v12";
@@ -207,6 +208,7 @@ export async function sessionStart() {
   }
   city.clock.running = true;
   delete city.policy.autonomy_error;
+  city.policy.autonomy_failures = 0;
   addEvent(city, {
     event_type: "simulation_started",
     description: "The city simulation started.",
@@ -613,23 +615,9 @@ export async function sessionTick(generateCognition: GenerateCognition, decideEl
   } else if (city.simulation_mode === "autonomous" && liveElection(city)) {
     await advanceElection(city, generateCognition, decideElection);
   } else if (city.simulation_mode === "autonomous") {
-      await advanceSocial(city, checkedCognition, decideSocial).catch(
-        (error: unknown) => {
-          if (isStale(city)) return;
-          const reason = error instanceof Error
-            ? error.name === "TimeoutError" ? "The AI conversation took too long. Resume Auto to retry." : error.message
-            : "The AI conversation could not finish. Resume Auto to retry.";
-          city.clock.running = false;
-          city.policy.autonomy_error = reason;
-          addEvent(city, {
-            event_type: "agent_cognition_blocked",
-            location_id: city.encounter?.location_id ?? null,
-            actors: city.encounter ? [city.encounter.actor_id, city.encounter.target_id] : [],
-            description: `Auto paused: ${reason}`,
-            payload: {},
-            priority: 3,
-          });
-        },
+      await advanceSocial(city, checkedCognition, decideSocial).then(
+        () => { city.policy.autonomy_failures = 0; },
+        (error: unknown) => { if (!isStale(city)) socialFailure(city, error); },
       );
   }
 
@@ -1216,10 +1204,10 @@ export async function sessionSocialBeat(generateCognition: GenerateCognition, de
   };
   try {
     await advanceSocial(city, checked, decideSocial, true);
+    city.policy.autonomy_failures = 0;
   } catch (error) {
     if (isStale(city)) return requireSessionCity();
-    city.clock.running = false;
-    city.policy.autonomy_error = error instanceof Error ? error.message : "The AI conversation could not finish.";
+    socialFailure(city, error);
   }
   if (isStale(city)) return requireSessionCity();
   return saveAndReturn(city);
@@ -1241,108 +1229,116 @@ export function routineContext(city: CityState): RoutineContext {
     publicHoliday: Boolean(today.holiday),
     weather: city.weather,
     evacuating: (city.evacuation_until ?? 0) > cityMinute(city),
-    closed: activeIncidents(city, cityMinute(city)).filter((i) => i.kind === "fire").map((i) => i.location_id),
+    closed: activeIncidents(city, cityMinute(city)).filter((i) => i.kind === "fire" || i.kind === "closure").map((i) => i.location_id),
   };
-}
-
-/** Player-created situations: the world changes now, and residents talk it through in Auto. */
-export async function sessionCreateSituation(request: ScenarioRequest, generate?: GenerateCognition) {
-  const city = requireSessionCity();
-  city.incidents = activeIncidents(city, cityMinute(city));
-  const news: LifeNews[] = [];
-  const sink = lifeSink(city);
-  const result = applyScenario(city, request, { sink: (item) => { news.push(item); sink(item); }, adjustBonds: (changes) => adjustBonds(city, changes), cityMinute: cityMinute(city) });
-  const spec = scenarioCatalog.find((s) => s.kind === request.kind);
-  const encounter = city.encounter;
-  const actors = [...new Set([...news.flatMap((n) => n.actors), ...(encounter ? [encounter.actor_id, encounter.target_id] : []), ...(request.citizen_ids ?? []).slice(0, spec?.needs.includes("pair") ? 2 : spec?.needs.includes("person") ? 1 : 0)])];
-  const story = startStory(city, {
-    id: newId("story"), kind: request.kind, icon: spec?.icon ?? "✨", title: result.headline, actors: actors.slice(0, 12),
-    focus_ids: [result.focus_id, encounter?.actor_id, encounter?.target_id].filter((id): id is string => Boolean(id)),
-    location_id: request.location_id ?? encounter?.location_id ?? null,
-    first: { icon: spec?.icon ?? "✨", text: news[0]?.headline ?? result.headline },
-  });
-  city.encounter = null;
-  const saved = saveAndReturn(city);
-  if (!encounter || !generate) return { city: saved, result, story_id: story.id, talked: false };
-  // The people involved react right away instead of waiting for the next tick.
-  const live = requireSessionCity();
-  try {
-    const actor = findCitizen(live, encounter.actor_id), target = findCitizen(live, encounter.target_id);
-    actor.current_location_id = target.current_location_id;
-    actor.x = actor.target_x = target.x;
-    actor.y = actor.target_y = target.y;
-    const event = addEvent(live, { event_type: "social_opportunity", actors: [actor.citizen_id, target.citizen_id], location_id: target.current_location_id,
-      description: encounter.reason, payload: { topic: encounter.topic, kind: "chance" }, priority: 2 });
-    addBeat(live, story.id, { icon: "🚶", text: `${actor.name.split(" ")[0]} goes to ${target.name.split(" ")[0]} to talk about ${encounter.topic}.` });
-    await runAutonomousCognition(live, event, generate);
-    if (isStale(live)) return { city: requireSessionCity(), result, story_id: story.id, talked: false };
-    return { city: saveAndReturn(live), result, story_id: story.id, talked: true };
-  } catch (error) {
-    return { city: isStale(live) ? requireSessionCity() : saved, result, story_id: story.id, talked: false, error: error instanceof Error ? error.message : "They could not talk right now." };
-  }
 }
 
 /**
  * Any resident can do something to any other: the actor goes to the target, the action takes effect
  * at once, then the target reacts in their own AI-generated words (only the reply when the player acts).
  */
-/** A choice made in "What happens next?": continue that story, or start one so the thread stays tracked. */
-export type ActionThread = { storyId?: string; track?: boolean };
-
-export async function sessionPerformAction(actorId: string, targetId: string, actionId: ActionId, note: string, generate: GenerateCognition, thread: ActionThread = {}):
-  Promise<{ city: CityState; outcome: ActionOutcome; talked: boolean; error?: string }> {
+/** Saves a resident's character prompt as the player wrote it; the next AI call for them follows it. Empty resets to their profile. */
+export async function sessionSetCharacterPrompt(citizenId: string, prompt: string | null) {
   const city = requireSessionCity();
-  const actor = findCitizen(city, actorId), target = findCitizen(city, targetId);
-  const blocked = actionBlocked(city, actor, target, actionId);
+  const citizen = findCitizen(city, citizenId);
+  const text = (prompt ?? "").trim();
+  if (!text) {
+    const { prompt: _dropped, prompt_edited: _edited, ...rest } = citizen.personality;
+    citizen.personality = rest;
+  } else {
+    if (text.length > MAX_PROMPT) throw new Error(`Keep the prompt under ${MAX_PROMPT} characters.`);
+    assertPlayerTextSafe(text);
+    citizen.personality = { ...citizen.personality, prompt: text, prompt_edited: true };
+  }
+  addEvent(city, { event_type: "prompt_edited", actors: [citizen.citizen_id], description: text ? `The player rewrote ${citizen.name}'s character prompt.` : `${citizen.name}'s character prompt was reset to their profile.`, priority: 1 });
+  return saveAndReturn(city);
+}
+
+/** The game master that reads free-text actions and situations (the backend /cognition/act). */
+export type InterpretAct = (request: ActRequest) => Promise<ActInterpretation>;
+export type ActResult = { city: CityState; headline: string; talked: boolean; story_id: string; error?: string };
+
+/**
+ * Anything the player writes, with no fixed list of actions: "Tom asks Maya to move in", "Kenji finds Haruto's
+ * sketchbook", or, with nobody acting, "a water pipe bursts at the library". The words are interpreted, capped
+ * effects applied, the story tracked, and the people involved react in their own words. A relationship step
+ * (a date, an engagement, moving in) happens only if the person asked says yes in that reaction.
+ */
+export async function sessionAct(actorId: string | null, targetId: string | null, text: string, interpret: InterpretAct, generate: GenerateCognition, thread: ActionThread = {}): Promise<ActResult> {
+  const city = requireSessionCity();
+  const words = text.trim().slice(0, 400);
+  if (!words) throw new Error("Write what happens.");
+  assertPlayerTextSafe(words);
+  const actor = actorId ? findCitizen(city, actorId) : null;
+  const target = targetId ? findCitizen(city, targetId) : null;
+  if (actor && target && actor === target) throw new Error("Choose someone else.");
+  const tools = { sink: lifeSink(city), adjustBonds: (changes: BondChange[]) => adjustBonds(city, changes), bond: bondLookup(city) };
+  const act = await interpret(actRequest(city, words, actor, target, describeNow(city), tools.bond));
+  if (isStale(city)) throw new Error("This action was interrupted.");
+  const blocked = actBlocked(city, actor, target, act);
   if (blocked) throw new Error(blocked);
-  const text = note.trim().slice(0, 300);
-  if (text) assertPlayerTextSafe(text);
-  const baseline: ActionBaseline = ensureRelationships(city)
-    .filter((r) => (r.citizen_id === actorId && r.other_citizen_id === targetId) || (r.citizen_id === targetId && r.other_citizen_id === actorId))
-    .map((r) => ({ relationship: structuredClone(r), mood: r.citizen_id === actorId ? actor.mood : target.mood }));
-  actor.current_location_id = target.current_location_id;
-  actor.x = actor.target_x = target.x;
-  actor.y = actor.target_y = target.y;
-  actor.current_activity = `With ${target.name}`;
-  if (actorId === city.policy.player_citizen_id) city.policy.player_destination = null;
-  if (city.encounter && [actorId, targetId].some((id) => [city.encounter!.actor_id, city.encounter!.target_id].includes(id))) city.encounter = null;
-  const outcome = performAction(city, actor, target, actionId, { sink: lifeSink(city), adjustBonds: (changes) => adjustBonds(city, changes), bond: bondLookup(city) }, text);
-  const spec = actionCatalog.find((a) => a.id === actionId)!;
+  if (actor?.citizen_id === city.policy.player_citizen_id) city.policy.player_destination = null;
+  // How the two felt before the act, so their reaction shows before, after the act, and after talking.
+  const baseline: ActionBaseline | undefined = actor && target ? ensureRelationships(city)
+    .filter((r) => (r.citizen_id === actor.citizen_id && r.other_citizen_id === target.citizen_id) || (r.citizen_id === target.citizen_id && r.other_citizen_id === actor.citizen_id))
+    .map((r) => ({ relationship: structuredClone(r), mood: r.citizen_id === actor.citizen_id ? actor.mood : target.mood })) : undefined;
+  const applied = applyAct(city, act, words, actor, target, tools);
+  const pairIds = applied.pair?.map((c) => c.citizen_id) ?? [];
+  if (city.encounter && pairIds.some((id) => [city.encounter!.actor_id, city.encounter!.target_id].includes(id))) city.encounter = null;
   const story = thread.storyId ? city.stories?.find((s) => s.id === thread.storyId) : undefined;
+  let storyId = story?.id ?? "";
   if (story) {
-    story.actors = [...new Set([...story.actors, actorId, targetId])];
+    story.actors = [...new Set([...story.actors, ...pairIds, ...act.involved_ids])];
     story.ends = Math.max(story.ends, cityMinute(city) + 12 * 60);
-    addBeat(city, story.id, { icon: "👉", text: `You chose: ${outcome.headline}` });
-    story.latest = `action_${actionId}`;
-  } else if (thread.track || spec.group === "love" || spec.group === "conflict" || actionId === "gift") {
-    const onlookers = city.citizens.filter((c) => c !== actor && c !== target && c.current_location_id === target.current_location_id).map((c) => c.citizen_id);
-    startStory(city, { id: newId("story"), kind: `action_${actionId}`, icon: spec.icon, title: outcome.headline, actors: [actorId, targetId, ...onlookers].slice(0, 10),
-      focus_ids: [actorId, targetId], location_id: target.current_location_id, first: { icon: spec.icon, text: outcome.headline }, length: 24 * 60 });
+    addBeat(city, story.id, { icon: "👉", text: `You chose: ${applied.headline}` });
+  } else {
+    storyId = newId("story");
+    const onlookers = city.citizens.filter((c) => !pairIds.includes(c.citizen_id) && c.current_location_id === applied.location_id).map((c) => c.citizen_id);
+    startStory(city, { id: storyId, kind: actor ? `act_${act.tone}` : "situation", icon: applied.icon, title: applied.headline,
+      actors: [...new Set([...pairIds, ...act.involved_ids, ...onlookers])].slice(0, 12), focus_ids: pairIds.length ? pairIds : act.involved_ids.slice(0, 2),
+      location_id: applied.location_id, first: { icon: applied.icon, text: applied.headline }, length: 24 * 60 });
   }
   const saved = saveAndReturn(city);
-  if (actor.age < 3 || target.age < 3) return { city: saved, outcome, talked: false };
+  const pair = applied.pair;
+  if (!pair || pair.some((c) => c.age < 3)) return { city: saved, headline: applied.headline, talked: false, story_id: storyId };
   const live = requireSessionCity();
-  const liveActor = findCitizen(live, actorId), liveTarget = findCitizen(live, targetId);
+  const [a, b] = pair.map((c) => findCitizen(live, c.citizen_id));
+  const player = live.policy.player_citizen_id;
+  // The AI never speaks for the resident you play: if something is done to you, you answer in Talk.
+  if (b.citizen_id === player) return { city: saved, headline: applied.headline, talked: false, story_id: storyId };
   try {
-    if (actorId === live.policy.player_citizen_id) {
-      const response = await generate({ city: live, actor_id: actorId, target_id: targetId, require_conversation: true, task: "Respond to the player's action and words.",
-        player_utterance: outcome.utterance, prior_lines: recentChat(live, actorId, targetId), observations: [outcome.reason], memories: [],
-        private_memories: { [actorId]: privateMemoryContext(liveActor, targetId), [targetId]: privateMemoryContext(liveTarget, actorId) } });
-      if (isStale(live)) return { city: requireSessionCity(), outcome, talked: false };
-      applyAutonomousCognition(live, liveActor, liveTarget, { event_id: newId("action"), location_id: liveTarget.current_location_id } as CityEvent, response, baseline);
-      markPlayerChat(actorId, targetId);
+    let response: SessionCognitionResponse | undefined;
+    if (a.citizen_id === player) {
+      response = await generate({ city: live, actor_id: a.citizen_id, target_id: b.citizen_id, require_conversation: true, task: "Respond to what the player's character just did.",
+        player_utterance: `*${words}*`, prior_lines: recentChat(live, a.citizen_id, b.citizen_id), observations: [act.reaction || applied.headline], memories: [],
+        private_memories: { [a.citizen_id]: privateMemoryContext(a), [b.citizen_id]: privateMemoryContext(b) } });
+      if (isStale(live)) return { city: requireSessionCity(), headline: applied.headline, talked: false, story_id: storyId };
+      applyAutonomousCognition(live, a, b, { event_id: newId("action"), location_id: b.current_location_id } as CityEvent, response, baseline);
+      markPlayerChat(a.citizen_id, b.citizen_id);
       live.policy.player_lines = Number(live.policy.player_lines ?? 0) + 1;
     } else {
-      const event = addEvent(live, { event_type: "player_action", actors: [actorId, targetId], location_id: liveTarget.current_location_id,
-        description: outcome.reason, payload: { topic: outcome.topic, kind: "chance" }, priority: 2 });
-      await runAutonomousCognition(live, event, generate, baseline);
-      if (isStale(live)) return { city: requireSessionCity(), outcome, talked: false };
+      const event = addEvent(live, { event_type: "player_action", actors: [a.citizen_id, b.citizen_id], location_id: b.current_location_id,
+        description: act.reaction || applied.headline, payload: { topic: applied.headline, kind: "chance" }, priority: 2 });
+      response = await runAutonomousCognition(live, event, generate, baseline);
+      if (isStale(live)) return { city: requireSessionCity(), headline: applied.headline, talked: false, story_id: storyId };
     }
-    return { city: saveAndReturn(live), outcome, talked: true };
+    if (actor && target && response) {
+      const answer = response.participant_outcomes?.[target.citizen_id]?.invitation_response;
+      if (answer === "accepted" || answer === "declined") {
+        const liveTools = { sink: lifeSink(live), adjustBonds: (changes: BondChange[]) => adjustBonds(live, changes), bond: bondLookup(live) };
+        const step = resolveProposal(live, act.proposal, findCitizen(live, actor.citizen_id), findCitizen(live, target.citizen_id), answer === "accepted", liveTools);
+        if (step && storyId) addBeat(live, storyId, { icon: answer === "accepted" ? "💍" : "🙅", text: step });
+      }
+    }
+    return { city: saveAndReturn(live), headline: applied.headline, talked: true, story_id: storyId };
   } catch (error) {
-    return { city: isStale(live) ? requireSessionCity() : saved, outcome, talked: false, error: error instanceof Error ? error.message : "They could not talk right now." };
+    return { city: isStale(live) ? requireSessionCity() : saved, headline: applied.headline, talked: false, story_id: storyId,
+      error: error instanceof Error ? error.message : "They could not react right now." };
   }
 }
+
+/** A choice made in "What happens next?" continues that story instead of starting a new one. */
+export type ActionThread = { storyId?: string };
 
 /** The resident you play goes over to someone, ready to talk. No AI call: you speak first. */
 export async function sessionApproach(targetId: string) {
@@ -1672,7 +1668,7 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
       const people = meeting.actor_ids.map((id) => city.citizens.find((c) => c.citizen_id === id));
       if (people.every((c) => c && sociallyAvailable(c, city.policy.player_citizen_id) && c.current_location_id === meeting.location_id)) {
         city.encounter = { actor_id: meeting.actor_ids[0], target_id: meeting.actor_ids[1], location_id: meeting.location_id, topic: meeting.topic,
-          reason: `They both kept their plan to meet at ${locationName(city, meeting.location_id)} about ${meeting.topic}.`, started_at: now - 15, meeting_id: meeting.id };
+          reason: `They both kept their plan to meet at ${locationName(city, meeting.location_id)}: ${meeting.topic}.`, started_at: now - 15, meeting_id: meeting.id };
       }
     }
   }
@@ -1708,20 +1704,61 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
   if (!decide) throw new Error("Social decision service is unavailable.");
   const decision = await decide({ citizen: clone(choice.actor), city_time: describeNow(city),
     location: locationName(city, choice.actor.current_location_id), memories: privateMemoryContext(choice.actor),
-    nearby: choice.nearby.map((c) => ({ citizen_id: c.citizen_id, name: c.name, activity: c.current_activity })) });
+    on_your_mind: onTheirMind(choice.actor),
+    nearby: choice.nearby.map((c) => ({ citizen_id: c.citizen_id, name: c.name, activity: c.current_activity, ...howTheySee(city, choice.actor, c) })) });
   if (isStale(city)) throw new Error("This action was interrupted.");
   if (!decision.reason?.trim() || (decision.target_id && (!decision.topic?.trim() || !choice.nearby.some((c) => c.citizen_id === decision.target_id)))) throw new Error("The citizen selected an unavailable encounter.");
   city.policy.last_social_choice = now;
   city.policy.social_choice_times = { ...turns, [choice.actor.citizen_id]: now };
   choice.actor.current_thought = decision.reason;
   if (!decision.target_id) {
-    addEvent(city, { event_type: "quiet_moment", actors: [choice.actor.citizen_id], description: `${choice.actor.name} chose some time alone: ${decision.reason}`, priority: 1 });
+    addEvent(city, { event_type: "quiet_moment", actors: [choice.actor.citizen_id], description: `${choice.actor.name} kept it to themselves for now: ${decision.reason}`, priority: 1 });
     return;
   }
   city.encounter = { actor_id: choice.actor.citizen_id, target_id: decision.target_id, location_id: choice.actor.current_location_id,
     reason: decision.reason, topic: decision.topic, started_at: now };
   addEvent(city, { event_type: "encounter_intention", actors: [choice.actor.citizen_id, decision.target_id], location_id: choice.actor.current_location_id,
     description: `${choice.actor.name} wants to approach ${findCitizen(city, decision.target_id).name}: ${decision.reason}`, priority: 2 });
+}
+
+/**
+ * One slow or failed AI call must not freeze the town: that encounter is dropped and life carries on.
+ * Auto pauses only when the AI keeps failing (three in a row) or is not configured at all.
+ */
+function socialFailure(city: CityState, error: unknown) {
+  const failures = Number(city.policy.autonomy_failures ?? 0) + 1;
+  city.policy.autonomy_failures = failures;
+  const pair = city.encounter ? [city.encounter.actor_id, city.encounter.target_id] : [];
+  const where = city.encounter?.location_id ?? null;
+  if (city.encounter) city.encounter = null;
+  const reason = error instanceof Error ? (error.name === "TimeoutError" ? "The AI took too long." : error.message) : "The AI could not finish.";
+  // A missing key or an exhausted quota won't fix itself on the next try: pause straight away.
+  if (failures >= 3 || /configure|api key|cognition is unavailable|quota|rate limit/i.test(reason)) {
+    city.clock.running = false;
+    city.policy.autonomy_error = `${reason} Resume Auto to try again.`;
+    addEvent(city, { event_type: "agent_cognition_blocked", location_id: where, actors: pair, description: `Auto paused: ${reason} Resume Auto to try again.`, payload: {}, priority: 3 });
+    return;
+  }
+  const names = pair.map((id) => city.citizens.find((c) => c.citizen_id === id)?.name.split(" ")[0]).filter(Boolean).join(" and ");
+  addEvent(city, { event_type: "conversation_fizzled", location_id: where, actors: pair,
+    description: `${names || "Two neighbours"} didn't get to talk (${reason}). The town carries on.`, payload: {}, priority: 1 });
+}
+
+/** Who someone is to this resident, and what they remember of them: only their own view, never the other's private mind. */
+function howTheySee(city: CityState, me: CitizenAgent, other: CitizenAgent) {
+  const bond = bondLookup(city)(me.citizen_id, other.citizen_id);
+  const feelings = bond?.feelings ? Object.entries(bond.feelings).filter(([, v]) => Number(v) >= 30).map(([k]) => k) : [];
+  const relation = relationName(city, me, other);
+  const relationship = [relation && relation !== "family" ? `your ${relation}` : relation, bond ? bondLabel(bond).toLowerCase() : "a stranger", feelings.length ? `you feel ${feelings.join(" and ")}` : ""]
+    .filter(Boolean).join(", ").slice(0, 240);
+  const you_know = sessionMemories(me.citizen_id).filter((m) => m.related_citizen_id === other.citizen_id).slice(0, 2)
+    .map((m) => m.content.replace(/\s+/g, " ").slice(0, 280)).join(" | ").slice(0, 600);
+  return { relationship, you_know };
+}
+
+/** What happened to them or what they heard recently that they might act on or pass on. */
+function onTheirMind(citizen: CitizenAgent) {
+  return sessionMemories(citizen.citizen_id).filter((m) => m.importance >= 0.7).slice(0, 6).map((m) => m.content.replace(/\s+/g, " ").slice(0, 220));
 }
 
 function currentTaskTarget(city: CityState, task: PlayerTaskData) {
@@ -1996,6 +2033,7 @@ async function runAutonomousCognition(
   });
   if (isStale(city)) return;
   applyAutonomousCognition(city, actor, target, event, response, baseline);
+  return response;
 }
 
 function applyAutonomousCognition(
@@ -2083,6 +2121,10 @@ function applyAutonomousCognition(
       meeting_id: typeof sourceEvent.payload?.meeting_id === "string" ? sourceEvent.payload.meeting_id : undefined,
     } as EncounterContext : undefined,
   };
+  const intentions = Object.fromEntries(Object.entries(response.participant_outcomes ?? {})
+    .map(([id, outcome]) => [id, String(outcome?.next_intention ?? "").trim().slice(0, 160)])
+    .filter(([id, text]) => text && savedConversation.actor_ids.includes(id)));
+  if (Object.keys(intentions).length) savedConversation.intentions = intentions;
   recordMeeting(city, response, savedConversation);
   savedConversation.impacts = strengthenRelationship(city, actor, target, response, savedConversation.conversation_id);
   for (const impact of savedConversation.impacts) {
@@ -2197,7 +2239,11 @@ function applySoloCognition(
 }
 
 function recordMeeting(city: CityState, response: SessionCognitionResponse, conversation: Conversation) {
-  const meeting = acceptMeeting(city, response.meeting_plan, conversation.actor_ids, conversation.conversation_id);
+  // A plan both people agreed to out loud counts even when the model didn't flag it, so promises can be kept or broken.
+  const spoken = response.meeting_plan ? null : agreedPlan(conversation.transcript, city);
+  const plan = response.meeting_plan ?? (spoken && { actor_ids: conversation.actor_ids.slice(0, 2), location_id: spoken.location_id,
+    game_day: spoken.day, game_minute: spoken.minute, topic: spoken.topic });
+  const meeting = acceptMeeting(city, plan, conversation.actor_ids, conversation.conversation_id);
   if (!meeting) return;
   city.meetings = [...(city.meetings ?? []).filter((m) => m.id !== meeting.id).slice(-39), meeting];
   const at = `${String(Math.floor(meeting.game_minute / 60)).padStart(2, "0")}:${String(meeting.game_minute % 60).padStart(2, "0")}`;

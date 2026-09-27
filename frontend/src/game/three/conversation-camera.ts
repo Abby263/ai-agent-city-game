@@ -52,3 +52,12 @@ export function conversationCameraOffset(target: THREE.Vector3, heads: THREE.Vec
   }
   return best;
 }
+
+/** True when a camera at `position` can see every head without a roof, wall or tree in the way. */
+export function sightLinesClear(position: THREE.Vector3, heads: THREE.Vector3[], town: THREE.Object3D) {
+  town.updateMatrixWorld(true);
+  return heads.every((head) => {
+    const direction = head.clone().sub(position);
+    return !new THREE.Raycaster(position, direction.clone().normalize(), 0, direction.length() - 0.15).intersectObject(town, true).length;
+  });
+}

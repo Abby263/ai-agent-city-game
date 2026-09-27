@@ -3,8 +3,11 @@ import type { CitizenAgent, CityState } from "./types";
 export type SocialDecision = { target_id: string | null; reason: string; topic: string };
 export type SocialDecisionRequest = {
   citizen: CitizenAgent; city_time: string; location: string;
-  nearby: Array<{ citizen_id: string; name: string; activity: string }>;
+  /** Each person nearby, with who they are to this resident and what this resident remembers of them. */
+  nearby: Array<{ citizen_id: string; name: string; activity: string; relationship?: string; you_know?: string }>;
   memories: string[];
+  /** Recent news and events this resident might act on or pass on. */
+  on_your_mind?: string[];
 };
 export type DecideSocial = (request: SocialDecisionRequest) => Promise<SocialDecision>;
 export type Encounter = {

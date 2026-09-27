@@ -4,10 +4,10 @@ import { useState } from "react";
 import { ChevronDown, ChevronUp, Eye, Play, RotateCcw, X } from "lucide-react";
 import { activeStories, type Story } from "@/lib/stories";
 import { liveElection, playerTurn } from "@/lib/elections";
-import { nextChoices, type Choice } from "@/lib/choices";
-import { ChoiceButtons } from "./NextChoices";
+import { nextMoves, type NextMove } from "@/lib/next-moves";
+import { MoveButtons, WriteWhatHappens } from "./NextChoices";
 import { useGameStore } from "@/lib/store";
-import type { CityState } from "@/lib/types";
+import type { CityState, Conversation } from "@/lib/types";
 
 const hhmm = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 
@@ -16,10 +16,11 @@ export function watchStory(story: Story) {
 }
 
 /** "Happening now": the latest storyline you set in motion, beat by beat, with a button to watch it. */
-export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onVote, onAsk, onChoose, onRetryElection }: {
-  city: CityState; onOpenAll: () => void; busy?: boolean; onOpenBallots?: () => void;
+export function StoryTracker({ city, conversations = [], onOpenAll, busy = false, onOpenBallots, onVote, onAsk, onChoose, onWrite, onRetryElection }: {
+  city: CityState; conversations?: Conversation[]; onOpenAll: () => void; busy?: boolean; onOpenBallots?: () => void;
   onVote?: (candidateId: string | null) => void; onAsk?: (candidateId: string) => void;
-  onChoose?: (choice: Choice, storyId: string) => void;
+  onChoose?: (move: NextMove, storyId: string) => void;
+  onWrite?: (actorId: string | null, text: string, storyId: string) => void;
   onRetryElection?: () => void;
 }) {
   const stories = activeStories(city);
@@ -31,9 +32,11 @@ export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onV
   const turn = election ? playerTurn(city) : undefined;
   const me = turn && city.citizens.find((c) => c.citizen_id === turn.voterId)?.name.split(" ")[0];
   const latestTalk = [...story.beats].reverse().find((b) => b.conversation_id);
-  const choices = story.kind === "election" ? [] : nextChoices(city, story.focus_ids, story.latest ?? story.kind);
-  // With choices on the card, the two latest beats are enough context.
-  const beats = story.beats.slice(open ? (choices.length && onChoose ? -2 : -3) : -1);
+  // What happens next comes from what the people in it now want, plus anything the player writes.
+  const deciding = !election && open && Boolean(onChoose && onWrite);
+  const choices = deciding ? nextMoves(city, conversations.find((c) => c.conversation_id === latestTalk?.conversation_id)) : [];
+  const people = story.focus_ids.map((id) => city.citizens.find((c) => c.citizen_id === id)).filter((c) => c !== undefined);
+  const beats = story.beats.slice(open ? (deciding ? -2 : -3) : -1);
   return (
     <section className="story-tracker" aria-label="Happening now" aria-live="polite">
       <header>
@@ -87,10 +90,11 @@ export function StoryTracker({ city, onOpenAll, busy = false, onOpenBallots, onV
           </div>
         </div>
       )}
-      {!election && open && onChoose && choices.length > 0 && (
+      {deciding && (
         <div className="story-next">
           <small>What happens next? You decide.</small>
-          <ChoiceButtons choices={choices} busy={busy} onPick={(c) => onChoose(c, story.id)} />
+          <MoveButtons moves={choices} busy={busy} onPick={(m) => onChoose!(m, story.id)} />
+          <WriteWhatHappens key={story.id} people={people} busy={busy} onWrite={(actor, text) => onWrite!(actor, text, story.id)} />
         </div>
       )}
       <div className="story-actions">

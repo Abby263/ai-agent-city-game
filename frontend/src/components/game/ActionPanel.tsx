@@ -1,19 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { Wand2 } from "lucide-react";
 import { CitizenPortrait } from "./CitizenPortrait";
-import { actionBlocked, actions, type ActionGroup, type ActionId } from "@/lib/actions";
 import { api } from "@/lib/api";
 import type { CitizenAgent, CityState } from "@/lib/types";
 
-const groups: Array<{ id: ActionGroup; label: string }> = [
-  { id: "talk", label: "Talk" },
-  { id: "kind", label: "Be kind" },
-  { id: "love", label: "Love (grown-ups)" },
-  { id: "conflict", label: "Conflict" },
-];
-
-/** Make any resident do something to any other, then watch both of them react. */
+/** Make a resident do anything, in your own words: to someone, or on their own. Then watch the reaction. */
 export function ActionPanel({ city, actor, initialTargetId, busy, act, onMessage }: {
   city: CityState;
   actor: CitizenAgent;
@@ -26,19 +19,20 @@ export function ActionPanel({ city, actor, initialTargetId, busy, act, onMessage
   const others = city.citizens.filter((c) => c.citizen_id !== actor.citizen_id);
   const nearby = others.filter((c) => c.current_location_id === actor.current_location_id);
   const [targetId, setTargetId] = useState(others.some((c) => c.citizen_id === initialTargetId) ? initialTargetId! : (nearby[0] ?? others[0])?.citizen_id ?? "");
-  const [note, setNote] = useState("");
+  const [text, setText] = useState("");
   const [result, setResult] = useState("");
   const target = others.find((c) => c.citizen_id === targetId);
   const place = (id: string) => city.locations.find((l) => l.location_id === id)?.name ?? "town";
   const first = actor.name.split(" ")[0];
 
-  const run = (id: ActionId) => {
-    if (!target) return;
+  const run = () => {
+    const words = text.trim();
+    if (!words) return;
     void act(async () => {
-      const { city: next, outcome, talked, error } = await api.performAction(actor.citizen_id, target.citizen_id, id, note);
-      setNote("");
-      setResult(outcome.headline);
-      onMessage(talked ? `${outcome.headline} Watch how they react.` : error ? `${outcome.headline} (${error})` : outcome.headline);
+      const { city: next, headline, talked, error } = await api.act(actor.citizen_id, target?.citizen_id ?? null, words);
+      setText("");
+      setResult(headline);
+      onMessage(error ? `${headline} (${error})` : talked ? `${headline} Watch how they react.` : headline);
       return next;
     });
   };
@@ -47,8 +41,9 @@ export function ActionPanel({ city, actor, initialTargetId, busy, act, onMessage
     <div className="action-panel">
       <h4>What should {first} do?</h4>
       <label className="action-target">
-        <span>To</span>
+        <span>With</span>
         <select value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+          <option value="">Nobody in particular</option>
           {nearby.length > 0 && <optgroup label={`Here at ${place(actor.current_location_id)}`}>
             {nearby.map((c) => <option key={c.citizen_id} value={c.citizen_id}>{c.name} ({c.age})</option>)}
           </optgroup>}
@@ -63,25 +58,13 @@ export function ActionPanel({ city, actor, initialTargetId, busy, act, onMessage
           <small>{target.name.split(" ")[0]} is {target.current_activity.toLowerCase()} at {place(target.current_location_id)}</small>
         </div>
       )}
-      <input className="action-note" value={note} maxLength={300} onChange={(e) => setNote(e.target.value)}
-        placeholder={`Optional: what ${first} says (e.g. "Want to study together?")`} aria-label="What they say" />
-      {groups.map((group) => (
-        <section key={group.id} className="action-group" data-group={group.id}>
-          <small>{group.label}</small>
-          <div>
-            {actions.filter((a) => a.group === group.id).map((a) => {
-              const blocked = target ? actionBlocked(city, actor, target, a.id) : "Choose someone.";
-              return (
-                <button key={a.id} disabled={busy || Boolean(blocked)} title={blocked ?? a.label} onClick={() => run(a.id)}>
-                  <span aria-hidden="true">{a.icon}</span>{a.label}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ))}
+      <form onSubmit={(e) => { e.preventDefault(); run(); }}>
+        <textarea className="action-note" value={text} maxLength={400} rows={3} onChange={(e) => setText(e.target.value)} aria-label={`What ${first} does`}
+          placeholder={target ? `Anything at all. e.g. "${first} admits they read ${target.name.split(" ")[0]}'s diary" or "${first} asks to borrow $200"` : `e.g. "${first} quits their job on the spot"`} />
+        <button className="primary-action full-width" type="submit" disabled={busy || !text.trim()}><Wand2 size={15} /> Make it happen</button>
+      </form>
       {result && <p className="action-result" role="status">{result}</p>}
-      <p className="news-footnote">Actions have real consequences: feelings change, onlookers judge, and they will remember it. In Auto or when you play as someone, they talk it through.</p>
+      <p className="news-footnote">Anything goes: the game reads your words, feelings and relationships change, onlookers judge, and everyone remembers. A date, engagement or moving in only happens if the other person says yes.</p>
     </div>
   );
 }
