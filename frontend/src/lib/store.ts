@@ -3,7 +3,8 @@
 import { create } from "zustand";
 
 import { API_URL, api } from "@/lib/api";
-import { saveSessionCity, sessionMemoryEnabled } from "@/lib/session-simulation";
+import { sessionMemoryEnabled } from "@/lib/session-simulation";
+import { newExchanges, type InlineTalk, type PlaybackConversation } from "@/lib/conversation-playback";
 import type {
   CityEvent,
   CityState,
@@ -39,6 +40,18 @@ type GameStore = {
   relationships: Relationship[];
   conversations: Conversation[];
   cityConversations: Conversation[];
+  playbackQueue: PlaybackConversation[];
+  /** The player's own chat being voiced where they stand. */
+  inlineTalk: InlineTalk | null;
+  setInlineTalk: (talk: InlineTalk | null) => void;
+  /** Ask the camera to frame these residents; `onlyIfHidden` leaves the view alone if they're visible. */
+  focusRequest: { ids: string[]; onlyIfHidden: boolean; at: number; locationId?: string } | null;
+  focusOn: (ids: string[], onlyIfHidden?: boolean, locationId?: string) => void;
+  finishPlayback: (id: string) => void;
+  /** The scene that just finished, so the player can decide what happens next. */
+  lastScene: { conversationId: string; actorIds: string[]; at: number } | null;
+  clearLastScene: () => void;
+  replayConversation: (id: string) => void;
   connectionStatus: "idle" | "connecting" | "connected" | "offline";
   error: string | null;
   setCity: (city: CityState) => void;
@@ -92,6 +105,8 @@ function updateCitizens(city: CityState, citizens: CitizenAgent[]) {
   };
 }
 
+const knownConversations = new Set<string>();
+
 export const useGameStore = create<GameStore>((set, get) => ({
   city: null,
   selectedCitizenId: null,
@@ -100,13 +115,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
   relationships: [],
   conversations: [],
   cityConversations: [],
+  playbackQueue: [],
+  inlineTalk: null,
+  setInlineTalk: (inlineTalk) => set({ inlineTalk }),
+  focusRequest: null,
+  focusOn: (ids, onlyIfHidden = false, locationId) => set({ focusRequest: { ids, onlyIfHidden, at: Date.now(), locationId } }),
+  finishPlayback: (id) => set((state) => {
+    const scene = state.playbackQueue.find((c) => c.conversation_id === id);
+    const remaining = state.playbackQueue.filter((c) => c.conversation_id !== id);
+    // Only the last scene in a row asks "what next?", and never for a replay or your own chat.
+    const lastScene = scene && !scene.replay && !scene.player_chat && !remaining.length
+      ? { conversationId: id, actorIds: scene.actor_ids, at: Date.now() } : remaining.length ? null : state.lastScene;
+    return { playbackQueue: remaining, lastScene };
+  }),
+  lastScene: null,
+  clearLastScene: () => set({ lastScene: null }),
+  replayConversation: (id) => set((state) => {
+    const conversation = state.cityConversations.find((c) => c.conversation_id === id);
+    if (!conversation?.transcript.length || state.playbackQueue.some((c) => c.conversation_id === id)) return state;
+    return { playbackQueue: [...state.playbackQueue, { ...conversation, replay: true }] };
+  }),
   connectionStatus: "idle",
   error: null,
   setCity: (city) => {
-    saveSessionCity(city);
     set({
       city,
-      timeline: dedupeTimeline(city.events.slice(-60).map(eventToTimeline).reverse(), 40),
+      timeline: dedupeTimeline(
+        city.events.slice(-60).map(eventToTimeline).reverse(),
+        40,
+      ),
       error: null,
     });
   },
@@ -121,10 +158,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       api.getRelationships(citizenId),
       api.getConversations(citizenId),
     ]);
+    if (get().selectedCitizenId !== citizenId) return;
     set({
       memories: memories.status === "fulfilled" ? memories.value : [],
-      relationships: relationships.status === "fulfilled" ? relationships.value : [],
-      conversations: conversations.status === "fulfilled" ? conversations.value : [],
+      relationships:
+        relationships.status === "fulfilled" ? relationships.value : [],
+      conversations:
+        conversations.status === "fulfilled" ? conversations.value : [],
     });
   },
   loadInitialState: async () => {
@@ -137,16 +177,25 @@ export const useGameStore = create<GameStore>((set, get) => ({
         throw city.reason;
       }
       get().setCity(city.value);
+      if (cityConversations.status === "fulfilled") {
+        cityConversations.value.forEach((c) => knownConversations.add(c.conversation_id));
+      }
       set({
-        cityConversations: cityConversations.status === "fulfilled" ? cityConversations.value : [],
+        cityConversations:
+          cityConversations.status === "fulfilled"
+            ? cityConversations.value
+            : [],
       });
     } catch (error) {
-      set({ error: error instanceof Error ? error.message : "Unable to load city" });
+      set({
+        error: error instanceof Error ? error.message : "Unable to load city",
+      });
     }
   },
   refreshCityConversations: async () => {
     const cityConversations = await api.getCityConversations();
-    set({ cityConversations });
+    const added = newExchanges(knownConversations, cityConversations);
+    set((state) => ({ cityConversations, playbackQueue: [...state.playbackQueue, ...added] }));
   },
   connectWebSocket: () => {
     const wsUrl = resolveWebSocketUrl();
@@ -167,7 +216,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         return;
       }
       if (envelope.type === "tick" && envelope.payload) {
-        const payload = envelope.payload as Partial<CityState> & { citizens?: CitizenAgent[] };
+        const payload = envelope.payload as Partial<CityState> & {
+          citizens?: CitizenAgent[];
+        };
         if ("city_id" in payload) {
           state.setCity(payload as CityState);
           return;
@@ -189,29 +240,52 @@ export const useGameStore = create<GameStore>((set, get) => ({
           id: payload.event_id ?? `${Date.now()}-${Math.random()}`,
           type: payload.event_type ?? "event",
           time: gameTime(state.city),
-          text: payload.description ?? `City event: ${payload.event_type ?? "update"}`,
+          text:
+            payload.description ??
+            `City event: ${payload.event_type ?? "update"}`,
           priority: payload.priority,
         });
       }
-      if (["thought", "memory", "reflection", "conversation"].includes(envelope.type)) {
+      if (
+        ["thought", "memory", "reflection", "conversation"].includes(
+          envelope.type,
+        )
+      ) {
         const payload = envelope.payload as Record<string, unknown>;
         if (envelope.type === "conversation") {
           const names = Object.fromEntries(
-            state.city?.citizens.map((citizen) => [citizen.citizen_id, citizen.name]) ?? [],
+            state.city?.citizens.map((citizen) => [
+              citizen.citizen_id,
+              citizen.name,
+            ]) ?? [],
           );
-          const actorIds = Array.isArray(payload.actor_ids) ? (payload.actor_ids as string[]) : [];
+          const actorIds = Array.isArray(payload.actor_ids)
+            ? (payload.actor_ids as string[])
+            : [];
           const speakers = actorIds.map((id) => names[id] ?? id).join(" and ");
           const relationship =
-            typeof payload.relationship_before === "string" && typeof payload.relationship_after === "string"
+            typeof payload.relationship_before === "string" &&
+            typeof payload.relationship_after === "string"
               ? ` (${payload.relationship_before} -> ${payload.relationship_after})`
               : "";
           const lines = Array.isArray(payload.transcript)
-            ? (payload.transcript as Array<{ speaker_id?: string; text?: string }>)
+            ? (
+                payload.transcript as Array<{
+                  speaker_id?: string;
+                  text?: string;
+                }>
+              )
                 .slice(0, 2)
-                .map((line) => `${names[String(line.speaker_id)] ?? line.speaker_id}: ${line.text}`)
+                .map(
+                  (line) =>
+                    `${names[String(line.speaker_id)] ?? line.speaker_id}: ${line.text}`,
+                )
                 .join(" ")
             : "";
-          const summary = typeof payload.summary === "string" ? payload.summary : "A conversation unfolded.";
+          const summary =
+            typeof payload.summary === "string"
+              ? payload.summary
+              : "A conversation unfolded.";
           state.appendTimeline({
             id: `conversation-${String(payload.conversation_id ?? Date.now())}-${Math.random()}`,
             type: "conversation",
@@ -220,7 +294,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
             priority: 2,
           });
           const selectedId = state.selectedCitizenId;
-          if (selectedId && actorIds.includes(selectedId) && typeof payload.conversation_id === "string") {
+          if (
+            selectedId &&
+            actorIds.includes(selectedId) &&
+            typeof payload.conversation_id === "string"
+          ) {
             set((current) => ({
               conversations: [
                 {
@@ -230,7 +308,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
                   location_id: null,
                   actor_ids: actorIds,
                   transcript: Array.isArray(payload.transcript)
-                    ? (payload.transcript as Array<{ speaker_id: string; text: string }>)
+                    ? (payload.transcript as Array<{
+                        speaker_id: string;
+                        text: string;
+                      }>)
                     : [],
                   summary,
                 },
@@ -248,13 +329,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
                   location_id: null,
                   actor_ids: actorIds,
                   transcript: Array.isArray(payload.transcript)
-                    ? (payload.transcript as Array<{ speaker_id: string; text: string }>)
+                    ? (payload.transcript as Array<{
+                        speaker_id: string;
+                        text: string;
+                      }>)
                     : [],
                   summary,
                 },
                 ...current.cityConversations,
               ].slice(0, 80),
             }));
+            const incoming = get().cityConversations.find((c) => c.conversation_id === payload.conversation_id);
+            if (incoming) {
+              const added = newExchanges(knownConversations, [incoming]);
+              set((current) => ({ playbackQueue: [...current.playbackQueue, ...added] }));
+            }
           }
           return;
         }

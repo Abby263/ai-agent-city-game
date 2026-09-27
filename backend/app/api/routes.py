@@ -1,17 +1,28 @@
 from __future__ import annotations
 
+import hashlib
+import io
+import time
+import wave
+from collections import OrderedDict, defaultdict, deque
+from datetime import datetime, timedelta
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.cognition.openai_client import CognitionUnavailableError, CognitionValidationError
+from app.cognition.errors import CognitionUnavailableError, CognitionValidationError
 from app.cognition.pipeline import CognitionPipeline
+from app.cognition.elections import ElectionDecision, ElectionDecisionRequest, decide_election
+from app.cognition.encounters import SocialDecision, SocialDecisionRequest, decide_social
 from app.config import get_settings
 from app.database import get_db
 from app.models import CitizenORM, ConversationORM, MemoryORM, RelationshipORM
 from app.realtime import manager
+from app.safety import unsafe_player_text_message
 from app.schemas import (
     AssignTaskRequest,
     CitizenAgent,
@@ -31,9 +42,48 @@ from app.schemas import (
 from app.simulation.engine import SimulationEngine
 
 router = APIRouter()
+
+
+def describe_city_time(city: CityState) -> str:
+    """Real date, time and weather in the city, so residents can mention the rain or the holiday."""
+    clock = f"{city.clock.minute_of_day // 60:02d}:{city.clock.minute_of_day % 60:02d}"
+    when = f"Day {city.clock.day}, {clock}"
+    if city.calendar_start:
+        try:
+            date = datetime.fromisoformat(city.calendar_start) + timedelta(days=city.clock.day - 1)
+            when = f"{date.strftime('%A %d %B %Y')}, {clock}"
+        except ValueError:
+            pass
+    place = f"{when} in {city.city_name}, Meguro City, Tokyo"
+    weather = city.weather or {}
+    if weather.get("label"):
+        place += f". Weather: {weather['label']}, {round(float(weather.get('temp_c', 0)))}°C"
+        alert = weather.get("alert")
+        if isinstance(alert, dict) and alert.get("text"):
+            place += f". Alert: {alert['text']}"
+    return place
+
+
+def _reject_unsafe_player_text(*texts: str | None) -> None:
+    if message := unsafe_player_text_message(*texts):
+        raise HTTPException(status_code=400, detail=message)
+
 settings = get_settings()
 engine = SimulationEngine(settings)
 cognition = CognitionPipeline(settings)
+
+
+@router.post("/cognition/election", response_model=ElectionDecision)
+def election_decision(request: ElectionDecisionRequest) -> ElectionDecision:
+    _reject_unsafe_player_text(*(candidate.platform for candidate in request.candidates))
+    if not settings.real_llm_enabled:
+        raise HTTPException(status_code=503, detail="An AI provider key is required for independent election decisions.")
+    try:
+        return decide_election(cognition.client.deep_agents, request)
+    except CognitionUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except CognitionValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @router.get("/city/state", response_model=CityState)
@@ -123,17 +173,31 @@ def get_citizen_conversations(citizen_id: str, db: Session = Depends(get_db)) ->
     return [Conversation.model_validate(conversation) for conversation in conversations]
 
 
+@router.post("/cognition/social", response_model=SocialDecision)
+def social_decision(request: SocialDecisionRequest) -> SocialDecision:
+    try:
+        return decide_social(cognition.client.deep_agents, request)
+    except CognitionUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except CognitionValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @router.post("/cognition/session", response_model=SessionCognitionResponse)
-async def session_cognition(request: SessionCognitionRequest) -> SessionCognitionResponse:
+def session_cognition(request: SessionCognitionRequest) -> SessionCognitionResponse:
+    _reject_unsafe_player_text(request.player_utterance, request.task)
     actor = next((citizen for citizen in request.city.citizens if citizen.citizen_id == request.actor_id), None)
     if not actor:
         raise HTTPException(status_code=404, detail="Actor citizen not found in session state")
 
+    requested_target_id = request.target_id or request.required_target_id
     target = (
-        next((citizen for citizen in request.city.citizens if citizen.citizen_id == request.target_id), None)
-        if request.target_id
+        next((citizen for citizen in request.city.citizens if citizen.citizen_id == requested_target_id), None)
+        if requested_target_id
         else None
     )
+    if requested_target_id and target is None:
+        raise HTTPException(status_code=404, detail="Target citizen not found in session state")
     nearby = []
     if target:
         nearby.append(
@@ -163,10 +227,11 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
                 or abs(citizen.x - actor.x) + abs(citizen.y - actor.y) <= 3
             )
         )
-    city_time = f"Day {request.city.clock.day}, {request.city.clock.minute_of_day // 60:02d}:{request.city.clock.minute_of_day % 60:02d}"
-    event_context = " ".join(event.description for event in request.city.events[-6:] if event.priority >= 2)
+    city_time = describe_city_time(request.city)
+    # A world event log is not public knowledge. Only deliver events witnessed by the actor.
+    event_context = " ".join(event.description for event in request.city.events[-6:] if actor.citizen_id in event.actors and event.event_type not in {"conversation", "player_task"})
     try:
-        if target and (request.require_conversation or request.target_id):
+        if target:
             result = cognition.client.generate_private_exchange(
                 actor=actor.model_dump(mode="json"),
                 target=target.model_dump(mode="json"),
@@ -177,6 +242,11 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
                 actor_memories=request.private_memories.get(actor.citizen_id, request.memories),
                 target_memories=request.private_memories.get(target.citizen_id, []),
                 event_context=event_context,
+                player_utterance=request.player_utterance,
+                prior_lines=request.prior_lines,
+                autonomous=request.conversation_mode == "autonomous",
+                meeting_locations=[{"location_id": p.location_id, "name": p.name} for p in request.city.locations],
+                meeting_now=request.city.clock.day * 1440 + request.city.clock.minute_of_day,
             )
         else:
             result = cognition.client.generate(
@@ -219,11 +289,14 @@ async def session_cognition(request: SessionCognitionRequest) -> SessionCognitio
         conversation=conversation,
         participant_memories=result.participant_memories,
         participant_reflections=result.participant_reflections,
+        participant_outcomes=result.participant_outcomes,
+        meeting_plan=result.meeting_plan,
     )
 
 
 @router.post("/cognition/task-plan", response_model=SessionTaskPlanResponse)
-async def session_task_plan(request: SessionTaskPlanRequest) -> SessionTaskPlanResponse:
+def session_task_plan(request: SessionTaskPlanRequest) -> SessionTaskPlanResponse:
+    _reject_unsafe_player_text(request.task)
     actor = next((citizen for citizen in request.city.citizens if citizen.citizen_id == request.actor_id), None)
     if not actor:
         raise HTTPException(status_code=404, detail="Actor citizen not found in session state")
@@ -237,6 +310,8 @@ async def session_task_plan(request: SessionTaskPlanRequest) -> SessionTaskPlanR
         )
     except CognitionUnavailableError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except CognitionValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     valid_citizen_ids = {citizen.citizen_id for citizen in request.city.citizens if citizen.citizen_id != actor.citizen_id}
     valid_location_ids = {location.location_id for location in request.city.locations}
     target_ids = [citizen_id for citizen_id in result.target_citizen_ids if citizen_id in valid_citizen_ids]
@@ -322,6 +397,7 @@ async def assign_citizen_task(
     request: AssignTaskRequest,
     db: Session = Depends(get_db),
 ) -> CityState:
+    _reject_unsafe_player_text(request.task)
     try:
         state = engine.assign_task(db, citizen_id, request, cognition)
     except CognitionUnavailableError as error:
@@ -364,3 +440,77 @@ async def mayor_policy(request: MayorPolicyRequest, db: Session = Depends(get_db
     await manager.broadcast("city_state", state.model_dump(mode="json"))
     await manager.broadcast("metrics", state.metrics.model_dump())
     return state
+
+
+# ---------------------------------------------------------------------------------------------
+# Natural character voices (Gemini TTS). Short lines only, cached, and rate limited per visitor.
+
+SPEECH_VOICES = {
+    "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus", "Aoede", "Callirrhoe", "Autonoe", "Enceladus", "Iapetus",
+    "Umbriel", "Algieba", "Despina", "Erinome", "Algenib", "Rasalgethi", "Laomedeia", "Achernar", "Alnilam", "Schedar",
+    "Gacrux", "Pulcherrima", "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Sulafat",
+}
+_speech_cache: OrderedDict[str, bytes] = OrderedDict()
+_speech_calls: dict[str, deque[float]] = defaultdict(deque)
+
+
+class SpeechRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=420)
+    voice: str
+    style: str = Field(default="", max_length=180)
+
+
+@router.post("/speech")
+def character_speech(request: SpeechRequest, http: Request) -> Response:
+    if settings.llm_provider != "gemini" or not settings.llm_api_key or not settings.gemini_tts_model:
+        raise HTTPException(status_code=503, detail="Natural voices are not configured.")
+    if request.voice not in SPEECH_VOICES:
+        raise HTTPException(status_code=422, detail="Unknown voice.")
+    key = hashlib.sha256(f"{request.voice}|{request.style}|{request.text}".encode()).hexdigest()
+    if key in _speech_cache:
+        _speech_cache.move_to_end(key)
+        return Response(content=_speech_cache[key], media_type="audio/wav", headers={"Cache-Control": "private, max-age=86400"})
+    client_id = http.client.host if http.client else "unknown"
+    calls, now = _speech_calls[client_id], time.monotonic()
+    while calls and now - calls[0] > 60:
+        calls.popleft()
+    if len(calls) >= 40:
+        raise HTTPException(status_code=429, detail="Too many voice requests. Device voices will be used for a moment.")
+    calls.append(now)
+    try:
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(api_key=settings.llm_api_key)
+        # A short bracketed tag sets the delivery without being read aloud (longer directions get spoken).
+        style = request.style.strip().strip("[]")
+        prompt = f"[{style}] {request.text.strip()}" if style else request.text.strip()
+        result = client.models.generate_content(
+            model=settings.gemini_tts_model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=types.SpeechConfig(voice_config=types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=request.voice))),
+            ),
+        )
+        audio = result.candidates[0].content.parts[0].inline_data
+    except Exception as error:  # provider errors fall back to device voices in the browser
+        raise HTTPException(status_code=503, detail="The voice service could not answer.") from error
+    if not audio or not audio.data:
+        raise HTTPException(status_code=503, detail="The voice service returned no audio.")
+    data = audio.data if "wav" in (audio.mime_type or "") else _wav(audio.data)
+    _speech_cache[key] = data
+    while len(_speech_cache) > 300:
+        _speech_cache.popitem(last=False)
+    return Response(content=data, media_type="audio/wav", headers={"Cache-Control": "private, max-age=86400"})
+
+
+def _wav(pcm: bytes, rate: int = 24000) -> bytes:
+    """Wraps raw 16-bit mono PCM in a WAV header."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as file:
+        file.setnchannels(1)
+        file.setsampwidth(2)
+        file.setframerate(rate)
+        file.writeframes(pcm)
+    return buffer.getvalue()

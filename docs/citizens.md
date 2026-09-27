@@ -28,8 +28,8 @@ current_thought: I want to find someone who understands my project idea.
 short_term_goals:
   - Ask one classmate about robotics club
 long_term_goals:
-  - Build a real friendship circle in Navora
-memory_summary: Maya Rivera is a new student in Navora.
+  - Build a real friendship circle in Nakameguro
+memory_summary: Maya Rivera is a new student in Nakameguro.
 seed_memories:
   - memory_id: mem_seed_cit_027
     content: Maya Rivera recently joined the student circle and wants to belong.
@@ -42,7 +42,7 @@ Runtime memory is not written back to YAML. The YAML is the immutable persona an
 During browser play, each active citizen gets an isolated short-term memory store:
 
 ```text
-agentcity.v11.memory.<citizen_id>
+agentcity.v12.memory.<citizen_id>
 ```
 
 The cognition endpoint receives a map of private memories by citizen id. The

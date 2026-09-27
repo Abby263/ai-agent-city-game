@@ -111,7 +111,7 @@ def load_citizen_profiles() -> dict[str, CitizenProfile]:
         raw.setdefault("daily_schedule", default_work_schedule(raw.get("profession", ""), raw.get("work_location_id")))
         raw.setdefault(
             "memory_summary",
-            f"{raw.get('name', path.stem)} lives in Navora and carries personal memories that change over time.",
+            f"{raw.get('name', path.stem)} lives in Nakameguro and carries personal memories that change over time.",
         )
         raw.setdefault("current_thought", "I should pay attention to what is happening around me today.")
         try:

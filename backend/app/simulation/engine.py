@@ -5,7 +5,7 @@ from uuid import uuid4
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.cognition.openai_client import CognitionUnavailableError
+from app.cognition.errors import CognitionUnavailableError
 from app.cognition.pipeline import CognitionPipeline, observations_by_actor
 from app.config import Settings
 from app.memory.store import MemoryStore
@@ -72,7 +72,7 @@ class SimulationEngine:
                 db,
                 state=state,
                 event_type="manual_mode_waiting",
-                description="Manual mode is waiting for the player to assign a student task.",
+                description="Manual mode is waiting for the player to assign a resident a task.",
                 priority=1,
             )
             db.commit()
@@ -100,9 +100,9 @@ class SimulationEngine:
         state.updated_at = utcnow()
         event_type = "manual_mode_enabled" if request.mode == "manual" else "autonomous_mode_enabled"
         description = (
-            "Manual mode enabled. The city waits until the player assigns a student task."
+            "Manual mode enabled. The city waits until the player assigns a resident a task."
             if request.mode == "manual"
-            else "Autonomous mode enabled. Students resume daily life, conversations, and city reactions."
+            else "Autonomous mode enabled. Residents resume daily life, conversations, and city reactions."
         )
         if previous_mode != request.mode:
             self._event(
@@ -156,7 +156,7 @@ class SimulationEngine:
                 db,
                 state=state,
                 event_type="new_day",
-                description=f"Day {state.day} begins in Navora.",
+                description=f"Day {state.day} begins in Nakameguro.",
                 priority=2,
             )
         state.updated_at = utcnow()
@@ -228,7 +228,6 @@ class SimulationEngine:
             actors = [
                 citizen.citizen_id
                 for citizen in citizens
-                if citizen.profession in {"Student", "Teacher", "Doctor", "Nurse", "Scientist", "Researcher"}
             ]
             for citizen in citizens:
                 if citizen.citizen_id in actors:
@@ -238,11 +237,11 @@ class SimulationEngine:
                         db,
                         citizen_id=citizen.citizen_id,
                         kind="episodic",
-                        content="A flu outbreak is spreading through Navora, especially around the school and hospital.",
+                        content="A flu outbreak is spreading through Nakameguro's offices and trains.",
                         importance=0.82,
                         salience=0.86,
                     )
-            description = "A flu outbreak starts spreading through the school and hospital network."
+            description = "A flu outbreak starts spreading around Nakameguro."
         elif request.event_type == "traffic_accident":
             actors = [citizen.citizen_id for citizen in citizens if citizen.profession in {"Driver", "Police Officer"}]
             for citizen in citizens:
@@ -258,11 +257,10 @@ class SimulationEngine:
                 market.inventory = inventory
             description = "A food shortage hits the market and raises concern about household supplies."
         elif request.event_type == "school_exam":
-            actors = [citizen.citizen_id for citizen in citizens if citizen.profession in {"Student", "Teacher"}]
+            actors = [citizen.citizen_id for citizen in citizens]
             for citizen in citizens:
-                if citizen.profession == "Student":
-                    citizen.stress = self._clamp(citizen.stress + 10 * severity_multiplier)
-            description = "The school starts an important exam day."
+                citizen.stress = self._clamp(citizen.stress + 10 * severity_multiplier)
+            description = "Qualification exam day: everyone studying for a certificate sits their test."
         elif request.event_type == "city_festival":
             actors = [citizen.citizen_id for citizen in citizens]
             for citizen in citizens:
@@ -276,7 +274,7 @@ class SimulationEngine:
             actors = [citizen.citizen_id for citizen in citizens if citizen.profession in {"Engineer", "Mayor"}]
             for citizen in citizens:
                 citizen.stress = self._clamp(citizen.stress + 8 * severity_multiplier)
-            description = "A power outage disrupts routines across Navora."
+            description = "A power outage disrupts routines across Nakameguro."
 
         self._event(
             db,
@@ -340,7 +338,7 @@ class SimulationEngine:
 
             raise HTTPException(status_code=404, detail="Citizen not found")
         if not cognition:
-            raise CognitionUnavailableError("OpenAI task planning is required before a citizen can accept a task.")
+            raise CognitionUnavailableError("AI task planning is required before a citizen can accept a task.")
 
         task = request.task.strip()
         city_snapshot = self.get_state(db)

@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.config import Settings
-from app.cognition.openai_client import CitizenCognitionClient, TaskPlanResult
+from app.cognition.client import CitizenCognitionClient, TaskPlanResult
 from app.models import Base, CitizenORM, CityEventORM, ConversationORM, MemoryORM
 from app.schemas import AssignTaskRequest, SimulationModeRequest, TriggerEventRequest
 from app.seed import ensure_seeded
@@ -87,9 +87,10 @@ def test_tick_progresses_clock_and_moves_citizens():
 
     assert after.clock.tick == before.clock.tick + 1
     assert after.clock.minute_of_day == before.clock.minute_of_day + 15
-    assert len(after.citizens) == 5
+    assert len(after.citizens) == 26
     assert db.query(CitizenORM).count() >= 26
-    assert {citizen.profession for citizen in after.citizens} == {"Student"}
+    assert {"Lab assistant", "Doctor", "Teacher", "Retired farmer"} <= {citizen.profession for citizen in after.citizens}
+    assert all(citizen.age >= 18 for citizen in after.citizens)
     assert any(citizen.current_activity for citizen in after.citizens)
 
 
@@ -104,7 +105,7 @@ def test_assign_task_creates_goal_memory_and_event():
     )
     citizen = db.get(CitizenORM, "cit_009")
 
-    assert len(state.citizens) == 5
+    assert len(state.citizens) == 26
     assert citizen.current_activity == "Task: Ask Iris if she wants to study together"
     assert citizen.personality["player_task"]["status"] == "active"
     assert citizen.short_term_goals[0].startswith("Player task:")

@@ -1,0 +1,79 @@
+citizen_id: cit_031
+name: Hannah Brooks
+age: 44
+profession: Bank clerk
+active: true
+work_location_id: loc_bank
+position:
+- 3
+- 3
+money: 720
+health: 90
+hunger: 30
+energy: 78
+stress: 35
+happiness: 70
+reputation: 60
+skills: []
+mood: Excited
+personality:
+  nature:
+    traits:
+    - Organised
+    - Warm
+    - Anxious
+    values: Security for her family and doing things properly.
+    voice: Makes lists out loud, asks caring follow-up questions.
+    sensitivity: Plans falling apart; feeling she is doing everything alone.
+    repair: Makes a plan together and says thank you.
+  appearance:
+    skin: '#f0c8a6'
+    hair: '#c49a5c'
+    shirt: '#c98ea7'
+    background: '#f3dce6'
+  playable: true
+current_thought: Leo seems happier at the substation. Maybe it is time to focus on my own promotion.
+short_term_goals:
+- Turn Leo's old room into a sewing corner
+- Prepare my branch supervisor application
+long_term_goals:
+- Keep a calm, happy home for all of us
+memory_summary: I work at Aobadai Bank. Our son Leo is nineteen now and working at the substation, and I'm proud and a little lost. Walter, Tom's dad, lives with us.
+relationship_scores:
+  cit_030: 88
+  cit_032: 78
+  cit_026: 90
+seed_memories:
+- memory_id: mem_seed_cit_031
+  content: I work at Aobadai Bank. Our son Leo is nineteen now and working at the substation, and I'm proud and a little lost. Walter, Tom's dad, lives with us.
+  importance: 0.8
+life:
+  sex: female
+  birthday_in_days: 150
+  height_cm: 165
+  weight_kg: 71
+  fitness: 50
+  household_id: home_a
+  parent_ids: []
+  partner_id: cit_030
+  children_ids:
+  - cit_026
+  relationship_status: married
+  job:
+    title: Bank clerk
+    location_id: loc_bank
+    hourly_wage: 24
+    start: 540
+    end: 1020
+    workdays:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  ambition:
+    goal: Get promoted to branch supervisor
+    kind: career
+    progress: 40
+  conditions: []
+  wants_children: false

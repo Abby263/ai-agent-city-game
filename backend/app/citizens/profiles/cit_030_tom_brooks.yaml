@@ -1,0 +1,81 @@
+citizen_id: cit_030
+name: Tom Brooks
+age: 46
+profession: Farmer
+active: true
+work_location_id: loc_farm
+position:
+- 3
+- 3
+money: 640
+health: 90
+hunger: 8
+energy: 78
+stress: 35
+happiness: 70
+reputation: 60
+skills: []
+mood: Steady
+personality:
+  nature:
+    traits:
+    - Hardworking
+    - Gentle
+    - Stubborn
+    values: Honest work, feeding the town and being there for his family.
+    voice: Few words, dry jokes, talks about weather and soil.
+    sensitivity: Being told farming is not real work; money worries he keeps to himself.
+    repair: Shows up with fresh vegetables and fixes what is broken.
+  appearance:
+    skin: '#e8bd98'
+    hair: '#8a6437'
+    shirt: '#7f9a5c'
+    background: '#e3ecd2'
+  playable: true
+current_thought: If the weather holds, the tomatoes will be ready by the weekend.
+short_term_goals:
+- Get the tomatoes to the market
+- Teach Leo to run the garden's irrigation
+long_term_goals:
+- Keep the farm going for the next generation
+memory_summary: I run Meguro Community Garden like my father did. Hannah and I have a grown son, Leo, who just started as an apprentice at the substation. Dad lives with us now and his heart worries me.
+relationship_scores:
+  cit_031: 88
+  cit_032: 85
+  cit_026: 88
+seed_memories:
+- memory_id: mem_seed_cit_030
+  content: I run Meguro Community Garden like my father did. Hannah and I have a grown son, Leo, who just started as an apprentice at the substation. Dad lives with us now and his heart worries me.
+  importance: 0.8
+life:
+  sex: male
+  birthday_in_days: 48
+  height_cm: 181
+  weight_kg: 84
+  fitness: 68
+  household_id: home_a
+  parent_ids:
+  - cit_032
+  partner_id: cit_031
+  children_ids:
+  - cit_026
+  relationship_status: married
+  job:
+    title: Farmer
+    location_id: loc_farm
+    hourly_wage: 21
+    start: 360
+    end: 900
+    workdays:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  ambition:
+    goal: Expand Meguro Community Garden with a new greenhouse
+    kind: career
+    progress: 35
+  conditions: []
+  wants_children: false

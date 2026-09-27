@@ -1,0 +1,81 @@
+citizen_id: cit_040
+name: Kenji Tanaka
+age: 54
+profession: Station master
+active: true
+home_location_id: loc_apartments
+current_location_id: loc_apartments
+work_location_id: loc_station
+position:
+- 55
+- 5
+money: 1600
+health: 92
+hunger: 12
+energy: 80
+stress: 30
+happiness: 70
+reputation: 60
+skills: []
+mood: Composed
+personality:
+  nature:
+    traits:
+    - Punctual
+    - Dutiful
+    - Secretly sentimental
+    values: Trains on time, a tidy station and a family that eats dinner together.
+    voice: Formal and polite, checks his watch, softens around young staff.
+    sensitivity: Delays he can't control; being thanked in public.
+    repair: Bows deeply, apologises properly, and fixes the schedule.
+  appearance:
+    skin: '#e9c29f'
+    hair: '#6d6a6a'
+    shirt: '#2f4f7a'
+    background: '#dbe3ef'
+  playable: true
+current_thought: The 7:42 was two minutes late yesterday. Unacceptable.
+short_term_goals:
+- Keep the morning trains on time
+- Watch Haruto's baseball tryout
+long_term_goals:
+- Retire with a perfect record
+memory_summary: I have been station master at Nakameguro Station for twenty years. My wife Aiko runs HappyMart 24 and our son Haruto, twenty-two, works on my platform staff. He is obsessed with baseball.
+relationship_scores:
+  cit_041: 88
+  cit_042: 86
+seed_memories:
+- memory_id: mem_seed_cit_040
+  content: I have been station master at Nakameguro Station for twenty years. My wife Aiko runs HappyMart 24 and our son Haruto, twenty-two, works on my platform staff. He is obsessed with baseball.
+  importance: 0.8
+life:
+  sex: male
+  birthday_in_days: 140
+  height_cm: 170
+  weight_kg: 68
+  fitness: 50
+  household_id: apt_101
+  parent_ids: []
+  partner_id: cit_041
+  children_ids:
+  - cit_042
+  relationship_status: married
+  job:
+    title: Station master
+    location_id: loc_station
+    hourly_wage: 30
+    start: 330
+    end: 1050
+    workdays:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+  ambition:
+    goal: Run a whole year with zero late trains
+    kind: career
+    progress: 60
+  conditions: []
+  wants_children: false

@@ -1,0 +1,80 @@
+citizen_id: cit_046
+name: Emi Kobayashi
+age: 44
+profession: Clinic doctor
+active: true
+home_location_id: loc_apartments
+current_location_id: loc_apartments
+work_location_id: loc_clinic
+position:
+- 55
+- 5
+money: 2600
+health: 92
+hunger: 30
+energy: 80
+stress: 30
+happiness: 70
+reputation: 60
+skills: []
+mood: Calm
+personality:
+  nature:
+    traits:
+    - Gentle
+    - Meticulous
+    - Tired
+    values: Patients who feel listened to, and her daughter's happiness.
+    voice: Soft, careful, explains things with drawings.
+    sensitivity: Being rushed; Sakura not believing in herself.
+    repair: Writes a thoughtful note and follows up.
+  appearance:
+    skin: '#efcaa8'
+    hair: '#262528'
+    shirt: '#7fb0ac'
+    background: '#dcefeb'
+  playable: true
+current_thought: Mr Nakamura hasn't been in for his blood pressure check. I should call.
+short_term_goals:
+- Check on Mr Nakamura
+- Hear Sakura play at the café open mic
+long_term_goals:
+- Open a seniors' clinic
+memory_summary: I run Minami Clinic near the station. My daughter Sakura is nineteen, works shifts at HappyMart and plays piano beautifully. I worry about the lonely seniors in the apartments.
+relationship_scores:
+  cit_047: 90
+  cit_045: 50
+seed_memories:
+- memory_id: mem_seed_cit_046
+  content: I run Minami Clinic near the station. My daughter Sakura is nineteen, works shifts at HappyMart and plays piano beautifully. I worry about the lonely seniors in the apartments.
+  importance: 0.8
+life:
+  sex: female
+  birthday_in_days: 75
+  height_cm: 160
+  weight_kg: 54
+  fitness: 55
+  household_id: apt_301
+  parent_ids: []
+  partner_id: null
+  children_ids:
+  - cit_047
+  relationship_status: single
+  job:
+    title: Clinic doctor
+    location_id: loc_clinic
+    hourly_wage: 38
+    start: 540
+    end: 1080
+    workdays:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  ambition:
+    goal: Open a free Saturday clinic for seniors
+    kind: career
+    progress: 40
+  conditions: []
+  wants_children: false

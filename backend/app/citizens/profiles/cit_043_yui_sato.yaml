@@ -1,0 +1,82 @@
+citizen_id: cit_043
+name: Yui Sato
+age: 28
+profession: Office worker
+active: true
+home_location_id: loc_apartments
+current_location_id: loc_apartments
+work_location_id: loc_office
+position:
+- 55
+- 5
+money: 2200
+health: 92
+hunger: 30
+energy: 80
+stress: 30
+happiness: 70
+reputation: 60
+skills: []
+mood: Busy
+personality:
+  nature:
+    traits:
+    - Ambitious
+    - Witty
+    - Overworked
+    values: Doing great work and one day having a life outside of it.
+    voice: Fast, funny, lots of work jargon she then makes fun of.
+    sensitivity: Being overlooked for promotion; being told to smile.
+    repair: Owns it with humour and buys the coffee.
+  appearance:
+    skin: '#efcaa8'
+    hair: '#2b2a2f'
+    shirt: '#b86e8e'
+    background: '#f2dde6'
+  playable: true
+current_thought: If I skip lunch again I'll finish the deck. Or I could... not.
+short_term_goals:
+- Finish the campaign pitch
+- Go to the gym twice this week
+long_term_goals:
+- Get promoted
+- Find someone who makes me laugh
+memory_summary: I work in marketing on the ninth floor of GT Tower. I moved to Nakameguro for the job. I love my work but I'm tired, and a bit lonely.
+relationship_scores:
+  cit_044: 55
+seed_memories:
+- memory_id: mem_seed_cit_043
+  content: I work in marketing on the ninth floor of GT Tower. I moved to Nakameguro for the job. I love my work but I'm tired, and a bit lonely.
+  importance: 0.8
+life:
+  sex: female
+  birthday_in_days: 20
+  height_cm: 161
+  weight_kg: 52
+  fitness: 58
+  household_id: apt_102
+  parent_ids: []
+  partner_id: null
+  children_ids: []
+  relationship_status: single
+  job:
+    title: Marketing specialist
+    location_id: loc_office
+    hourly_wage: 31
+    start: 540
+    end: 1110
+    workdays:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  ambition:
+    goal: Lead her first big campaign at GT Tower
+    kind: career
+    progress: 35
+  conditions: []
+  wants_children: false
+  gym_days:
+  - 1
+  - 3

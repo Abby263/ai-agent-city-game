@@ -1,0 +1,83 @@
+citizen_id: cit_042
+name: Haruto Tanaka
+age: 22
+profession: Station staff
+active: true
+home_location_id: loc_apartments
+current_location_id: loc_apartments
+work_location_id: loc_station
+position:
+- 55
+- 5
+money: 900
+health: 92
+hunger: 30
+energy: 80
+stress: 30
+happiness: 70
+reputation: 60
+skills:
+- baseball
+- manga
+mood: Restless
+personality:
+  nature:
+    traits:
+    - Sporty
+    - Funny
+    - Secretive
+    values: Being good at something, and being more than his father's son.
+    voice: Short answers to adults, loud jokes with friends, baseball slang.
+    sensitivity: His dad's high expectations; being laughed at for reading manga.
+    repair: Makes a joke to break the ice, then admits the truth.
+  appearance:
+    skin: '#e9c29f'
+    hair: '#1f1e22'
+    shirt: '#e0e3e6'
+    background: '#e6ecf2'
+  playable: true
+current_thought: Tryouts for the company baseball team are next month. I have to practise every evening.
+short_term_goals:
+- Practise pitching after work
+- Keep the manga sketchbook hidden from Dad
+long_term_goals:
+- Play in the corporate baseball league
+memory_summary: I'm twenty-two and work at Nakameguro Station, where my dad is the station master and expects a lot. I love baseball and I secretly draw manga. I still live with my parents in the Kamimeguro Apartments.
+relationship_scores:
+  cit_040: 82
+  cit_041: 86
+seed_memories:
+- memory_id: mem_seed_cit_042
+  content: I work at the station under my dad. I love baseball and secretly draw manga, and he expects a lot.
+  importance: 0.8
+life:
+  sex: male
+  birthday_in_days: 55
+  height_cm: 177
+  weight_kg: 70
+  fitness: 72
+  household_id: apt_101
+  parent_ids:
+  - cit_040
+  - cit_041
+  partner_id: null
+  children_ids: []
+  relationship_status: single
+  job:
+    title: Station staff
+    location_id: loc_station
+    hourly_wage: 17
+    start: 360
+    end: 960
+    workdays:
+    - 0
+    - 1
+    - 2
+    - 3
+    - 4
+  ambition:
+    goal: Make the corporate-league baseball team
+    kind: fitness
+    progress: 40
+  conditions: []
+  wants_children: false

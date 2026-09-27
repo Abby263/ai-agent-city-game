@@ -42,7 +42,7 @@ def ensure_seeded(db: Session) -> None:
     if not state:
         state = SimulationStateORM(
             id="navora",
-            city_name="Navora",
+            city_name="Nakameguro",
             day=1,
             minute_of_day=6 * 60,
             tick=0,
