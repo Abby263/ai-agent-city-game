@@ -362,8 +362,8 @@ test("auto errors are visible, pause retries, and never fabricate conversations"
   await sessionSetMode("autonomous");
   const before = sessionConversations().length;
   const city = await sessionTick(async () => reply(), undefined, async () => { throw new Error("gemini quota or rate limit reached."); });
-  assert.equal(city.clock.running, false);
-  assert.equal(city.policy.autonomy_error, "gemini quota or rate limit reached.");
+  assert.equal(city.clock.running, false, "an exhausted quota pauses at once instead of retrying");
+  assert.match(String(city.policy.autonomy_error), /quota or rate limit reached/);
   assert.equal(sessionConversations().length, before);
   assert.ok(city.events.some((event) => event.event_type === "agent_cognition_blocked" && event.description.includes("quota")));
   const resumed = await sessionStart();
@@ -398,8 +398,8 @@ test("auto cannot approach an absent resident or invent a fallback exchange", as
   const city = await sessionTick(async () => reply(), undefined, async () => ({ target_id: "absent", reason: "A visit", topic: "dinner" }));
   assert.equal(city.encounter, undefined);
   assert.equal(sessionConversations().length, 0);
-  assert.equal(city.clock.running, false);
-  assert.ok(city.policy.autonomy_error);
+  assert.equal(city.clock.running, true, "one bad choice is dropped and the town carries on");
+  assert.ok(city.events.some((e) => e.event_type === "conversation_fizzled" && /unavailable encounter/.test(e.description)));
 });
 
 test("agreed appointments are saved to both journals and become a planned encounter", async () => {

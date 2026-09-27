@@ -10,6 +10,9 @@ class NearbyResident(BaseModel):
     citizen_id: str
     name: str
     activity: str
+    # Who they are to you ("your mother", "a friend you trust", "someone you resent") and what you remember of them.
+    relationship: str = Field(default="", max_length=240)
+    you_know: str = Field(default="", max_length=600)
 
 
 class SocialDecisionRequest(BaseModel):
@@ -18,6 +21,8 @@ class SocialDecisionRequest(BaseModel):
     location: str
     nearby: list[NearbyResident] = Field(max_length=40)
     memories: list[str] = Field(default_factory=list, max_length=32)
+    # Recent things that happened to you or that you heard, which you might act on or pass on.
+    on_your_mind: list[str] = Field(default_factory=list, max_length=12)
 
 
 class SocialDecision(BaseModel):
@@ -41,15 +46,22 @@ def decide_social(runtime, request: SocialDecisionRequest) -> SocialDecision:
         "location": request.location,
         "own_nature": request.citizen.personality.get("nature", {}),
         "nearby_people_you_can_see": [p.model_dump() for p in request.nearby],
+        "on_your_mind": request.on_your_mind,
+        "your_goals": {"now": request.citizen.short_term_goals, "life": request.citizen.long_term_goals},
         "private_memories_for_speaker_only": request.memories,
         "player_task": "Decide whether you personally want to approach someone here. This is your free time, not a player command.",
         "rules": [
-            "Do not cycle through everyone. Consider your own relationships, unfinished conversations, promises, interests, energy and mood.",
-            "You may prefer a friend, cautiously introduce yourself to a stranger for a concrete reason, avoid someone who hurt you, or keep to yourself.",
-            "Being in the same building is an opportunity, not an obligation. Respect classes, work, tiredness, concentration and recent refusals.",
-            "You cannot know another person's thoughts, friends, memories or interests unless you learned them. Nearby descriptions only show public activity.",
+            "Approach someone only with a real reason, as a real person would: something you want (a goal, a favour, advice, "
+            "company, a date), something to share (news about yourself or someone else, good or bad), something unresolved "
+            "(a grudge, an apology, a promise, a worry about them), or a genuine curiosity about them.",
+            "Small talk about weather, breakfast or someone's shift is not a reason. If you have nothing that matters to say, keep to yourself.",
+            "Family, friends and people you have strong feelings about matter most. Passing on news you heard to someone it concerns "
+            "is natural; whether to keep something private is your own choice.",
+            "Do not cycle through everyone. Respect work, tiredness, concentration and recent refusals.",
+            "You cannot know another person's thoughts, memories or interests unless you learned them. Use only relationship, "
+            "you_know and on_your_mind for what you know about people.",
             "Do not invent prior meetings or shared interests. For a stranger, use what is observable here or introduce yourself honestly.",
-            "Choose a specific topic related to your own life. Greetings and generic how-is-your-day loops are not mandatory.",
+            "The topic must be specific (what you will actually bring up), never 'catch up' or 'say hello'.",
         ],
     }
     try:
@@ -58,7 +70,8 @@ def decide_social(runtime, request: SocialDecisionRequest) -> SocialDecision:
         raise CognitionValidationError("The resident did not return a valid social intention.") from error
     eligible = {p.citizen_id for p in request.nearby} - {request.citizen.citizen_id}
     if decision.target_id is not None and decision.target_id not in eligible:
-        raise CognitionValidationError("The resident chose someone who is not available nearby.")
+        # Wanting someone who isn't here (to pass on news, say) is not an error: it waits until they meet.
+        return SocialDecision(target_id=None, reason=decision.reason, topic="")
     if decision.target_id and not decision.topic.strip():
         raise CognitionValidationError("The resident did not explain what they want to discuss.")
     return decision

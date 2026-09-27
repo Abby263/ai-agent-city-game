@@ -39,8 +39,42 @@ export function parsePlan(text: string, city: CityState): ParsedPlan | null {
   if (day === null || hour === null || hour > 23) return null;
   const minute = hour * 60 + minutes;
   if (day === city.clock.day && minute <= city.clock.minute_of_day + 30) return null;
-  const location_id = placeWords.find(([pattern]) => pattern.test(t))?.[1] ?? "loc_restaurant";
+  // As with days, the place mentioned last wins: "ramen... see you at the station shop" means the station.
+  const lastAt = (pattern: RegExp) => Math.max(-1, ...[...t.matchAll(new RegExp(pattern.source, "g"))].map((m) => m.index ?? -1));
+  const location_id = placeWords.map(([pattern, id]) => ({ id, at: lastAt(pattern) })).filter((p) => p.at >= 0).sort((a, b) => b.at - a.at)[0]?.id ?? "loc_restaurant";
   const place = city.locations.find((l) => l.location_id === location_id)?.name ?? "town";
   const when = day === city.clock.day ? "today" : day === city.clock.day + 1 ? "tomorrow" : dayWords[weekdayIndex(day)].replace(/^./, (c) => c.toUpperCase());
   return { day, minute, location_id, label: `${when} ${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")} at ${place}` };
+}
+
+const agreeing = /\b(yes|yeah|yep|sure|absolutely|definitely|sounds (good|great|like a plan)|deal|count me in|it'?s a date|see you|let'?s (do|go)|i'?ll be there|okay|ok|great|perfect|awesome)\b/i;
+const refusing = /\b(can'?t|cannot|won'?t|no thanks|not (tonight|today|tomorrow)|another time|rain check|too busy|i'?m busy|maybe not)\b/i;
+
+/**
+ * A plan two residents agreed on out loud ("ramen at the station shop around six" / "See you there at six!"),
+ * even when the model did not flag it: a time and place, then a yes from the other person and no refusal.
+ */
+export function agreedPlan(transcript: Array<{ speaker_id: string; text: string }>, city: CityState) {
+  for (let i = 0; i < transcript.length; i++) {
+    const soFar = transcript.slice(0, i + 1).map((l) => l.text).join(" ");
+    const plan = parsePlan(soFar, city);
+    if (!plan) continue;
+    const proposer = transcript[i].speaker_id;
+    const replies = transcript.slice(i + 1).filter((l) => l.speaker_id !== proposer);
+    // The time can land in the reply itself ("Great, see you at six!").
+    const answers = replies.length ? replies : transcript.slice(0, i + 1).filter((l) => l.speaker_id !== proposer).slice(-1);
+    if (answers.some((l) => refusing.test(l.text)) || !answers.some((l) => agreeing.test(l.text))) continue;
+    const opener = transcript.find((l) => placeWords.some(([pattern]) => pattern.test(l.text.toLowerCase())) || /\b(meet|dinner|lunch|coffee|ramen|drinks?)\b/i.test(l.text)) ?? transcript[i];
+    return { ...plan, topic: planTopic(opener.text).slice(0, 200) };
+  }
+  return null;
+}
+
+/** "Awesome, how about we grab a coffee and map out the party?" becomes "grab a coffee and map out the party". */
+export function planTopic(line: string) {
+  const text = line
+    .replace(/^\s*((oh|awesome|great|sure|okay|ok|yes|yeah|perfect|sounds good|absolutely|definitely|well|hey|so|and)[\s,!.—-]+)+/i, "")
+    .replace(/^(how about (we|you and i)|let'?s|we could|we should|(do|would) you (want|like) to|want to|shall we|maybe we (can|could))\s+/i, "")
+    .replace(/[?!.\s]+$/, "");
+  return text ? text.charAt(0).toLowerCase() + text.slice(1) : line;
 }

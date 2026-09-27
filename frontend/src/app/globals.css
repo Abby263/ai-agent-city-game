@@ -1956,6 +1956,30 @@ select {
 .next-move header .icon-button { width: 28px; height: 28px; min-width: 28px; color: #cfd8d2; background: transparent; border-color: transparent; }
 .next-move > p { margin: 4px 0 8px; font-size: 12.5px; color: #cfd8d2; }
 .next-choices { display: grid; gap: 6px; }
+/* Write what happens: anyone does anything, or it just happens. */
+.write-what { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.write-what select { max-width: 42%; min-height: 34px; border-radius: 8px; border: 1px solid #ffffff38; background: #ffffff10; color: #fff; font-size: 12.5px; padding: 0 6px; }
+.write-what select option { color: #111; }
+.write-what input { flex: 1; min-width: 0; min-height: 34px; border-radius: 8px; border: 1px solid #ffffff38; background: #ffffff14; color: #fff; padding: 0 10px; font-size: 13px; }
+.write-what input::placeholder { color: #cfd8d2aa; }
+.write-what .icon-button { color: #ffe19c; background: transparent; border-color: #ffe19c66; }
+.person-do { margin-top: 10px; }
+/* The editable character prompt. */
+.prompt-panel { display: grid; gap: 10px; }
+.prompt-label { display: grid; gap: 6px; }
+.prompt-label > span { display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 600; color: #4d5b52; }
+.prompt-label em { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #ffe19c; color: #5c4200; }
+.prompt-label textarea { width: 100%; min-height: 220px; resize: vertical; border-radius: 10px; border: 1px solid #cfdcd1; padding: 10px 12px;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: #1f2a24; background: #fbfcf8; }
+.prompt-label small { justify-self: end; font-size: 11px; color: #7a877e; }
+.prompt-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.prompt-rules summary { cursor: pointer; font-size: 12.5px; color: #367a58; }
+.prompt-rules p { white-space: pre-wrap; font-size: 12px; line-height: 1.5; color: #4d5b52; background: #f3f6ef; border-radius: 8px; padding: 10px; }
+/* Create: make anything happen. */
+.anything-form { display: grid; gap: 8px; margin-bottom: 6px; }
+.anything-form textarea { width: 100%; resize: vertical; border-radius: 10px; border: 1px solid #cfdcd1; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+.action-panel form { display: grid; gap: 8px; }
+.action-panel textarea.action-note { min-height: 72px; resize: vertical; }
 .story-tracker .next-choices { display: flex; flex-wrap: wrap; }
 .next-choices button { display: flex; align-items: center; gap: 8px; text-align: left; min-height: 36px; padding: 6px 10px; border-radius: 8px;
   border: 1px solid #ffffff38; background: #ffffff10; color: #fff; font-size: 13px; cursor: pointer; }
@@ -1966,7 +1990,7 @@ select {
 .conversation-on-stage .person-bar, .conversation-on-stage .next-move { display: none; }
 .world-stage:has(.person-bar) .camera-modes { visibility: hidden; }
 @media (max-width: 760px) {
-  .person-bar { bottom: 104px; }
+  .person-bar { bottom: 104px; transform: none; }
   .next-move { top: auto; bottom: 150px; left: 12px; width: calc(100% - 24px); }
 }
 .story-tracker { max-height: calc(100% - 270px); overflow-y: auto; }
@@ -2095,4 +2119,8 @@ select {
   .city-game[data-keyboard="true"] .with-panel .world-stage { display: none; }
   .city-game[data-keyboard="true"] .game-workspace.with-panel { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
   .city-game[data-keyboard="true"] .game-panel { grid-area: 1 / 1; }
+}
+/* The compact layout places the person bar with left/width, so it must not also be centred with a transform. */
+@media (max-width: 760px), (max-width: 1024px) and (max-height: 500px) {
+  .person-bar { transform: none; }
 }

@@ -40,11 +40,11 @@ The AI residents know the date, time, weather and any alerts, so they talk about
 
 ## Playing God And Taking Action
 
-- **Create:** change the weather, trigger an earthquake, or set up situations: drop money (who hands it in at the kōban?),
-  a bicycle accident, a fire, a lottery win, a spark of love, a misunderstanding, a lost puppy, a secret gift or a
-  neighbourhood-association election. The first reaction plays at once and the **Happening now** card tracks what follows.
-- **Act (on any profile):** make anyone do something to anyone: talk, hug, high-five, compliment, gift, comfort,
-  apologise, flirt, ask out, confess, kiss, propose, tease, argue, insult, push, slap or hit. Feelings, relationships,
-  memories and onlookers change; the target reacts in their own AI-generated words.
-- One game for everyone: romance is only between adults; physical conflict is non-graphic and only between people of
-  the same age group, with consequences (injury, a police warning, parents finding out).
+- **Create:** change the weather, trigger an earthquake, hold a neighbourhood-association election, or write anything
+  that happens ("a water pipe bursts at the library", "Yui gets a job offer in Osaka"). The first reaction plays at once
+  and the **Happening now** card tracks what follows.
+- **Act (on any profile) and the quick bar:** make anyone do anything to anyone, in your own words. There is no list of
+  actions: the game master reads the words, capped effects follow (feelings, onlookers, injuries, money, closures), and
+  the people involved react in their own AI-generated words. See [player control](player-control.md).
+- Everyone is an adult. Conflict is non-graphic and has consequences; romance between relatives is refused, and a date,
+  engagement or moving in only happens if the other person says yes.

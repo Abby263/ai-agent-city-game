@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Art } from "./materials";
 import { arrivals, buildings } from "./layout";
-import type { Incident } from "@/lib/scenarios";
+import type { Incident } from "@/lib/incidents";
 
 /** Flames, smoke and emergency vehicles for fires and accidents the player creates. */
 export function makeIncidents(art: Art) {

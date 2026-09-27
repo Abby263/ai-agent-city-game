@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     llm_provider: Literal["openai", "gemini"] = "openai"
     gemini_api_key: str | None = Field(default=None, repr=False)
     gemini_model: str = "gemini-3.5-flash-lite"
+    # Dialogue needs quick replies, not long deliberation; "" leaves the provider default.
+    gemini_thinking_level: str = "minimal"
+    # A reply slower than this is requested again in parallel and the first answer wins (0 disables).
+    hedge_after_seconds: float = Field(default=6.0, ge=0, le=60)
     # Natural character voices; empty disables AI speech and the game uses device voices.
     gemini_tts_model: str = "gemini-3.8-flash-lite-tts"
     openai_api_key: str | None = Field(default=None, repr=False)

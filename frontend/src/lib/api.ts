@@ -34,21 +34,23 @@ import {
   sessionWalkTo,
   sessionSpeak,
   sessionSetWeather,
-  sessionCreateSituation,
   sessionSetTimeMode,
   sessionSyncToRealTime,
   sessionSocialBeat,
-  sessionPerformAction,
   sessionAddPlan,
   sessionStartElectionAuto,
   sessionAdvanceAutoElection,
+  sessionAct,
   sessionApproach,
+  sessionSetCharacterPrompt,
   sessionCallCandidate,
   sessionCastVote,
   sessionOpenBallots,
 } from "@/lib/session-simulation";
 
 import { API_URL } from "./api-url";
+import { withPrompt } from "./character-prompt";
+import type { ActInterpretation, ActRequest } from "./acts";
 export { API_URL };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -74,7 +76,6 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   // Play-god tools run in the browser world only.
   setWeather: (condition: Parameters<typeof sessionSetWeather>[0], options?: Parameters<typeof sessionSetWeather>[1]) => sessionSetWeather(condition, options),
-  createSituation: (request: import("./scenarios").ScenarioRequest) => sessionCreateSituation(request, generateSessionCognition),
   startElection: (firstId: string, secondId: string) => sessionStartElectionAuto(firstId, secondId, generateElectionDecision),
   advanceElection: () => sessionAdvanceAutoElection(generateSessionCognition, generateElectionDecision),
   openBallots: () => sessionOpenBallots(),
@@ -82,9 +83,11 @@ export const api = {
   callCandidate: (candidateId: string) => sessionCallCandidate(candidateId),
   setTimeMode: (mode: "live" | "fast") => sessionSetTimeMode(mode),
   addPlan: (a: string, b: string, plan: { day: number; minute: number; location_id: string }, topic: string) => sessionAddPlan(a, b, plan, topic),
-  performAction: (actorId: string, targetId: string, action: import("./actions").ActionId, note = "", thread: import("./session-simulation").ActionThread = {}) =>
-    sessionPerformAction(actorId, targetId, action, note, generateSessionCognition, thread),
   approach: (targetId: string) => sessionApproach(targetId),
+  /** Anyone does anything, in the player's words; with no actor it is a situation that just happens. */
+  act: (actorId: string | null, targetId: string | null, text: string, thread: import("./session-simulation").ActionThread = {}) =>
+    sessionAct(actorId, targetId, text, interpretAct, generateSessionCognition, thread),
+  setCharacterPrompt: (citizenId: string, prompt: string | null) => sessionSetCharacterPrompt(citizenId, prompt),
   syncToRealTime: () => sessionSyncToRealTime(),
   socialBeat: (onCognitionStart?: (request: SessionCognitionRequest) => void) => sessionSocialBeat((request) => {
     onCognitionStart?.(request);
@@ -175,12 +178,15 @@ export const api = {
   },
 };
 
+// Every resident travels with the character prompt the player can see and edit, so edits take effect on the next call.
+const prompted = <T extends { citizens: CityState["citizens"] }>(city: T): T => ({ ...city, citizens: city.citizens.map(withPrompt) });
+
 async function generateSocialDecision(body: SocialDecisionRequest): Promise<SocialDecision> {
-  return request<SocialDecision>("/cognition/social", { method: "POST", body: JSON.stringify(body) });
+  return request<SocialDecision>("/cognition/social", { method: "POST", body: JSON.stringify({ ...body, citizen: withPrompt(body.citizen) }) });
 }
 
 async function generateElectionDecision(body: ElectionDecisionRequest): Promise<ElectionDecision> {
-  return request<ElectionDecision>("/cognition/election", { method: "POST", body: JSON.stringify(body) });
+  return request<ElectionDecision>("/cognition/election", { method: "POST", body: JSON.stringify({ ...body, citizen: withPrompt(body.citizen) }) });
 }
 
 async function generateSessionCognition(
@@ -188,7 +194,7 @@ async function generateSessionCognition(
 ): Promise<SessionCognitionResponse> {
   return request<SessionCognitionResponse>("/cognition/session", {
     method: "POST",
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify({ ...requestBody, city: prompted(requestBody.city) }),
   });
 }
 
@@ -197,6 +203,17 @@ async function generateSessionTaskPlan(
 ): Promise<SessionTaskPlanResponse> {
   return request<SessionTaskPlanResponse>("/cognition/task-plan", {
     method: "POST",
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify({ ...requestBody, city: prompted(requestBody.city) }),
   });
+}
+
+/** The game master reads a free-text action or situation and returns bounded effects. */
+export async function interpretAct(body: ActRequest): Promise<ActInterpretation> {
+  return request<ActInterpretation>("/cognition/act", { method: "POST",
+    body: JSON.stringify({ ...body, actor: body.actor && withPrompt(body.actor), target: body.target && withPrompt(body.target) }) });
+}
+
+/** The fixed rules every resident follows, shown next to their editable prompt. */
+export async function cognitionRules(): Promise<{ game_rules: string; safety_rules: string }> {
+  return request("/cognition/rules");
 }

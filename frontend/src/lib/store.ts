@@ -50,6 +50,9 @@ type GameStore = {
   finishPlayback: (id: string) => void;
   /** The scene that just finished, so the player can decide what happens next. */
   lastScene: { conversationId: string; actorIds: string[]; at: number } | null;
+  /** While the player is chatting as a resident, other people's scenes wait instead of taking over the screen. */
+  playbackHeld: boolean;
+  setPlaybackHeld: (held: boolean) => void;
   clearLastScene: () => void;
   replayConversation: (id: string) => void;
   connectionStatus: "idle" | "connecting" | "connected" | "offline";
@@ -129,6 +132,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return { playbackQueue: remaining, lastScene };
   }),
   lastScene: null,
+  playbackHeld: false,
+  setPlaybackHeld: (playbackHeld) => set({ playbackHeld }),
   clearLastScene: () => set({ lastScene: null }),
   replayConversation: (id) => set((state) => {
     const conversation = state.cityConversations.find((c) => c.conversation_id === id);

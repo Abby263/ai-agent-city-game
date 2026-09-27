@@ -35,7 +35,8 @@ export function GameCanvas({
   const [error, setError] = useState("");
   const [labels, setLabels] = useState(false);
   const [mode, setMode] = useState<CameraMode>("orbit");
-  const conversation = useGameStore((state) => state.playbackQueue[0]);
+  // Scenes wait while the player is chatting; a replay they asked for still plays.
+  const conversation = useGameStore((state) => state.playbackHeld && !state.playbackQueue[0]?.replay ? undefined : state.playbackQueue[0]);
   const finishPlayback = useGameStore((state) => state.finishPlayback);
   const inlineTalk = useGameStore((state) => state.inlineTalk);
   const focusRequest = useGameStore((state) => state.focusRequest);

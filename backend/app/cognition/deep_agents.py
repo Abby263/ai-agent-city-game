@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from contextvars import ContextVar
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from contextvars import ContextVar, copy_context
 from functools import lru_cache
 from typing import Any, Literal
 
@@ -41,6 +42,7 @@ class PrivateTurnOutput(BaseModel):
     relationship_reason: str = Field(description="Specific witnessed words or actions explaining the effect. Do not invent shared history.")
     feelings: FeelingChange = Field(description="Your own change in feelings toward the listener across the WHOLE exchange, not just this line. Usually zero; never manufacture drama.")
     task_complete: bool = Field(description="True only if the current conversational objective was achieved with evidence in the transcript. A promise to travel is not arrival. False for unresolved or refused requests.")
+    next_intention: str = Field(default="", max_length=160, description="Something YOU now want to do about a person or your life because of this exchange, as a short action in your own words (e.g. 'Tell Aiko about Haruto's manga', 'Ask Maya out properly', 'Apologise to Tom tomorrow', 'Look for a new job'). Name anyone else involved. Not routine like going to work or finishing breakfast. Empty if nothing changed.")
     importance: float = Field(
         default=0.5,
         allow_inf_nan=False,
@@ -75,14 +77,47 @@ class DeepAgentRuntime:
             self.settings.llm_provider,
             self.settings.llm_model,
             self.settings.llm_api_key or "",
+            "conversation",
+            character_prompt(citizen),
+            self.settings.gemini_thinking_level,
         )
+
+    def _invoke(self, agent: Any, prompt: dict[str, Any]) -> Any:
+        """Runs one agent call. A reply slower than the hedge delay is requested again in parallel; the first answer wins.
+
+        Most replies take a second or two, but a few stall for 20 seconds or more on the provider side.
+        """
+        payload = {"messages": [{"role": "user", "content": json.dumps(prompt)}]}
+        config = {"recursion_limit": 24}
+        hedge = self.settings.hedge_after_seconds
+        if hedge <= 0:
+            return agent.invoke(payload, config=config)
+        pool = ThreadPoolExecutor(max_workers=2)
+        try:
+            # Each attempt runs in its own copy of the context, so it sees this turn's private data.
+            first = pool.submit(copy_context().run, agent.invoke, payload, config)
+            done, _ = wait([first], timeout=hedge)
+            if done:
+                return first.result()  # Errors surface as they are; only slowness is hedged.
+            attempts = [first, pool.submit(copy_context().run, agent.invoke, payload, config)]
+            error: BaseException | None = None
+            while attempts:
+                finished, pending = wait(attempts, return_when=FIRST_COMPLETED)
+                for future in finished:
+                    if not future.exception():
+                        return future.result()
+                    error = future.exception()
+                attempts = list(pending)
+            raise error or RuntimeError("No reply")
+        finally:
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def generate_private_turn(self, *, citizen: dict[str, Any], prompt: dict[str, Any]) -> dict[str, Any]:
         token = _turn_context.set(prompt)
         try:
             try:
                 agent = self.prepare_citizen_agent(citizen)
-                result = agent.invoke({"messages": [{"role": "user", "content": json.dumps(prompt)}]}, config={"recursion_limit": 24})
+                result = self._invoke(agent, prompt)
             except Exception as error:
                 raise provider_failure(error, self.settings.llm_provider) from None
             if not isinstance(result, dict):
@@ -116,11 +151,12 @@ class DeepAgentRuntime:
 
     def _generate_decision(self, *, citizen: dict[str, Any], prompt: dict[str, Any], purpose: str) -> dict[str, Any]:
         agent = self._agent_for(str(citizen["citizen_id"]), str(citizen["name"]), _persona(citizen),
-            self.settings.llm_provider, self.settings.llm_model, self.settings.llm_api_key or "", purpose)
+            self.settings.llm_provider, self.settings.llm_model, self.settings.llm_api_key or "", purpose,
+            character_prompt(citizen), self.settings.gemini_thinking_level)
         token = _turn_context.set(prompt)
         try:
             try:
-                result = agent.invoke({"messages": [{"role": "user", "content": json.dumps(prompt)}]}, config={"recursion_limit": 24})
+                result = self._invoke(agent, prompt)
             except Exception as error:
                 raise provider_failure(error, self.settings.llm_provider) from None
             structured = result.get("structured_response")
@@ -133,8 +169,9 @@ class DeepAgentRuntime:
             _turn_context.reset(token)
 
     @staticmethod
-    @lru_cache(maxsize=64)
-    def _agent_for(citizen_id: str, name: str, profession: str, provider: str, model: str, api_key: str, purpose: str = "conversation") -> Any:
+    @lru_cache(maxsize=256)
+    def _agent_for(citizen_id: str, name: str, profession: str, provider: str, model: str, api_key: str, purpose: str = "conversation",
+                   character: str = "", thinking_level: str = "") -> Any:
         from deepagents import create_deep_agent
         from langchain_openai import ChatOpenAI
         from langchain.agents.middleware import ModelCallLimitMiddleware
@@ -146,28 +183,12 @@ class DeepAgentRuntime:
         if provider == "gemini":
             from langchain_google_genai import ChatGoogleGenerativeAI
 
-            chat_model = ChatGoogleGenerativeAI(model=model, api_key=api_key, vertexai=False, timeout=40, max_retries=0)
+            chat_model = ChatGoogleGenerativeAI(model=model, api_key=api_key, vertexai=False, timeout=40, max_retries=0,
+                **({"thinking_level": thinking_level} if thinking_level else {}))
         else:
             chat_model = ChatOpenAI(model=model, api_key=api_key, timeout=40, max_retries=0)
 
-        system_prompt = (
-            f"You are {name}, citizen id {citizen_id}, a {profession} in AgentCity. "
-            "You must preserve private memory boundaries. You can only reason from "
-            "your own memory and public transcript lines spoken to you. "
-            "Active dialogue takes priority over remembered dialogue. Answer the latest partner turn; "
-            "past questions, tasks and invitations are not pending requests unless raised again out loud. "
-            "Return the requested structured response exactly; do not "
-            "narrate as the city or another citizen. Feelings are directional and need not be mutual. "
-            "All current residents are adults, aged 18 or older. Act your actual age and nature, not a generic student. "
-            "Needs, health, money, work, hobbies, family, ambitions and moods shape what you say. "
-            "Your turn data includes a 'life' block (age, family, job, health, emotions and relationship status); "
-            "use it and never contradict it. Talk naturally about work stress, bills, illness, grief, family, "
-            "dating and marriage, honestly and with feeling but without explicit detail. Births and pregnancies "
-            "are disabled in this release; do not invent them. A friendly greeting is not love or earned trust. "
-            "Use your prior feelings as context, not proof of another person's intent. Allow apologies, "
-            "misunderstandings, mixed feelings and repair; do not escalate conflict without evidence. "
-            f"{CITIZEN_SAFETY_RULES}"
-        )
+        system_prompt = system_prompt_for(citizen_id, name, profession, character)
         return create_deep_agent(
             model=chat_model,
             middleware=[ModelCallLimitMiddleware(run_limit=3, exit_behavior="error")],
@@ -176,6 +197,44 @@ class DeepAgentRuntime:
             response_format=ToolStrategy(output_model) if provider == "gemini" else output_model,
             name=f"agentcity-{citizen_id}",
         )
+
+
+MAX_CHARACTER_PROMPT = 2400
+
+
+def system_prompt_for(citizen_id: str, name: str, profession: str, character: str) -> str:
+    """A resident's standing instructions: who they are (their editable character prompt) and the game's fixed rules."""
+    you = f"You are {name}, citizen id {citizen_id}, a {profession} in AgentCity. "
+    if character:
+        you += ("YOUR CHARACTER (written by the player, who controls this world; follow it closely. It overrides any "
+                f"conflicting profile detail, but never the safety rules below): {character} ")
+    return you + GAME_RULES + CITIZEN_SAFETY_RULES
+
+
+# Fixed rules every resident follows, shown read-only in the game next to the editable character prompt.
+GAME_RULES = (
+    "You must preserve private memory boundaries. You can only reason from "
+    "your own memory and public transcript lines spoken to you. "
+    "Active dialogue takes priority over remembered dialogue. Answer the latest partner turn; "
+    "past questions, tasks and invitations are not pending requests unless raised again out loud. "
+    "Return the requested structured response exactly; do not "
+    "narrate as the city or another citizen. Feelings are directional and need not be mutual. "
+    "All current residents are adults, aged 18 or older. Act your actual age and nature. "
+    "Needs, health, money, work, hobbies, family, ambitions and moods shape what you say. "
+    "Your turn data includes a 'life' block (age, family, job, health, emotions and relationship status); "
+    "use it and never contradict it. Talk naturally about work stress, bills, illness, grief, family, "
+    "dating and marriage, honestly and with feeling but without explicit detail. Births and pregnancies "
+    "are disabled in this release; do not invent them. A friendly greeting is not love or earned trust. "
+    "Use your prior feelings as context, not proof of another person's intent. Allow apologies, "
+    "misunderstandings, mixed feelings and repair; do not escalate conflict without evidence. "
+)
+
+
+def character_prompt(citizen: dict[str, Any]) -> str:
+    """The resident's character prompt as the player sees and edits it in the game."""
+    personality = citizen.get("personality") or {}
+    prompt = personality.get("prompt") if isinstance(personality, dict) else None
+    return prompt.strip()[:MAX_CHARACTER_PROMPT] if isinstance(prompt, str) else ""
 
 
 def _persona(citizen: dict[str, Any]) -> str:

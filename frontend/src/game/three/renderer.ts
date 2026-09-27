@@ -8,14 +8,14 @@ import { arrivals, citizenPoint, walkablePoint, walkingRoute } from "./layout";
 import type { CityState } from "@/lib/types";
 import type { ConversationFrame, InlineTalk } from "@/lib/conversation-playback";
 import { speechLevel } from "@/lib/speech-level";
-import { conversationCameraOffset, conversationDistance, conversationStaging } from "./conversation-camera";
+import { conversationCameraOffset, conversationDistance, conversationStaging, sightLinesClear } from "./conversation-camera";
 import { skyAt } from "./sky";
 import { makeAtmosphere } from "./atmosphere";
 import { makeTraffic } from "./traffic";
 import { makeTrain } from "./train";
 import { groundTint, makeWeatherFx } from "./weather-fx";
 import { makeIncidents } from "./incidents";
-import { activeIncidents } from "@/lib/scenarios";
+import { activeIncidents } from "@/lib/incidents";
 import { applyFoliage, foliageFor } from "./seasons";
 import { calendarDay, calendarStartFor } from "@/lib/calendar";
 import type { WeatherNow } from "@/lib/weather";
@@ -414,7 +414,12 @@ export class CityRenderer {
     this.focusTarget = new THREE.Vector3(center.x, 0.7, center.z);
     const offset = this.camera.position.clone().sub(this.controls.target).setLength(distance);
     offset.y = Math.max(offset.y, distance * 0.45);
-    this.shotPosition = this.focusTarget.clone().add(offset.setLength(distance));
+    offset.setLength(distance);
+    // Keep the current angle when the pair is in view from it; otherwise swing to one no building blocks,
+    // so the camera never ends up behind a wall or inside a block of flats.
+    const heads = models.map((m) => m.root.position.clone().setY(1.35));
+    const clear = sightLinesClear(this.focusTarget.clone().add(offset), heads, this.town.root);
+    this.shotPosition = this.focusTarget.clone().add(clear ? offset : conversationCameraOffset(this.focusTarget, heads, this.town.root, distance, false));
   }
   private holdInPlace(id: string) {
     const model = this.people.get(id);
@@ -514,13 +519,14 @@ export class CityRenderer {
     this.camera.aspect = this.width / this.height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(this.width, this.height);
-    const ratio = this.renderer.getPixelRatio();
-    this.ink.resize(
-      Math.round(this.width * ratio),
-      Math.round(this.height * ratio),
-    );
+    const buffer = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    this.ink.resize(buffer.x, buffer.y);
     if (this.conversationCenter) this.focusConversation();
     else if (this.inline) this.focusPair(this.inline.actorIds);
+    // Resizing clears the canvas. Draw at once: if the loop is paused (hidden tab, pane or scrolled away), the stage's
+    // green background would otherwise show through with stale name tags until the loop happens to resume.
+    if (this.alive && this.width > 1 && this.height > 1) this.ink.render(this.renderer, this.scene, this.camera);
+    this.resume();
   }
   private project(point: THREE.Vector3, element: HTMLElement, lift = 0) {
     this.vector.copy(point);

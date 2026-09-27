@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { createInitialCity } from "../src/lib/initial-city";
-import { getSessionCity, saveSessionCity, seedSession, sessionAdvanceAutoElection, sessionCastVote, sessionConversations, sessionCreateSituation, sessionPause, sessionStartElectionAuto, sessionTakeControl } from "../src/lib/session-simulation";
+import { getSessionCity, saveSessionCity, seedSession, sessionAdvanceAutoElection, sessionCastVote, sessionConversations, sessionAct, sessionPause, sessionStartElectionAuto, sessionTakeControl } from "../src/lib/session-simulation";
 import { activeStories } from "../src/lib/stories";
 import type { SessionCognitionRequest, SessionCognitionResponse } from "../src/lib/types";
 import { playerTurn, type DecideElection } from "../src/lib/elections";
@@ -64,14 +64,15 @@ const talk = async (request: SessionCognitionRequest): Promise<SessionCognitionR
 test("a situation starts a story and the people involved react straight away", async () => {
   const city = getSessionCity()!;
   const [yui, daichi] = ["Yui", "Daichi"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
-  const { result, talked, story_id } = await sessionCreateSituation({ kind: "love_spark", citizen_ids: [yui, daichi] }, talk);
-  assert.ok(result.headline);
+  const master = async () => ({ allowed: true, refusal: "", headline: "Yui and Daichi got stuck in the lift together.", target_id: yui, involved_ids: [yui, daichi],
+    location_id: "", tone: "tense" as const, intensity: 1, harm: 0, money: 0, proposal: "none" as const, closes_location: false, reaction: "You're stuck in the lift together.", target_memory: "" });
+  const { headline, talked, story_id } = await sessionAct(null, null, "Yui and Daichi get stuck in the lift together", master, talk);
+  assert.match(headline, /stuck in the lift/);
   assert.equal(talked, true);
   const story = activeStories(getSessionCity()!).find((s) => s.id === story_id)!;
-  assert.equal(story.icon, "💘");
   assert.ok(story.beats.some((b) => b.conversation_id), "the reaction conversation is a beat of the story");
   assert.ok(sessionConversations(yui).length > 0);
-  assert.equal(getSessionCity()!.encounter, null, "no leftover encounter waits for a tick");
+  assert.equal(getSessionCity()!.encounter ?? null, null, "no leftover encounter waits for a tick");
 });
 
 test("an election from Create runs its campaign and ends with a winner in the story", async () => {

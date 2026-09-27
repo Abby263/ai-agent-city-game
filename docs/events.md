@@ -16,14 +16,14 @@ waiting for Auto. The **Happening now** card on the map then collects each beat:
 - every later conversation between the people in the story, quoted, with **Replay talk**,
 - life news about them (an injury healing, a new couple, a police warning, an election result).
 
-**What happens next? You decide.** Each story offers up to three next moves for the
-people in it, chosen from what just happened (`frontend/src/lib/choices.ts`): after a
-slap, an apology, a confrontation or a hug; after a spark, asking out or flirting; after a
-kept secret, a confession or a guilty gift. Picking one plays their reaction and adds
-"👉 You chose…" to the same story, and the next choices follow that latest move. When a
-scene that isn't part of a story ends, a **What happens next?** card offers the same kind
-of choice (and starts a story if you pick one). The AI never acts on the resident you play;
-your own moves are yours to make. **Watch** moves the camera back to them. **All stories** (the News panel) lists every
+**What happens next? You decide.** After each conversation, every person in it says what
+they now want to do, in their own words ("Tell Aiko about Haruto's manga", "Ask Maya out
+properly"). The story card offers those as next moves, aimed at whoever they name, and has
+a box to write anything else, done by either person or by nobody ("it just happens").
+Picking one plays their reaction and adds "👉 You chose…" to the same story. When a scene
+that isn't part of a story ends, a **What happens next?** card offers the same. The AI never
+acts or speaks for the resident you play. See [player control](player-control.md).
+**Watch** moves the camera back to them. **All stories** (the News panel) lists every
 running story with its full timeline. Stories stay open for 36 city hours (24 for
 actions, 48 for elections); switch on **Auto** to see how the rest of town reacts.
 

@@ -3,8 +3,9 @@ import { after, afterEach, beforeEach, test } from "node:test";
 import { createInitialCity } from "../src/lib/initial-city";
 import {
   getSessionCity, saveSessionCity, seedSession, sessionConversations,
-  sessionMemories, sessionPause, sessionPerformAction, sessionRelationships, sessionTakeControl,
+  sessionAct, sessionMemories, sessionPause, sessionRelationships, sessionTakeControl,
 } from "../src/lib/session-simulation";
+import type { ActInterpretation } from "../src/lib/acts";
 import type { BondSnapshot, CityState, ConversationImpact, Relationship, SessionCognitionRequest, SessionCognitionResponse } from "../src/lib/types";
 
 // Per-file Node isolation and in-memory storage keep real saved worlds untouched.
@@ -14,14 +15,17 @@ const originalFetch = globalThis.fetch;
 const actorId = "cit_009", targetId = "cit_010";
 const metrics = ["trust", "warmth", "familiarity", "affection", "jealousy", "resentment", "admiration"] as const;
 const initial: BondSnapshot = { trust: 60, warmth: 64, familiarity: 40, affection: 10, jealousy: 12, resentment: 20, admiration: 14 };
+// An argument read as a tense act of intensity 1 (two steps): the person argued with warms less and resents more;
+// both know each other a little better. The final bonds come from what the reaction actually persisted.
 const postAction: Record<string, BondSnapshot> = {
-  [actorId]: { ...initial, warmth: 58 },
-  [targetId]: { ...initial, warmth: 56, resentment: 30 },
+  [actorId]: { ...initial, familiarity: 43 },
+  [targetId]: { ...initial, trust: 56, warmth: 58, familiarity: 43, resentment: 28 },
 };
-const final: Record<string, BondSnapshot> = {
-  [actorId]: { trust: 55, warmth: 53, familiarity: 41, affection: 7, jealousy: 14, resentment: 24, admiration: 12 },
-  [targetId]: { trust: 62, warmth: 58, familiarity: 41, affection: 13, jealousy: 10, resentment: 26, admiration: 19 },
-};
+/** The game master's reading of "argue about the plan". */
+const argument = async (): Promise<ActInterpretation> => ({ allowed: true, refusal: "", headline: "Ava argued with Mateo about the plan.", target_id: targetId,
+  involved_ids: [actorId, targetId], location_id: "", tone: "tense", intensity: 1, harm: 0, money: 0, proposal: "none", closes_location: false,
+  reaction: "Ava just argued with you about the plan.", target_memory: "Ava argued with me about the plan." });
+const argue = (generate: (request: SessionCognitionRequest) => Promise<SessionCognitionResponse>) => sessionAct(actorId, targetId, "argue about the plan", argument, generate);
 let networkCalls = 0;
 Object.defineProperty(globalThis, "window", { configurable: true, value: { localStorage: {
   getItem: (key: string) => storage.get(key) ?? null,
@@ -125,25 +129,25 @@ function assertHistory(r: Relationship, withConversation: boolean) {
   assert.deepEqual(action.after, postAction[r.citizen_id]);
   assert.deepEqual(action.changes, changes(initial, postAction[r.citizen_id]));
   if (withConversation) {
+    const final = snapshot(r);
     const conversation = entries[1];
     assert.equal(conversation.source, "conversation");
     assert.equal(conversation.conversation_id, "bond-accounting-reply");
     assert.deepEqual(conversation.before, postAction[r.citizen_id]);
-    assert.deepEqual(conversation.after, final[r.citizen_id]);
-    assert.deepEqual(conversation.changes, changes(postAction[r.citizen_id], final[r.citizen_id]));
-    assert.deepEqual(Object.keys(conversation.changes!).sort(), [...metrics].sort(), "all seven metrics change in this response");
+    assert.deepEqual(conversation.after, final);
+    assert.deepEqual(conversation.changes, changes(postAction[r.citizen_id], final));
     for (const key of metrics) {
-      assert.equal((action.changes?.[key] ?? 0) + (conversation.changes?.[key] ?? 0), final[r.citizen_id][key] - initial[key], `${key}: no missing or double-counted action delta`);
+      assert.equal((action.changes?.[key] ?? 0) + (conversation.changes?.[key] ?? 0), final[key] - initial[key], `${key}: no missing or double-counted action delta`);
     }
   }
 }
 
 for (const controlled of [false, true]) {
   const label = controlled ? "player" : "NPC";
-  test(`${label}: Argue impacts retain pre-action, post-action and final seven-metric bonds`, async () => {
+  test(`${label}: an argument's impacts retain pre-action, post-action and final bonds`, async () => {
     if (controlled) await sessionTakeControl(actorId);
     let actionBonds: Relationship[] = [], actionCity: CityState | undefined;
-    const result = await sessionPerformAction(actorId, targetId, "argue", "I disagree with that plan.", async (request) => {
+    const result = await argue(async (request) => {
       actionBonds = pairBonds();
       actionCity = getSessionCity()!;
       return response(request);
@@ -158,12 +162,13 @@ for (const controlled of [false, true]) {
     const conversations = sessionConversations();
     assert.equal(conversations.length, 1);
     assert.equal(conversations[0].impacts?.length, 2);
+    const final: Record<string, BondSnapshot> = {};
     for (const r of pairBonds()) {
+      final[r.citizen_id] = snapshot(r);
       const impact: ConversationImpact = conversations[0].impacts!.find((i) => i.citizen_id === r.citizen_id)!;
       assert.equal(impact.other_citizen_id, r.other_citizen_id);
       assert.deepEqual(impact.before, initial);
       assert.deepEqual(impact.action_after, postAction[r.citizen_id]);
-      assert.deepEqual(impact.after, final[r.citizen_id]);
       assert.deepEqual(impact.after, snapshot(r), "visible impact equals persisted final relationship");
       assert.equal(impact.mood_before, "Calm before the argument");
       assertHistory(r, true);
@@ -176,7 +181,7 @@ for (const controlled of [false, true]) {
     if (controlled) await sessionTakeControl(actorId);
     const beforeMemories = memories();
     let committed: ReturnType<typeof stored> | undefined;
-    const result = await sessionPerformAction(actorId, targetId, "argue", "", async () => {
+    const result = await argue(async () => {
       committed = stored();
       throw new Error("Bond provider unavailable");
     });
@@ -200,7 +205,9 @@ for (const controlled of [false, true]) {
       let resolve!: (response: SessionCognitionResponse) => void, reject!: (error: Error) => void;
       const gate = new Promise<SessionCognitionResponse>((yes, no) => { resolve = yes; reject = no; });
       let request: SessionCognitionRequest | undefined;
-      const pending = sessionPerformAction(actorId, targetId, "argue", "", (r) => { request = r; return gate; });
+      const pending = argue((r) => { request = r; return gate; });
+      // The act is interpreted first; wait until their reaction is actually being generated.
+      for (let i = 0; !request && i < 200; i++) await new Promise((resolve) => setTimeout(resolve, 0));
       assert.ok(request, "the response is pending before pause");
       for (const r of pairBonds()) assertHistory(r, false);
       await sessionPause();

@@ -17,7 +17,7 @@ export function validateCognition(value: unknown): asserts value is SessionCogni
     if (!record(value.participant_outcomes)) return fail();
     for (const outcome of Object.values(value.participant_outcomes)) {
       if (!record(outcome)) return fail();
-      for (const key of ["relationship_reason", "mood", "thought"]) if (outcome[key] !== undefined && typeof outcome[key] !== "string") fail();
+      for (const key of ["relationship_reason", "mood", "thought", "next_intention"]) if (outcome[key] !== undefined && typeof outcome[key] !== "string") fail();
       if (outcome.task_complete !== undefined && typeof outcome.task_complete !== "boolean") fail();
       if (outcome.relationship_effect !== undefined && !["neutral", "positive", "negative"].includes(String(outcome.relationship_effect))) fail();
       if (outcome.invitation_response !== undefined && !["accepted", "declined", "undecided", "none"].includes(String(outcome.invitation_response))) fail();

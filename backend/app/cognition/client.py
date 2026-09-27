@@ -154,7 +154,8 @@ class CitizenCognitionClient:
                     model=self.settings.gemini_model,
                     contents=json.dumps(prompt),
                     config={"system_instruction": system, "response_mime_type": "application/json",
-                            "response_json_schema": schema, "max_output_tokens": 4096},
+                            "response_json_schema": schema, "max_output_tokens": 4096,
+                            **({"thinking_config": {"thinking_level": self.settings.gemini_thinking_level}} if self.settings.gemini_thinking_level else {})},
                 )
                 text = response.text
             else:
@@ -428,7 +429,7 @@ class CitizenCognitionClient:
             participant_reflections=participant_reflections,
             meeting_plan=final_state.get("meeting_plan"),
             participant_outcomes={
-                citizen_id: {key: result.get(key) for key in ("invitation_response", "relationship_effect", "relationship_reason", "task_complete", "feelings", "mood", "thought")}
+                citizen_id: {key: result.get(key) for key in ("invitation_response", "relationship_effect", "relationship_reason", "task_complete", "feelings", "mood", "thought", "next_intention")}
                 for citizen_id, result in ((actor_id, actor_result), (target_id, target_result))
                 if not player_utterance or citizen_id != actor_id
             },
@@ -573,6 +574,13 @@ class CitizenCognitionClient:
                 "Use 'you' for the listener. Avoid gendered third-person pronouns for the listener.",
                 "Do not announce that you are about to go ask or talk to someone else when you are already speaking with the current listener.",
                 "Use a human tone with emotion, uncertainty, or a small follow-up when natural.",
+                "Talk like a person with a life and stakes: pursue what you came to say, share real news or feelings, ask for what you want, "
+                "disagree, tease, confide or push back when it fits. Polite filler (weather, breakfast, 'hope your shift goes well') is "
+                "only acceptable as a brief lead-in, never as the whole conversation.",
+                "You may pass on news you have heard about other people when it matters to the listener. Decide for yourself whether "
+                "something told to you in confidence should be kept private; people do gossip, and people also keep promises.",
+                "Set next_intention to what you now want to do about a person or your life because of this exchange, naming anyone else "
+                "involved. Leave it empty rather than naming routine plans such as going to work.",
                 "Let own_nature shape your voice, values, sensitivities and attempts to repair conflict. Do not recite trait labels. Traits are tendencies, not compulsory reactions or stereotypes.",
                 "Assess only YOUR feelings toward the listener, grounded in specific words in this exchange and your private history. Explain why your personal values make those words matter. Neutral and mixed reactions are valid; do not reward every greeting or force jealousy, affection or romance.",
                 "Use the exchange as a whole for your final emotional assessment, not a cumulative delta on each turn. The game applies that assessment once after the exchange.",
