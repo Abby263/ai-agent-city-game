@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { bondClusters, bondValue, overviewBonds, type BondMetric } from "@/lib/bond-network";
-import { bondLabel, bondMetrics } from "@/lib/social";
+import { bondLabel, bondMetrics, partnershipLabel } from "@/lib/social";
 import type { CitizenAgent, Relationship } from "@/lib/types";
 import { CitizenPortrait } from "./CitizenPortrait";
 
@@ -85,7 +85,7 @@ export function BondNetwork({ citizens, relationships, initialFocus = "" }: {
     {selected && reverse && focused && target && <div className="network-detail">
       <div><strong>{focused.name.split(" ")[0]} → {target.name.split(" ")[0]}</strong><b>{bondValue(selected, metric)}/100</b></div>
       <div><strong>{target.name.split(" ")[0]} → {focused.name.split(" ")[0]}</strong><b>{bondValue(reverse, metric)}/100</b></div>
-      <small>{bondLabel(selected)} · {focused.mood}</small>
+      <small>{partnershipLabel(focused, target) ? `${partnershipLabel(focused, target)} · ` : ""}Social closeness: {bondLabel(selected)} · {focused.mood}</small>
       <p>{selected.history?.at(-1)?.reason ?? selected.notes}</p>
     </div>}
   </section>;

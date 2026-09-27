@@ -286,11 +286,33 @@ class CitizenCognitionClient:
         meeting_locations: list[dict[str, str]] | None = None,
         meeting_now: int | None = None,
     ) -> CognitionResult:
+        actor_id = actor.get("citizen_id")
+        target_id = target.get("citizen_id")
+        if (
+            any(not isinstance(value, str) or not value.strip() for value in (actor_id, target_id))
+            or actor_id == target_id
+        ):
+            raise CognitionValidationError("Private exchange requires two distinct, nonempty citizen IDs.")
+        if player_utterance is not None and (
+            not isinstance(player_utterance, str)
+            or not player_utterance.strip()
+            or len(player_utterance) > 600
+        ):
+            raise CognitionValidationError("Player utterance must contain 1 to 600 characters of speech.")
+        for line in prior_lines or []:
+            if not isinstance(line, dict) or any(
+                not isinstance(line.get(key), str) or not line[key].strip()
+                for key in ("speaker_id", "text")
+            ):
+                raise CognitionValidationError("Prior lines require a speaker_id and nonempty text.")
         if not self.client:
             raise CognitionUnavailableError(f"Cognition is unavailable. Configure the backend API key for {self.settings.llm_provider}.")
 
-        self.deep_agents.prepare_citizen_agent(actor)
-        self.deep_agents.prepare_citizen_agent(target)
+        try:
+            self.deep_agents.prepare_citizen_agent(actor)
+            self.deep_agents.prepare_citizen_agent(target)
+        except Exception as error:
+            raise provider_failure(error, self.settings.llm_provider) from None
 
         try:
             from langgraph.graph import END, START, StateGraph
@@ -391,7 +413,7 @@ class CitizenCognitionClient:
             actor_id: str(actor_result["reflection"]),
             target_id: str(target_result["reflection"]),
         }
-        summary = self._public_summary(actor, target, task, lines)
+        summary = self._public_summary(actor, target, lines)
         importance = max(float(actor_result["importance"]), float(target_result["importance"]))
         return CognitionResult(
             thought=str(actor_result["thought"]),
@@ -441,6 +463,11 @@ class CitizenCognitionClient:
             meeting_offer=state.get("meeting_offer"),
             meeting_locations=state.get("meeting_locations", []),
         )
+        spoken_line = _clean_line(
+            result["spoken_line"], (str(result.get("mood") or ""), str(speaker.get("mood") or "")),
+        )
+        if not spoken_line.strip():
+            raise CognitionValidationError("Private turn contained no spoken text after cleanup.")
         speaker_id = str(speaker["citizen_id"])
         offer = state.get("meeting_offer")
         plan = state.get("meeting_plan")
@@ -461,7 +488,7 @@ class CitizenCognitionClient:
             except (ValueError, TypeError):
                 pass  # An invalid proposed appointment must not invent a commitment.
         return {
-            "lines": [*state["lines"], {"speaker_id": speaker_id, "text": _clean_line(str(result["spoken_line"]), (str(result.get("mood") or ""), str(speaker.get("mood") or "")))}],
+            "lines": [*state["lines"], {"speaker_id": speaker_id, "text": spoken_line}],
             "turn_results": {
                 **state["turn_results"],
                 speaker_id: [*state["turn_results"].get(speaker_id, []), result],
@@ -633,12 +660,10 @@ class CitizenCognitionClient:
     def _public_summary(
         actor: dict[str, Any],
         target: dict[str, Any],
-        task: str,
         lines: list[dict[str, str]],
     ) -> str:
         first = next((line["text"] for line in lines if line["speaker_id"] == actor["citizen_id"]), "")
-        task_label = task.strip().rstrip(".!?")
-        return f"{actor['name']} and {target['name']} discussed: {task_label}. First line: {first}"
+        return f"{actor['name']} and {target['name']} talked. First line: {first}"
 
     def plan_task(
         self,

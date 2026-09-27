@@ -1,4 +1,7 @@
+import pytest
+
 from app.cognition.client import CitizenCognitionClient
+from app.cognition.errors import CognitionValidationError
 from app.config import Settings
 
 
@@ -174,3 +177,76 @@ def test_topic_change_keeps_gift_history_out_of_active_ramen_exchange(monkeypatc
         assert "STALE_" not in str(prompt)
     assert len(result.conversation["lines"]) == 6
     assert "What's in the box?" not in result.participant_memories["ava"]
+
+
+@pytest.mark.parametrize("actor_id,target_id", [("ava", "ava"), ("", "noah"), ("ava", " "), (None, "noah"), (1, "1")])
+def test_direct_exchange_rejects_ambiguous_participant_identity(monkeypatch, actor_id, target_id):
+    client, prompts = setup_client(monkeypatch, [])
+    prepared = []
+    monkeypatch.setattr(client.deep_agents, "prepare_citizen_agent", lambda citizen: prepared.append(citizen))
+    with pytest.raises(CognitionValidationError):
+        client.generate_private_exchange(
+            actor={"citizen_id": actor_id, "name": "Ava", "profession": "Student"},
+            target={"citizen_id": target_id, "name": "Noah", "profession": "Student"},
+            city_time="06:00", task="Talk", observations=[], actor_memories=[], target_memories=[], event_context="",
+        )
+    assert prompts == []
+    assert prepared == []
+
+
+@pytest.mark.parametrize("line", [{"speaker_id": "ava"}, {"speaker_id": "ava", "text": None}, None])
+def test_direct_exchange_rejects_malformed_history_before_generation(monkeypatch, line):
+    client, prompts = setup_client(monkeypatch, [])
+    with pytest.raises(CognitionValidationError):
+        exchange(client, prior_lines=[line])
+    assert prompts == []
+
+
+def test_private_task_does_not_leak_into_public_summary(monkeypatch):
+    client, prompts = setup_client(monkeypatch, [
+        {"spoken_line": "Hello there."}, {"spoken_line": "Hello!", "end_conversation": True},
+    ])
+    result = client.generate_private_exchange(
+        actor={"citizen_id": "ava", "name": "Ava", "profession": "Student"},
+        target={"citizen_id": "noah", "name": "Noah", "profession": "Student"},
+        city_time="06:00", task="Say hello without mentioning PRIVATE_TASK_SECRET", observations=[],
+        actor_memories=[], target_memories=[], event_context="",
+    )
+    assert "PRIVATE_TASK_SECRET" not in result.conversation["summary"]
+    assert "PRIVATE_TASK_SECRET" not in str(prompts[1][1])
+    assert "PRIVATE_TASK_SECRET" not in str(result.participant_memories)
+
+
+@pytest.mark.parametrize("stop_turn", [2, 3, 4, 5, 6])
+def test_exchange_stops_at_requested_turn_without_extra_calls(monkeypatch, stop_turn):
+    client, prompts = setup_client(monkeypatch, [
+        {"spoken_line": f"Line {i}", "end_conversation": i == stop_turn - 1} for i in range(stop_turn)
+    ])
+    result = exchange(client)
+    assert len(prompts) == len(result.conversation["lines"]) == stop_turn
+
+
+def test_alignment_retry_cannot_exceed_one_retry_or_expand_turn_cap(monkeypatch):
+    client, prompts = setup_client(monkeypatch, [{"spoken_line": f"Line {i}"} for i in range(7)])
+    monkeypatch.setattr(client, "_line_is_off_task", lambda *args: True)
+    result = exchange(client)
+    assert len(prompts) == 7
+    assert len(result.conversation["lines"]) == 6
+    assert "Line 0" not in str(result.participant_memories)
+
+
+@pytest.mark.parametrize("utterance", ["", " ", 42, "x" * 601])
+def test_invalid_player_utterance_never_falls_back_to_ai_voice(monkeypatch, utterance):
+    client, prompts = setup_client(monkeypatch, [])
+    with pytest.raises(CognitionValidationError):
+        exchange(client, player_utterance=utterance)
+    assert prompts == []
+
+
+def test_escaped_blank_provider_line_cannot_complete_exchange(monkeypatch):
+    client, prompts = setup_client(monkeypatch, [
+        {"spoken_line": r"\u0020\u000a"}, {"spoken_line": "Hello!", "end_conversation": True},
+    ])
+    with pytest.raises(CognitionValidationError):
+        exchange(client)
+    assert len(prompts) == 1

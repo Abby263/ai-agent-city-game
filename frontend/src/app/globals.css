@@ -708,6 +708,7 @@ button:hover:not(:disabled) {
 .change-filter { display: flex; align-items: center; gap: 8px; font-size: 12px; min-height: 32px; }
 .social-change { padding: 18px 0; border-bottom: 1px solid #dce2e4; }
 .social-change time { color: #666e7a; font-size: 11px; }
+.social-change .change-source { display: inline-block; margin-left: 10px; color: #4f5764; font-size: 11px; }
 .social-pair { display: flex; align-items: center; gap: 7px; margin: 10px 0; min-width: 0; }
 .social-pair strong { font-size: 12px; overflow-wrap: anywhere; }
 .social-pair svg { flex-shrink: 0; color: #7a8390; }

@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { ArrowRight, Heart, MessageCircle } from "lucide-react";
 import { CitizenPortrait } from "./CitizenPortrait";
-import { emptyFeelings, feelingNames } from "@/lib/social";
+import { bondMetrics, emptyFeelings, feelingNames } from "@/lib/social";
 import { BondNetwork } from "./BondNetwork";
-import type { CityState, Conversation, Feelings, Relationship } from "@/lib/types";
+import type { BondSnapshot, CityState, Conversation, Feelings, Relationship } from "@/lib/types";
 
 const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 
@@ -32,8 +32,8 @@ export function SocialPanel({ city, relationships, conversations, onConversation
   const available = new Set(conversations.map((c) => c.conversation_id));
   const visible = relationships.filter((r) => filter === "all" || r.citizen_id === filter);
   const changes = visible.flatMap((r) => (r.history ?? []).map((entry, index) => ({ r, entry, index })))
-    .filter(({ entry }) => !onlyChanges || Object.keys(entry.changes ?? {}).length > 0 || entry.effect !== "neutral")
-    .sort((a, b) => b.entry.day - a.entry.day || b.entry.minute - a.entry.minute);
+    .filter(({ entry }) => !onlyChanges || Object.keys(entry.changes ?? {}).length > 0 || (!entry.changes && entry.effect !== "neutral"))
+    .sort((a, b) => b.entry.day - a.entry.day || b.entry.minute - a.entry.minute || (b.entry.created_at ?? "").localeCompare(a.entry.created_at ?? "") || b.index - a.index);
   function pair(r: Relationship) {
     const from = names.get(r.citizen_id), to = names.get(r.other_citizen_id);
     if (!from || !to) return null;
@@ -61,10 +61,14 @@ export function SocialPanel({ city, relationships, conversations, onConversation
         {changes.length === 0 && <div className="social-empty"><Heart size={28} /><h3>No emotional changes yet</h3><p>Shared experiences are still unfolding.</p></div>}
         {changes.map(({ r, entry, index }) => <article className="social-change" key={`${r.relationship_id}-${index}`}>
           <time>Day {entry.day} · {clock(entry.minute)}</time>
+          {entry.source && <small className="change-source">{entry.source === "action" ? "Action effects" : "Conversation response"}</small>}
           {pair(r)}
           <div className="feeling-deltas">
-            {Object.entries(entry.changes ?? {}).map(([key, value]) => <span className={`feeling-${key}`} key={key}>{feelingNames[key as keyof Feelings]} {value! > 0 ? "+" : ""}{value}</span>)}
-            {!Object.keys(entry.changes ?? {}).length && <span>{entry.effect === "positive" ? "Trust grew" : entry.effect === "negative" ? "Trust fell" : "Feelings unchanged"}</span>}
+            {Object.entries(entry.changes ?? {}).map(([key, value]) => <span className={`feeling-${key}`} key={key}>
+              {bondMetrics[key as keyof BondSnapshot]} {value! > 0 ? "+" : ""}{value}
+              {entry.before && entry.after && <small> ({entry.before[key as keyof BondSnapshot]} → {entry.after[key as keyof BondSnapshot]})</small>}
+            </span>)}
+            {!Object.keys(entry.changes ?? {}).length && <span>{!entry.changes && entry.effect === "situation" ? "Change amounts were not recorded" : entry.effect === "positive" ? "Trust grew" : entry.effect === "negative" ? "Trust fell" : "No score change"}</span>}
           </div>
           {entry.mood && <small className="social-mood">{entry.mood}</small>}
           <p>{entry.reason}</p>

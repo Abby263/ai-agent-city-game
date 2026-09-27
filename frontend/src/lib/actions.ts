@@ -50,21 +50,32 @@ export const presentTense: Record<ActionId, string> = {
 export function actionBlocked(city: CityState, actor: CitizenAgent, target: CitizenAgent, id: ActionId): string | null {
   const spec = actions.find((a) => a.id === id);
   if (!spec) return "Unknown action.";
-  if (actor === target) return "Choose someone else.";
+  if (!actor || !target) return "Choose two residents who are in the city.";
+  if (actor.citizen_id === target.citizen_id) return "Choose someone else.";
+  if (!city.citizens.includes(actor) || !city.citizens.includes(target)) return "Choose two residents who are in the city.";
   if (actor.age < 3) return `${actor.name.split(" ")[0]} is too little to do that.`;
   if (spec.group === "love") {
     if (!isAdult(actor) || !isAdult(target)) return "Romance is only between grown-ups. Try a kind action instead.";
-    const partners = actor.life?.partner_id === target.citizen_id;
-    if (!partners && relatives(city, actor).includes(target.citizen_id)) return "They are family.";
+    if (!actor.life || !target.life) return "Their relationship information is not available yet.";
+    const partners = actor.life.partner_id === target.citizen_id && target.life.partner_id === actor.citizen_id
+      && actor.life.relationship_status === target.life.relationship_status && ["dating", "partnered", "married"].includes(actor.life.relationship_status);
+    if (!partners && (relatives(city, actor).includes(target.citizen_id) || relatives(city, target).includes(actor.citizen_id))) return "They are family.";
     if (id === "kiss" && !partners) return "Only partners kiss. Try asking them on a date first.";
-    if (id === "propose" && actor.life?.relationship_status !== "dating") return "Propose once they are dating.";
-    if ((id === "ask_out" || id === "confess") && partners) return "They are already together.";
+    if (id === "propose") {
+      if (!partners || actor.life.relationship_status !== "dating") return "Propose once they are dating each other.";
+      if (city.gatherings?.some((g) => g.kind === "wedding" && g.day >= city.clock.day
+        && (g.host_ids.includes(actor.citizen_id) || g.host_ids.includes(target.citizen_id)))) return "A wedding is already planned.";
+    }
+    if (id === "ask_out" || id === "confess") {
+      if (partners) return "They are already together.";
+      if ([actor.life, target.life].some((life) => life.partner_id || !["single", "widowed"].includes(life.relationship_status))) return "They must both be single before starting a relationship.";
+    }
   }
   if (spec.group === "conflict") {
     if (target.age < 5) return "Nobody hurts a little child.";
     if (isAdult(actor) !== isAdult(target)) return "In Nakameguro, adults never hurt children, and children don't fight adults. Try talking instead.";
   }
-  if (id === "gift" && actor.money < 20) return "Not enough money for a gift.";
+  if (id === "gift" && (!Number.isFinite(actor.money) || actor.money < 20)) return "Not enough money for a gift.";
   return null;
 }
 
@@ -82,6 +93,8 @@ function feel(c: CitizenAgent, emotions?: Partial<Emotions>) {
 
 /** Applies what an action does to both people and anyone watching. The actor must already be with the target. */
 export function performAction(city: CityState, actor: CitizenAgent, target: CitizenAgent, id: ActionId, tools: ActionTools, note = ""): ActionOutcome {
+  const blocked = actionBlocked(city, actor, target, id);
+  if (blocked) throw new Error(blocked);
   const spec = actions.find((a) => a.id === id)!;
   const { sink, adjustBonds, bond } = tools;
   const day = city.clock.day, tick = city.clock.tick;
@@ -96,7 +109,7 @@ export function performAction(city: CityState, actor: CitizenAgent, target: Citi
   // Closeness changes how a hug, tease or flirt lands.
   if (id === "hug" && (toward?.feelings?.resentment ?? 0) > 40) { targetEffect = { warmth: 1, emotions: { anger: 5 } }; headline = `${actor.name} tried to hug ${target.name}, who pulled away.`; }
   if (id === "tease" && (toward?.warmth ?? 0) > 70) { targetEffect = { warmth: 2, emotions: { joy: 6 } }; headline = `${actor.name} teased ${target.name}, and they both laughed.`; }
-  if (id === "flirt" && (target.life?.partner_id || (toward?.warmth ?? 0) < 45)) { targetEffect = { feelings: { resentment: 3 } }; headline = `${actor.name} flirted with ${target.name}. It was awkward.`; }
+  if (id === "flirt" && ((target.life?.partner_id && target.life.partner_id !== actor.citizen_id) || (toward?.warmth ?? 0) < 45)) { targetEffect = { feelings: { resentment: 3 } }; headline = `${actor.name} flirted with ${target.name}. It was awkward.`; }
   if (id === "gift") actor.money -= 20;
   if (id === "ask_out" || id === "confess" || id === "propose") {
     const warmth = toward?.warmth ?? 0, affection = toward?.feelings?.affection ?? 0;
@@ -120,7 +133,7 @@ export function performAction(city: CityState, actor: CitizenAgent, target: Citi
       headline = `${actor.name} ${spec.verb} ${target.name}, but ${first(target)} gently said no${target.life?.partner_id && target.life.partner_id !== actor.citizen_id ? ": they're already with someone" : ""}.`;
     }
   }
-  if (id === "hit" && roll(day, tick, target.citizen_id, "hurt") < 0.6) {
+  if (id === "hit" && target.life && roll(day, tick, target.citizen_id, "hurt") < 0.6) {
     const injury = catchCondition(target, "minor injury", day);
     if (injury) { injury.severity = 42; headline += ` ${first(target)} is hurt.`; }
   }

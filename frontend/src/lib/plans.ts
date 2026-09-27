@@ -24,18 +24,20 @@ export function parsePlan(text: string, city: CityState): ParsedPlan | null {
     mentions.push({ at: match.index ?? 0, day: city.clock.day + offset });
   }
   const day: number | null = mentions.length ? mentions[mentions.length - 1].day : null;
-  const clock = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/) ?? null;
+  const clock = [...t.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/g)]
+    .find((match) => match[3] || match[2] || /\b(at|around|by)\s+$/.test(t.slice(0, match.index))) ?? null;
   const worded = t.match(/\b(?:at|around|by)\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|noon)\b/)
     ?? t.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:at|o'clock|pm|tonight|sharp)\b/);
   let hour: number | null = null, minutes = 0;
-  if (clock && (clock[3] || clock[2] || /\b(at|around|by)\s+\d/.test(t))) {
+  if (clock) {
     hour = Number(clock[1]);
     minutes = Number(clock[2] ?? 0);
-    if (clock[3] === "pm" && hour < 12) hour += 12;
+    if (minutes > 59 || hour > 23 || (clock[3] && (hour < 1 || hour > 12))) return null;
+    if (clock[3]) hour = hour % 12 + (clock[3] === "pm" ? 12 : 0);
   } else if (worded) hour = numberWords[worded[1]];
-  if (hour !== null && hour < 12 && !/\bam\b|morning/.test(t) && hour >= 1 && hour <= 9) hour += 12; // "seven" after work means 19:00
+  if (hour !== null && hour < 12 && !clock?.[3] && !/\bam\b|morning/.test(t) && hour >= 1 && hour <= 9) hour += 12; // "seven" after work means 19:00
   if (day === null || hour === null || hour > 23) return null;
-  const minute = Math.min(1439, hour * 60 + Math.min(59, minutes));
+  const minute = hour * 60 + minutes;
   if (day === city.clock.day && minute <= city.clock.minute_of_day + 30) return null;
   const location_id = placeWords.find(([pattern]) => pattern.test(t))?.[1] ?? "loc_restaurant";
   const place = city.locations.find((l) => l.location_id === location_id)?.name ?? "town";

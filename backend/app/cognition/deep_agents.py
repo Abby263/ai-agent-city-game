@@ -8,7 +8,7 @@ from typing import Any, Literal
 from app.config import Settings
 from app.cognition.errors import CognitionValidationError, provider_failure
 from langchain_core.tools import tool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from app.cognition.encounters import MeetingAction
 from app.safety import CITIZEN_SAFETY_RULES
 
@@ -17,6 +17,8 @@ _turn_context: ContextVar[dict[str, Any]] = ContextVar("agentcity_turn_context",
 
 
 class FeelingChange(BaseModel):
+    model_config = ConfigDict(strict=True)
+
     affection: int = Field(ge=-8, le=8, description="Change in platonic care or fondness, not automatic romance. Zero if unchanged.")
     jealousy: int = Field(ge=-8, le=8, description="Change in envy or feeling left out, only with witnessed evidence. Zero if unchanged.")
     resentment: int = Field(ge=-8, le=8, description="Change in hurt, dislike or grievance. Repair can reduce it. Zero if unchanged.")
@@ -25,6 +27,8 @@ class FeelingChange(BaseModel):
 
 
 class PrivateTurnOutput(BaseModel):
+    model_config = ConfigDict(strict=True)
+
     meeting_action: MeetingAction | None = Field(default=None, description="Only when you explicitly SAY a future meeting proposal, acceptance or refusal out loud. Accept/decline must exactly match an existing public meeting offer. Never agree for the listener. Otherwise null.")
     spoken_line: str = Field(description="Exactly one spoken line said out loud by the current citizen.")
     thought: str = Field(description="The private inner thought behind this one turn.")
@@ -39,8 +43,17 @@ class PrivateTurnOutput(BaseModel):
     task_complete: bool = Field(description="True only if the current conversational objective was achieved with evidence in the transcript. A promise to travel is not arrival. False for unresolved or refused requests.")
     importance: float = Field(
         default=0.5,
+        allow_inf_nan=False,
+        strict=True,
         description="How important this turn is to remember, from 0.0 to 1.0.",
     )
+
+    @field_validator("spoken_line")
+    @classmethod
+    def nonempty_spoken_line(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("A private turn must contain a spoken line")
+        return value
 
 
 class DeepAgentRuntime:
@@ -65,16 +78,16 @@ class DeepAgentRuntime:
         )
 
     def generate_private_turn(self, *, citizen: dict[str, Any], prompt: dict[str, Any]) -> dict[str, Any]:
-        agent = self.prepare_citizen_agent(citizen)
         token = _turn_context.set(prompt)
         try:
             try:
+                agent = self.prepare_citizen_agent(citizen)
                 result = agent.invoke({"messages": [{"role": "user", "content": json.dumps(prompt)}]}, config={"recursion_limit": 24})
             except Exception as error:
                 raise provider_failure(error, self.settings.llm_provider) from None
+            if not isinstance(result, dict):
+                raise CognitionValidationError("Deep Agent did not return a structured private turn.")
             structured = result.get("structured_response")
-            if isinstance(structured, PrivateTurnOutput):
-                return self._normalize_turn(structured.model_dump())
             if hasattr(structured, "model_dump"):
                 return self._normalize_turn(structured.model_dump())
             if isinstance(structured, dict):
@@ -85,7 +98,11 @@ class DeepAgentRuntime:
 
     @staticmethod
     def _normalize_turn(turn: dict[str, Any]) -> dict[str, Any]:
-        importance = float(turn.get("importance", 0.5))
+        try:
+            turn = PrivateTurnOutput.model_validate(turn).model_dump()
+        except ValidationError:
+            raise CognitionValidationError("Deep Agent returned an invalid private turn. No result was committed.") from None
+        importance = turn["importance"]
         if importance > 1 and importance <= 10:
             importance = importance / 10
         turn["importance"] = max(0.0, min(1.0, importance))

@@ -229,7 +229,12 @@ export type Relationship = {
     reason: string;
     effect: string;
     conversation_id?: string;
-    changes?: Partial<Feelings>;
+    changes?: Partial<BondSnapshot>;
+    before?: BondSnapshot;
+    after?: BondSnapshot;
+    source?: "action" | "conversation";
+    created_at?: string;
+    assessment_status?: ConversationImpact["status"];
     feelings?: Feelings;
     mood?: string;
   }>;
@@ -263,10 +268,11 @@ export type ConversationImpact = {
   other_citizen_id: string;
   before: BondSnapshot;
   after: BondSnapshot;
+  action_after?: BondSnapshot;
   mood_before: string;
   mood_after: string;
   reason: string;
-  status: "assessed" | "cooldown" | "not_assessed";
+  status: "assessed" | "cooldown" | "repeated" | "not_assessed";
 };
 
 export type TimelineItem = {

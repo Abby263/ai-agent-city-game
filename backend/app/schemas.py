@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Location(BaseModel):
@@ -202,6 +202,37 @@ class SessionCognitionRequest(BaseModel):
     player_utterance: str | None = Field(default=None, min_length=1, max_length=600)
     # Recent lines of an ongoing chat between the same two people, oldest first.
     prior_lines: list[dict[str, str]] = Field(default_factory=list, max_length=12)
+
+    @field_validator("actor_id", "target_id", "required_target_id", "task", "player_utterance")
+    @classmethod
+    def nonempty_text(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Value must not be blank")
+        return value
+
+    @field_validator("prior_lines")
+    @classmethod
+    def valid_prior_lines(cls, lines: list[dict[str, str]]) -> list[dict[str, str]]:
+        for line in lines:
+            if not line.get("speaker_id", "").strip() or not line.get("text", "").strip():
+                raise ValueError("Prior lines require a speaker_id and nonempty text")
+            if len(line["text"]) > 600:
+                raise ValueError("Prior line text must not exceed 600 characters")
+        return lines
+
+    @model_validator(mode="after")
+    def valid_participants(self) -> SessionCognitionRequest:
+        ids = [citizen.citizen_id for citizen in self.city.citizens]
+        if any(not citizen_id.strip() for citizen_id in ids) or len(ids) != len(set(ids)):
+            raise ValueError("Session citizen IDs must be nonempty and unique")
+        if self.target_id and self.required_target_id and self.target_id != self.required_target_id:
+            raise ValueError("target_id and required_target_id must identify the same citizen")
+        target_id = self.target_id or self.required_target_id
+        if target_id == self.actor_id:
+            raise ValueError("Conversation participants must be distinct")
+        if (self.require_conversation or self.player_utterance is not None) and not target_id:
+            raise ValueError("A conversation requires a target citizen")
+        return self
 
 
 class SessionCognitionResponse(BaseModel):

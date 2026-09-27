@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evolveRelationship, bondLabel, conversationImpact } from "../src/lib/social";
+import { evolveRelationship, bondLabel, conversationImpact, bondSnapshot, partnershipLabel } from "../src/lib/social";
 import { sociallyAvailable } from "../src/lib/encounters";
 import { bondClusters, overviewBonds, bondValue } from "../src/lib/bond-network";
 import { createInitialCity } from "../src/lib/initial-city";
@@ -26,7 +26,7 @@ test("impact captures actual clamped values and is independent of future changes
   after.feelings!.affection = 0;
   assert.equal(impact.after.affection, 100);
   const repeated = evolveRelationship(after, outcome, 1, 375);
-  assert.equal(conversationImpact(after, repeated, outcome, "Calm", "Happy", 1, 375).status, "cooldown");
+  assert.equal(conversationImpact(after, repeated, outcome, "Calm", "Happy", 1, 375).status, "repeated");
   assert.equal(conversationImpact(before, before, undefined, "Calm", "Calm", 1, 360).status, "not_assessed");
 });
 
@@ -119,4 +119,58 @@ test("physical availability excludes travel, player control and sleeping", () =>
   assert.equal(sociallyAvailable(citizens[0]), true);
   citizens[2].current_activity = "Sleeping";
   assert.equal(sociallyAvailable(citizens[2]), false);
+});
+
+test("fresh conflict and repair change emotions immediately, even after positive small talk", () => {
+  const welcome = evolveRelationship(initial, { relationship_effect: "positive", relationship_reason: "They welcomed me." }, 1, 360, "hello");
+  const hurt = evolveRelationship(welcome, { relationship_effect: "negative", relationship_reason: "They dismissed my concerns.",
+    feelings: { affection: -4, resentment: 8, reason: "My concerns were dismissed." } }, 1, 360, "argument");
+  assert.equal(hurt.trust, welcome.trust - 5);
+  assert.equal(hurt.feelings!.resentment, 8);
+  const repaired = evolveRelationship(hurt, { relationship_effect: "positive", relationship_reason: "They apologized and listened.",
+    feelings: { affection: 2, resentment: -3, reason: "They listened and accepted responsibility." } }, 1, 360, "repair");
+  assert.equal(repaired.trust, hurt.trust + 2);
+  assert.equal(repaired.feelings!.resentment, 5);
+  assert.equal(repaired.history!.at(-1)!.changes!.resentment, -3);
+  assert.equal(repaired.history!.at(-1)!.changes!.trust, 2);
+});
+
+test("positive trust throttling does not freeze new jealousy or resentment", () => {
+  const first = evolveRelationship(initial, { relationship_effect: "positive", relationship_reason: "They helped me." }, 1, 360, "one");
+  const mixed = evolveRelationship(first, { relationship_effect: "positive", relationship_reason: "They introduced a close friend.",
+    feelings: { jealousy: 3, admiration: 2, reason: "I admire their kindness but felt left out." } }, 1, 365, "two");
+  assert.equal(mixed.trust, first.trust);
+  assert.equal(mixed.feelings!.jealousy, 3);
+  assert.equal(mixed.history!.at(-1)!.assessment_status, "cooldown");
+});
+
+test("the same conversation cannot apply its outcomes twice", () => {
+  const outcome = { relationship_effect: "negative" as const, relationship_reason: "They shouted at me.", feelings: { resentment: 8, reason: "They shouted." } };
+  const first = evolveRelationship(initial, outcome, 1, 360, "unique-exchange");
+  assert.deepEqual(evolveRelationship(first, outcome, 1, 720, "unique-exchange"), first);
+});
+
+test("extreme repeated conflict and repair keep finite scores in range with accurate deltas", () => {
+  let bond = structuredClone(initial);
+  for (let i = 0; i < 300; i++) {
+    const before = bondSnapshot(bond);
+    bond = evolveRelationship(bond, { relationship_effect: i % 2 ? "positive" : "negative", relationship_reason: `Experience ${i}`,
+      feelings: { resentment: i % 2 ? -1e9 : 1e9, affection: Infinity, jealousy: NaN, admiration: -Infinity, reason: `Reaction ${i}` } }, 1 + Math.floor(i / 96), (i % 96) * 15, `exchange-${i}`);
+    const after = bondSnapshot(bond), entry = bond.history!.at(-1)!;
+    for (const key of Object.keys(after) as Array<keyof typeof after>) {
+      assert.ok(Number.isFinite(after[key]) && after[key] >= 0 && after[key] <= 100);
+      assert.equal(entry.changes![key] ?? 0, after[key] - before[key]);
+    }
+    assert.ok(bond.history!.length <= 40);
+  }
+});
+
+test("dating status is separate from social closeness", () => {
+  const [a, b] = createInitialCity().citizens.slice(0, 2);
+  a.life!.partner_id = b.citizen_id; b.life!.partner_id = a.citizen_id;
+  a.life!.relationship_status = b.life!.relationship_status = "dating";
+  assert.equal(partnershipLabel(a, b), "Dating");
+  assert.equal(bondLabel({ trust: 10, warmth: 20, familiarity: 90 }), "Strained");
+  b.life!.partner_id = null;
+  assert.equal(partnershipLabel(a, b), null);
 });

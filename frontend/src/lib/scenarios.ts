@@ -63,6 +63,14 @@ function meet(city: CityState, actor: CitizenAgent, target: CitizenAgent, reason
   city.encounter = { actor_id: actor.citizen_id, target_id: target.citizen_id, location_id: target.current_location_id, reason, topic, started_at: now };
 }
 
+function nextIncidentId(city: CityState, kind: Incident["kind"]) {
+  const prefix = `${kind}-${city.clock.day}-${city.clock.tick}`;
+  const used = new Set((city.incidents ?? []).map((incident) => incident.id));
+  let sequence = 1;
+  while (used.has(`${prefix}-${sequence}`)) sequence++;
+  return `${prefix}-${sequence}`;
+}
+
 export function applyScenario(city: CityState, request: ScenarioRequest, tools: Tools): ScenarioResult {
   const { sink, adjustBonds, cityMinute: now } = tools;
   const day = city.clock.day, tick = city.clock.tick;
@@ -73,6 +81,8 @@ export function applyScenario(city: CityState, request: ScenarioRequest, tools: 
   const fear = (people: CitizenAgent[], amount: number) => people.forEach((p) => p.life && (p.life.emotions.fear = clamp(p.life.emotions.fear + amount)));
 
   if (request.kind === "drop_money") {
+    if (request.amount !== undefined && (typeof request.amount !== "number" || !Number.isFinite(request.amount)))
+      throw new Error("The amount must be a finite number.");
     const amount = Math.max(1, Math.min(5000, request.amount ?? 100));
     const here = peopleAt(city, location);
     const finder = here.length ? here[Math.floor(r("finder") * here.length)] : nearest(city, location);
@@ -119,7 +129,7 @@ export function applyScenario(city: CityState, request: ScenarioRequest, tools: 
     const helpers = city.citizens.filter((c) => c !== victim && c.current_location_id === victim.current_location_id && c.age >= 10).sort((a, b) => kindness(b) - kindness(a));
     const helper = helpers.find((h) => r(h.citizen_id) * 100 < kindness(h));
     fear([victim, ...helpers], 25);
-    city.incidents = [...(city.incidents ?? []), { id: `accident-${tick}`, kind: "accident", location_id: victim.current_location_id, until: now + 90 }];
+    city.incidents = [...(city.incidents ?? []), { id: nextIncidentId(city, "accident"), kind: "accident", location_id: victim.current_location_id, until: now + 90 }];
     if (helper) {
       adjustBonds([{ from: victim.citizen_id, to: helper.citizen_id, trust: 12, warmth: 12, feelings: { admiration: 12 }, reason: `${first(helper)} stopped to help me after the accident.` }]);
       meet(city, helper, victim, `${helper.name} rushed over to help ${victim.name}, who was knocked down by a bicycle near ${placeName(city, victim.current_location_id)}.`, "the bicycle accident", now);
@@ -140,7 +150,7 @@ export function applyScenario(city: CityState, request: ScenarioRequest, tools: 
     for (const c of smoke) { const hurt = catchCondition(c, "minor injury", day); if (hurt) hurt.severity = 42; }
     fear(inside, 45);
     fear(city.citizens.filter((c) => !inside.includes(c)), 8);
-    city.incidents = [...(city.incidents ?? []), { id: `fire-${tick}`, kind: "fire", location_id: location, until: now + 240 }];
+    city.incidents = [...(city.incidents ?? []), { id: nextIncidentId(city, "fire"), kind: "fire", location_id: location, until: now + 240 }];
     const workers = city.citizens.filter((c) => c.life?.job?.location_id === location);
     sink({ kind: "fire", icon: "🔥", headline: `Fire at ${where}! ${inside.length ? `${inside.length} people evacuated safely` : "The building was empty"}${smoke.length ? `; ${smoke.map((s) => s.name).join(" and ")} breathed in smoke` : ""}. Firefighters are on the scene and it is closed for the day.`,
       actors: [...inside, ...workers].map((c) => c.citizen_id), priority: 3, location_id: location,

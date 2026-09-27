@@ -16,12 +16,13 @@ import type {
   SimulationMode,
   TriggerEventPayload,
 } from "@/lib/types";
-import { bondLabel, conversationImpact, emptyFeelings, evolveRelationship } from "@/lib/social";
+import { bondChanges, bondLabel, bondSnapshot, conversationImpact, emptyFeelings, evolveRelationship } from "@/lib/social";
 import { acceptMeeting, cityMinute, meetingFor, meetingMinute, sociallyAvailable } from "./encounters";
 import type { DecideSocial, EncounterContext } from "./encounters";
 import { currentElection, liveElection, electionNotice, playerTurn, recordBallot, tallyElection } from "./elections";
 import type { DecideElection, Election, ElectionDecision, ElectionDecisionRequest } from "./elections";
 import { assertPlayerTextSafe } from "./safety";
+import { validateCognition } from "./cognition-validation";
 import { isWeekend, routineStop, weekday, type RoutineContext } from "./routine";
 import { calendarDay, calendarStartFor, realCityTime } from "./calendar";
 import { dayWeather, weatherAt, type WeatherOverride } from "./weather";
@@ -76,6 +77,9 @@ type GenerateCognition = (
 type GenerateTaskPlan = (
   request: SessionTaskPlanRequest,
 ) => Promise<SessionTaskPlanResponse>;
+
+type ActionBaseline = Array<{ relationship: Relationship; mood: string }>;
+const pendingTaskPlans = new Map<string, symbol>();
 
 export function sessionMemoryEnabled() {
   return (
@@ -383,13 +387,16 @@ export async function sessionAssignTask(
   const citizen = findCitizen(city, citizenId);
   const task = payload.task.trim();
   assertPlayerTextSafe(task);
+  const requestId = Symbol(citizenId);
+  pendingTaskPlans.set(citizenId, requestId);
   const taskPlan = await planManualTask(
     city,
     citizen,
     task,
     generateTaskPlan,
   ).catch(() => null);
-  if (isStale(city)) return requireSessionCity();
+  if (pendingTaskPlans.get(citizenId) !== requestId || isStale(city)) return requireSessionCity();
+  pendingTaskPlans.delete(citizenId);
   if (!taskPlan) {
     blockManualTask(
       city,
@@ -470,7 +477,8 @@ export async function sessionCloseTask(citizenId: string) {
   const city = requireSessionCity();
   const citizen = findCitizen(city, citizenId);
   const task = playerTask(citizen);
-  if (!task) return saveAndReturn(city);
+  pendingTaskPlans.delete(citizenId);
+  if (!task || task.status === "closed") return city;
 
   const closed = { ...task, status: "closed" };
   citizen.personality = { ...citizen.personality, player_task: closed };
@@ -1289,6 +1297,9 @@ export async function sessionPerformAction(actorId: string, targetId: string, ac
   if (blocked) throw new Error(blocked);
   const text = note.trim().slice(0, 300);
   if (text) assertPlayerTextSafe(text);
+  const baseline: ActionBaseline = ensureRelationships(city)
+    .filter((r) => (r.citizen_id === actorId && r.other_citizen_id === targetId) || (r.citizen_id === targetId && r.other_citizen_id === actorId))
+    .map((r) => ({ relationship: structuredClone(r), mood: r.citizen_id === actorId ? actor.mood : target.mood }));
   actor.current_location_id = target.current_location_id;
   actor.x = actor.target_x = target.x;
   actor.y = actor.target_y = target.y;
@@ -1318,13 +1329,13 @@ export async function sessionPerformAction(actorId: string, targetId: string, ac
         player_utterance: outcome.utterance, prior_lines: recentChat(live, actorId, targetId), observations: [outcome.reason], memories: [],
         private_memories: { [actorId]: privateMemoryContext(liveActor, targetId), [targetId]: privateMemoryContext(liveTarget, actorId) } });
       if (isStale(live)) return { city: requireSessionCity(), outcome, talked: false };
-      applyAutonomousCognition(live, liveActor, liveTarget, { event_id: newId("action"), location_id: liveTarget.current_location_id } as CityEvent, response);
+      applyAutonomousCognition(live, liveActor, liveTarget, { event_id: newId("action"), location_id: liveTarget.current_location_id } as CityEvent, response, baseline);
       markPlayerChat(actorId, targetId);
       live.policy.player_lines = Number(live.policy.player_lines ?? 0) + 1;
     } else {
       const event = addEvent(live, { event_type: "player_action", actors: [actorId, targetId], location_id: liveTarget.current_location_id,
         description: outcome.reason, payload: { topic: outcome.topic, kind: "chance" }, priority: 2 });
-      await runAutonomousCognition(live, event, generate);
+      await runAutonomousCognition(live, event, generate, baseline);
       if (isStale(live)) return { city: requireSessionCity(), outcome, talked: false };
     }
     return { city: saveAndReturn(live), outcome, talked: true };
@@ -1375,14 +1386,24 @@ function adjustBonds(city: CityState, changes: BondChange[]) {
   for (const change of changes) {
     const bond = relationships.find((r) => r.citizen_id === change.from && r.other_citizen_id === change.to);
     if (!bond) continue;
-    bond.trust = clamp(bond.trust + (change.trust ?? 0));
-    bond.warmth = clamp(bond.warmth + (change.warmth ?? 0));
-    bond.familiarity = clamp(bond.familiarity + (change.familiarity ?? 0));
+    const before = bondSnapshot(bond);
+    const finite = (value: number | undefined) => typeof value === "number" && Number.isFinite(value) ? value : 0;
+    bond.trust = clamp(bond.trust + finite(change.trust));
+    bond.warmth = clamp(bond.warmth + finite(change.warmth));
+    bond.familiarity = clamp(bond.familiarity + finite(change.familiarity));
     const feelings = { ...emptyFeelings(), ...bond.feelings };
-    for (const [key, value] of Object.entries(change.feelings ?? {})) feelings[key as keyof typeof feelings] = clamp(feelings[key as keyof typeof feelings] + Number(value));
+    for (const key of Object.keys(emptyFeelings()) as Array<keyof typeof feelings>) feelings[key] = clamp(feelings[key] + finite(change.feelings?.[key]));
     bond.feelings = feelings;
-    bond.last_changed_at = cityMinute(city);
-    bond.history = [...(bond.history ?? []), { day: city.clock.day, minute: city.clock.minute_of_day, reason: change.reason, effect: "situation", feelings }].slice(-20);
+    const after = bondSnapshot(bond), deltas = bondChanges(before, after);
+    if (Object.keys(deltas).length) bond.last_changed_at = cityMinute(city);
+    bond.history = [...(bond.history ?? []), { day: city.clock.day, minute: city.clock.minute_of_day, reason: change.reason,
+      effect: "situation", source: "action" as const, changes: deltas, before, after, created_at: new Date().toISOString(), feelings: { ...feelings } }].slice(-40);
+    const owner = city.citizens.find((c) => c.citizen_id === change.from);
+    if (owner) {
+      owner.relationship_scores[change.to] = (bond.trust + bond.warmth) / 2;
+      owner.friend_ids = owner.friend_ids.filter((id) => id !== change.to);
+      if (["Friends", "Close friends"].includes(bondLabel(bond))) owner.friend_ids.push(change.to);
+    }
   }
   writeJson(RELATIONSHIPS_KEY, relationships);
 }
@@ -1940,6 +1961,7 @@ async function runAutonomousCognition(
   city: CityState,
   event: CityEvent,
   generateCognition: GenerateCognition,
+  baseline?: ActionBaseline,
 ) {
   const [actorId, targetId] = event.actors;
   if (!actorId || !targetId) return;
@@ -1972,7 +1994,8 @@ async function runAutonomousCognition(
       [target.citizen_id]: privateMemoryContext(target, actor.citizen_id),
     },
   });
-  applyAutonomousCognition(city, actor, target, event, response);
+  if (isStale(city)) return;
+  applyAutonomousCognition(city, actor, target, event, response, baseline);
 }
 
 function applyAutonomousCognition(
@@ -1981,7 +2004,9 @@ function applyAutonomousCognition(
   target: CitizenAgent,
   sourceEvent: CityEvent,
   response: SessionCognitionResponse,
+  baseline?: ActionBaseline,
 ) {
+  validateCognition(response);
   if (!validTaskConversation(response.conversation, actor, target))
     throw new Error(
       "No valid conversation was returned; nothing was committed.",
@@ -2060,6 +2085,14 @@ function applyAutonomousCognition(
   };
   recordMeeting(city, response, savedConversation);
   savedConversation.impacts = strengthenRelationship(city, actor, target, response, savedConversation.conversation_id);
+  for (const impact of savedConversation.impacts) {
+    const start = baseline?.find((item) => item.relationship.citizen_id === impact.citizen_id);
+    if (start) {
+      impact.action_after = impact.before;
+      impact.before = bondSnapshot(start.relationship);
+      impact.mood_before = start.mood;
+    }
+  }
   const after = relationshipLabelFromScore(
     actor.relationship_scores[target.citizen_id] ?? 38,
   );
@@ -2088,6 +2121,7 @@ function applySoloCognition(
   task: PlayerTaskData,
   response: SessionCognitionResponse,
 ) {
+  validateCognition(response);
   const answer = response.thought || response.memory || response.reflection;
   const citizenMemory =
     response.participant_memories?.[citizen.citizen_id] ?? response.memory;
@@ -2181,6 +2215,7 @@ function applyCognition(
   task: PlayerTaskData,
   response: SessionCognitionResponse,
 ) {
+  validateCognition(response);
   if (!validTaskConversation(response.conversation, citizen, target))
     throw new Error(
       "No valid conversation was returned; nothing was committed.",

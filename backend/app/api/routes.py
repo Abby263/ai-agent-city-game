@@ -190,11 +190,14 @@ def session_cognition(request: SessionCognitionRequest) -> SessionCognitionRespo
     if not actor:
         raise HTTPException(status_code=404, detail="Actor citizen not found in session state")
 
+    requested_target_id = request.target_id or request.required_target_id
     target = (
-        next((citizen for citizen in request.city.citizens if citizen.citizen_id == request.target_id), None)
-        if request.target_id
+        next((citizen for citizen in request.city.citizens if citizen.citizen_id == requested_target_id), None)
+        if requested_target_id
         else None
     )
+    if requested_target_id and target is None:
+        raise HTTPException(status_code=404, detail="Target citizen not found in session state")
     nearby = []
     if target:
         nearby.append(
@@ -228,7 +231,7 @@ def session_cognition(request: SessionCognitionRequest) -> SessionCognitionRespo
     # A world event log is not public knowledge. Only deliver events witnessed by the actor.
     event_context = " ".join(event.description for event in request.city.events[-6:] if actor.citizen_id in event.actors and event.event_type not in {"conversation", "player_task"})
     try:
-        if target and (request.require_conversation or request.target_id):
+        if target:
             result = cognition.client.generate_private_exchange(
                 actor=actor.model_dump(mode="json"),
                 target=target.model_dump(mode="json"),
