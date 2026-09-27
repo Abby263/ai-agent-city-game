@@ -92,6 +92,15 @@ TASK_PLAN_SCHEMA: dict[str, Any] = {
     "required": ["task_kind", "target_citizen_ids", "location_id", "reasoning_summary", "player_visible_plan"],
 }
 
+
+PROPOSAL_QUESTIONS = {
+    "date": "to be their partner and start dating",
+    "engagement": "to get engaged to them",
+    "marriage": "to marry them",
+    "move_in": "to move in together",
+}
+
+
 class PrivateExchangeState(TypedDict):
     lines: list[dict[str, str]]
     previous_lines: list[dict[str, str]]
@@ -286,6 +295,7 @@ class CitizenCognitionClient:
         autonomous: bool = False,
         meeting_locations: list[dict[str, str]] | None = None,
         meeting_now: int | None = None,
+        proposal: str = "none",
     ) -> CognitionResult:
         actor_id = actor.get("citizen_id")
         target_id = target.get("citizen_id")
@@ -334,6 +344,17 @@ class CitizenCognitionClient:
                 enforce_task_alignment=not autonomous,
             )
 
+        # A proposal made by action ("*takes your hand and asks you to be her boyfriend*") is still a question
+        # waiting for the target's own yes or no, which the game reads from invitation_response.
+        question = PROPOSAL_QUESTIONS.get(proposal)
+        reply_observations = [f"You are speaking with {actor['name']} at your current location."]
+        if question:
+            reply_observations.append(
+                f"{actor['name']} is asking you {question}. This is a real question waiting for your answer. "
+                "Answer it out loud in your own words, and set invitation_response to 'accepted' if your answer is yes "
+                "or 'declined' if it is no ('undecided' only if you truly ask for time). The choice is entirely yours."
+            )
+
         def target_reply(state: PrivateExchangeState) -> PrivateExchangeState:
             return self._append_private_turn(
                 state,
@@ -341,7 +362,7 @@ class CitizenCognitionClient:
                 listener=actor,
                 city_time=city_time,
                 task="Respond to what was said to you. You may decline, disagree, ask a follow-up, or leave.",
-                observations=[f"You are speaking with {actor['name']} at your current location."],
+                observations=reply_observations,
                 private_memories=target_memories,
                 event_context="",
                 turn_goal="Reply honestly from your own private memory. If you do not know a fact, say so.",

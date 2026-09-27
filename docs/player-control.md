@@ -34,6 +34,14 @@ giver has it), closures, memories and news. Then the people involved react in th
 
 A relationship step (a date, an engagement or marriage, moving in) happens only if the person asked
 says yes in that reaction; a breakup needs no one's permission. Romance between relatives is refused.
+The person asked is told a question is waiting for them (`proposal` on `/cognition/session`), so an
+action like "*takes his hand and asks him to be her boyfriend*" gets a real yes or no, and the game
+reads their answer from `invitation_response`. The answer is still theirs: a stranger says no.
+
+The resident you play has two sides to every bond too. The AI never judges how you feel, but a
+conversation that went well for the other person raises your trust and warmth with them as well
+(and a hostile one lowers them), so friendships and romances can grow both ways while your feelings
+(affection, admiration and the rest) stay yours.
 The game master only refuses sexually explicit content, graphic gore, real-world harm or hate.
 
 ## Livelier residents
@@ -45,7 +53,12 @@ The game master only refuses sexually explicit content, graphic gore, real-world
 - **News travels.** Residents may pass on what they heard to people it concerns, and decide for
   themselves whether to keep a confidence.
 - **Plans are kept.** A time and place agreed out loud ("ramen at the station shop around six" /
-  "See you there!") becomes a real meeting, even if the model didn't flag it (`agreedPlan`).
+  "See you there!", "six-thirty", "half past six") becomes a real meeting, even if the model didn't
+  flag it (`agreedPlan`). "Morning, Mateo!" is a greeting, not a morning plan.
+- **Your plans too.** When it's time, the resident you play sets off for a plan they agreed to, like
+  everyone else (once: pick another place in **Go to…** and you can still stand someone up). Talking
+  with them there, around the agreed time, marks the plan kept; otherwise it is missed. **Go to…**
+  waits for a town moment in progress instead of being ignored.
 - **Intentions.** Every conversation turn can say what the speaker now wants to do; these become the
   "what happens next" choices.
 

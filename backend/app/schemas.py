@@ -202,6 +202,8 @@ class SessionCognitionRequest(BaseModel):
     player_utterance: str | None = Field(default=None, min_length=1, max_length=600)
     # Recent lines of an ongoing chat between the same two people, oldest first.
     prior_lines: list[dict[str, str]] = Field(default_factory=list, max_length=12)
+    # A question the actor has just put to the target (from a player action) that needs a yes or no.
+    proposal: Literal["none", "date", "engagement", "marriage", "move_in"] = "none"
 
     @field_validator("actor_id", "target_id", "required_target_id", "task", "player_utterance")
     @classmethod

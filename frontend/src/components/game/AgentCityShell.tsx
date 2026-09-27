@@ -458,6 +458,12 @@ export function AgentCityShell() {
     // Pause can invalidate a pending AI response immediately.
     setCity(await api.pause());
   }
+  /** Like a line you say, a trip waits for a town moment in progress instead of being dropped. */
+  async function goTo(locationId: string) {
+    for (let waited = 0; flight.current && waited < 60; waited++) await new Promise((resolve) => window.setTimeout(resolve, 500));
+    if (flight.current) { setMessage("The town is still busy. Try again in a moment."); return; }
+    await act(() => api.walkTo(locationId));
+  }
   async function speak(event: FormEvent) {
     event.preventDefault();
     const target = nearby.find((citizen) => citizen.citizen_id === targetId);
@@ -679,8 +685,8 @@ export function AgentCityShell() {
               </div>
               <label className="banner-go" title="Go somewhere">
                 <MapPin size={15} />
-                <select aria-label="Go to a place" value="" disabled={busy}
-                  onChange={(event) => event.target.value && void act(() => api.walkTo(event.target.value))}>
+                <select aria-label="Go to a place" value=""
+                  onChange={(event) => event.target.value && void goTo(event.target.value)}>
                   <option value="">Go to…</option>
                   {city?.locations.filter((l) => l.location_id !== player.current_location_id).map((l) => (
                     <option key={l.location_id} value={l.location_id}>{l.name}</option>
@@ -704,7 +710,7 @@ export function AgentCityShell() {
               onProfile={(id) => { setPersonId(null); choose(id); }}
               onPlayAs={(id) => { void api.takeControl(id).then(setCity); setPersonId(id); }}
               onWatch={(id) => useGameStore.getState().focusOn([id])}
-              onGoTo={(locationId) => { setPersonId(null); void act(() => api.walkTo(locationId)); }} />
+              onGoTo={(locationId) => { setPersonId(null); void goTo(locationId); }} />
           )}
           {city && !personCitizen && !scenePlaying && showScene && (
             <NextMoveCard names={sceneNames} moves={sceneChoices} people={scenePeople} busy={busy} onPick={(m) => pickChoice(m)}
@@ -989,11 +995,8 @@ export function AgentCityShell() {
                             {city?.locations.map((location) => (
                               <button
                                 key={location.location_id}
-                                disabled={busy}
                                 onClick={() =>
-                                  void act(() =>
-                                    api.walkTo(location.location_id),
-                                  )
+                                  void goTo(location.location_id)
                                 }
                               >
                                 <MapPin size={13} />
@@ -1394,11 +1397,10 @@ export function AgentCityShell() {
                     {player && (
                       <button
                         className="icon-button"
-                        disabled={busy}
                         title={`Walk to ${location.name}`}
                         aria-label={`Walk to ${location.name}`}
                         onClick={() =>
-                          void act(() => api.walkTo(location.location_id))
+                          void goTo(location.location_id)
                         }
                       >
                         <Footprints size={17} />

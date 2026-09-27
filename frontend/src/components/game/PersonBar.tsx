@@ -59,7 +59,7 @@ export function PersonBar({ city, citizen, player, busy, onClose, onTalk, onDo, 
         <div className="person-bar-actions">
           <label className="go-to">
             <MapPin size={14} />
-            <select aria-label="Go to a place" value="" disabled={busy} onChange={(e) => e.target.value && onGoTo(e.target.value)}>
+            <select aria-label="Go to a place" value="" onChange={(e) => e.target.value && onGoTo(e.target.value)}>
               <option value="">Go to…</option>
               {city.locations.filter((l) => l.location_id !== citizen.current_location_id).map((l) => <option key={l.location_id} value={l.location_id}>{l.name}</option>)}
             </select>

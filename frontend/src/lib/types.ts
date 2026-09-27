@@ -331,6 +331,8 @@ export type SessionCognitionRequest = {
   observations: string[];
   memories: string[];
   private_memories?: Record<string, string[]>;
+  /** A question the actor has just put to the target by action; the target answers it in invitation_response. */
+  proposal?: "none" | "date" | "engagement" | "marriage" | "move_in";
 };
 
 export type SessionCognitionResponse = {
