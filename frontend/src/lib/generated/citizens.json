@@ -1,7 +1,7 @@
 [
   {
     "citizen_id": "cit_009",
-    "name": "Ava Singh",
+    "name": "Aoi Takahashi",
     "age": 20,
     "profession": "Lab assistant",
     "active": true,
@@ -38,9 +38,27 @@
       "openness": 82,
       "conscientiousness": 68,
       "warmth": 74,
-      "risk_tolerance": 42
+      "risk_tolerance": 42,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Ava Singh"
+        ]
+      },
+      "appearance": {
+        "shirt": "#e8e9e3",
+        "skin": "#d6ac8b",
+        "hair": "#292a2c",
+        "background": "#dce4df",
+        "hairstyle": "bob",
+        "outfit": "coat",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
     },
-    "current_thought": "Dr. Chen called my data table 'promising'. I want to know what he really meant.",
+    "current_thought": "Dr. Ito called my data table 'promising'. I want to know what he really meant.",
     "short_term_goals": [
       "Ask one friend how they are really doing",
       "Finish the reagent inventory at the lab"
@@ -49,7 +67,7 @@
       "Build a real friendship circle in Nakameguro",
       "Get into a graduate research programme"
     ],
-    "memory_summary": "I'm twenty and work as a lab assistant at the Meguro Science Lab while I save for a master's degree. I love science and a good debate. I want to be someone people can rely on, but I sometimes offer help before listening. I still live with my mum, Priya.",
+    "memory_summary": "I'm twenty and work as a lab assistant at the Meguro Science Lab while I save for a master's degree. I love science and a good debate. I want to be someone people can rely on, but I sometimes offer help before listening. I still live with my mum, Kaori.",
     "friend_ids": [
       "cit_010",
       "cit_021"
@@ -138,7 +156,7 @@
   },
   {
     "citizen_id": "cit_010",
-    "name": "Mateo Garcia",
+    "name": "Ren Ishikawa",
     "age": 21,
     "profession": "Barista",
     "active": true,
@@ -175,7 +193,25 @@
       "openness": 78,
       "conscientiousness": 55,
       "warmth": 70,
-      "risk_tolerance": 58
+      "risk_tolerance": 58,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Mateo Garcia"
+        ]
+      },
+      "appearance": {
+        "shirt": "#c7bca3",
+        "skin": "#c99978",
+        "hair": "#37302c",
+        "background": "#e7dfe0",
+        "hairstyle": "parted",
+        "outfit": "apron",
+        "trousers": "#555951",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
     },
     "current_thought": "If Dad lets me paint the café wall, I could play a set on opening night too.",
     "short_term_goals": [
@@ -275,7 +311,7 @@
   },
   {
     "citizen_id": "cit_021",
-    "name": "Noah Mensah",
+    "name": "Riku Hayashi",
     "age": 19,
     "profession": "Trainee fitness instructor",
     "active": true,
@@ -312,9 +348,27 @@
       "openness": 65,
       "conscientiousness": 60,
       "warmth": 73,
-      "risk_tolerance": 67
+      "risk_tolerance": 67,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Noah Mensah"
+        ]
+      },
+      "appearance": {
+        "shirt": "#699487",
+        "skin": "#d6ac8b",
+        "hair": "#292a2c",
+        "background": "#dce4df",
+        "hairstyle": "crop",
+        "outfit": "casual",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
     },
-    "current_thought": "Maya says I'm good with the clients. I just need to pass the certification.",
+    "current_thought": "Natsumi says I'm good with the clients. I just need to pass the certification.",
     "short_term_goals": [
       "Organise a Sunday football game in the park",
       "Study for the instructor certification"
@@ -323,7 +377,7 @@
       "Build a real friendship circle in Nakameguro",
       "Play for the Meguro amateur football club"
     ],
-    "memory_summary": "I'm nineteen and training to be a fitness instructor at Riverside Gym. I love sport and biology, and I like pulling people into a game so everyone gets a turn. Being left out bothers me more than I admit. I still live with my mum, Grace.",
+    "memory_summary": "I'm nineteen and training to be a fitness instructor at Riverside Gym. I love sport and biology, and I like pulling people into a game so everyone gets a turn. Being left out bothers me more than I admit. I still live with my mum, Keiko.",
     "friend_ids": [
       "cit_009",
       "cit_010"
@@ -416,7 +470,7 @@
   },
   {
     "citizen_id": "cit_022",
-    "name": "Iris Novak",
+    "name": "Mio Fujimoto",
     "age": 21,
     "profession": "Pharmacy technician",
     "active": true,
@@ -453,7 +507,25 @@
       "openness": 88,
       "conscientiousness": 71,
       "warmth": 62,
-      "risk_tolerance": 33
+      "risk_tolerance": 33,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Iris Novak"
+        ]
+      },
+      "appearance": {
+        "shirt": "#e5e8e4",
+        "skin": "#c99978",
+        "hair": "#37302c",
+        "background": "#e7dfe0",
+        "hairstyle": "long",
+        "outfit": "coat",
+        "trousers": "#555951",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
     },
     "current_thought": "There is a story in how everyone is reacting today. I should write it down tonight.",
     "short_term_goals": [
@@ -464,7 +536,7 @@
       "Build a real friendship circle in Nakameguro",
       "Finish writing her first novel"
     ],
-    "memory_summary": "I'm twenty-one and a pharmacy technician at Riverside Pharmacy. I love chemistry and writing. I live with my aunt Elena while my parents work overseas. I notice small details but need time to get comfortable around people, and I value honest answers more than cheerful guesses.",
+    "memory_summary": "I'm twenty-one and a pharmacy technician at Riverside Pharmacy. I love chemistry and writing. I live with my aunt Yuka while my parents work overseas. I notice small details but need time to get comfortable around people, and I value honest answers more than cheerful guesses.",
     "friend_ids": [
       "cit_009",
       "cit_010"
@@ -565,7 +637,7 @@
   },
   {
     "citizen_id": "cit_026",
-    "name": "Leo Brooks",
+    "name": "Sota Watanabe",
     "age": 19,
     "profession": "Apprentice technician",
     "active": true,
@@ -602,7 +674,25 @@
       "openness": 76,
       "conscientiousness": 66,
       "warmth": 64,
-      "risk_tolerance": 38
+      "risk_tolerance": 38,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Leo Brooks"
+        ]
+      },
+      "appearance": {
+        "shirt": "#54788c",
+        "skin": "#c99978",
+        "hair": "#40342e",
+        "background": "#dfe4ea",
+        "hairstyle": "parted",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
     },
     "current_thought": "The substation crew still call me 'the new guy'. I'll show them my robot arm sketch someday.",
     "short_term_goals": [
@@ -613,7 +703,7 @@
       "Build a real friendship circle in Nakameguro",
       "Build the robot from his sketchbook"
     ],
-    "memory_summary": "I'm nineteen and an apprentice technician at the power substation. I love robotics and sketching. I live at home with Mum, Dad and Grandpa Walter. I worry my robot ideas will seem silly, but a genuine question helps me open up.",
+    "memory_summary": "I'm nineteen and an apprentice technician at the power substation. I love robotics and sketching. I live at home with Mum, Dad and Grandpa Masao. I worry my robot ideas will seem silly, but a genuine question helps me open up.",
     "friend_ids": [
       "cit_009",
       "cit_010"
@@ -703,7 +793,7 @@
   },
   {
     "citizen_id": "cit_027",
-    "name": "Sophie Laurent",
+    "name": "Hana Shimizu",
     "age": 20,
     "profession": "Library assistant",
     "active": true,
@@ -732,7 +822,25 @@
       "playable": true,
       "openness": 88,
       "warmth": 70,
-      "conscientiousness": 58
+      "conscientiousness": 58,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Sophie Laurent"
+        ]
+      },
+      "appearance": {
+        "shirt": "#ad697f",
+        "skin": "#efd0b5",
+        "hair": "#292a2c",
+        "background": "#dce4df",
+        "hairstyle": "bob",
+        "outfit": "casual",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
     },
     "current_thought": "Maybe someone would like to make a comic with me.",
     "short_term_goals": [
@@ -742,7 +850,7 @@
     "long_term_goals": [
       "Share my art without fearing criticism"
     ],
-    "memory_summary": "I'm twenty and work as a library assistant at Nakameguro Library. I draw comics and notice small acts of kindness. I live with my big sister Maya while our parents work abroad. I'm shy about unfinished work, and being left out can sting, but I try to ask what happened instead of assuming the worst.",
+    "memory_summary": "I'm twenty and work as a library assistant at Nakameguro Library. I draw comics and notice small acts of kindness. I live with my big sister Natsumi while our parents work abroad. I'm shy about unfinished work, and being left out can sting, but I try to ask what happened instead of assuming the worst.",
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_027",
@@ -786,7 +894,7 @@
   },
   {
     "citizen_id": "cit_028",
-    "name": "Zara Ali",
+    "name": "Rin Abe",
     "age": 21,
     "profession": "Junior software engineer",
     "active": true,
@@ -815,7 +923,25 @@
       "playable": true,
       "openness": 76,
       "warmth": 56,
-      "conscientiousness": 90
+      "conscientiousness": 90,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Zara Ali"
+        ]
+      },
+      "appearance": {
+        "shirt": "#52817c",
+        "skin": "#e3bfa2",
+        "hair": "#37302c",
+        "background": "#e7dfe0",
+        "hairstyle": "bun",
+        "outfit": "jacket",
+        "trousers": "#555951",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
     },
     "current_thought": "I want a teammate who challenges my ideas, not one who just agrees.",
     "short_term_goals": [
@@ -825,7 +951,7 @@
     "long_term_goals": [
       "Build a team where everyone's contribution matters"
     ],
-    "memory_summary": "I'm twenty-one and a junior software engineer at Nakameguro GT Tower. I build robots and play chess for fun. I'm competitive and sometimes compare myself with others. I respect honest feedback, hate taking credit for someone else's work, and can apologise when I get carried away. I live with my dad, Samir.",
+    "memory_summary": "I'm twenty-one and a junior software engineer at Nakameguro GT Tower. I build robots and play chess for fun. I'm competitive and sometimes compare myself with others. I respect honest feedback, hate taking credit for someone else's work, and can apologise when I get carried away. I live with my dad, Takeshi.",
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_028",
@@ -870,7 +996,7 @@
   },
   {
     "citizen_id": "cit_029",
-    "name": "Eliot Chen",
+    "name": "Kaito Ito",
     "age": 20,
     "profession": "Food-court cook",
     "active": true,
@@ -899,7 +1025,25 @@
       "playable": true,
       "openness": 68,
       "warmth": 85,
-      "conscientiousness": 75
+      "conscientiousness": 75,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Eliot Chen"
+        ]
+      },
+      "appearance": {
+        "shirt": "#d8bf75",
+        "skin": "#d6ac8b",
+        "hair": "#40342e",
+        "background": "#dfe4ea",
+        "hairstyle": "crop",
+        "outfit": "apron",
+        "trousers": "#55515d",
+        "shoes": "#eeeae2",
+        "glasses": true
+      }
     },
     "current_thought": "It would be nice to cook for someone and hear their story.",
     "short_term_goals": [
@@ -909,7 +1053,7 @@
     "long_term_goals": [
       "Start a small community kitchen with friends"
     ],
-    "memory_summary": "I'm twenty and cook at the Kokashita Arcade food court. I grow herbs and love cooking with family. I live with my dad, Wei. I like bringing people together but need quiet time too, and I feel hurt when promises are forgotten.",
+    "memory_summary": "I'm twenty and cook at the Kokashita Arcade food court. I grow herbs and love cooking with family. I live with my dad, Naoki. I like bringing people together but need quiet time too, and I feel hurt when promises are forgotten.",
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_029",
@@ -953,7 +1097,7 @@
   },
   {
     "citizen_id": "cit_030",
-    "name": "Tom Brooks",
+    "name": "Takashi Watanabe",
     "age": 46,
     "profession": "Farmer",
     "active": true,
@@ -984,22 +1128,34 @@
         "repair": "Shows up with fresh vegetables and fixes what is broken."
       },
       "appearance": {
-        "skin": "#e8bd98",
-        "hair": "#8a6437",
-        "shirt": "#7f9a5c",
-        "background": "#e3ecd2"
+        "skin": "#c99978",
+        "hair": "#292a2c",
+        "shirt": "#79865f",
+        "background": "#dce4df",
+        "hairstyle": "crop",
+        "outfit": "jacket",
+        "trousers": "#41484e",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Tom Brooks"
+        ]
+      }
     },
     "current_thought": "If the weather holds, the tomatoes will be ready by the weekend.",
     "short_term_goals": [
       "Get the tomatoes to the market",
-      "Teach Leo to run the garden's irrigation"
+      "Teach Sota to run the garden's irrigation"
     ],
     "long_term_goals": [
       "Keep the farm going for the next generation"
     ],
-    "memory_summary": "I run Meguro Community Garden like my father did. Hannah and I have a grown son, Leo, who just started as an apprentice at the substation. Dad lives with us now and his heart worries me.",
+    "memory_summary": "I run Meguro Community Garden like my father did. Yuko and I have a grown son, Sota, who just started as an apprentice at the substation. Dad lives with us now and his heart worries me.",
     "relationship_scores": {
       "cit_031": 88,
       "cit_032": 85,
@@ -1008,7 +1164,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_030",
-        "content": "I run Meguro Community Garden like my father did. Hannah and I have a grown son, Leo, who just started as an apprentice at the substation. Dad lives with us now and his heart worries me.",
+        "content": "I run Meguro Community Garden like my father did. Yuko and I have a grown son, Sota, who just started as an apprentice at the substation. Dad lives with us now and his heart worries me.",
         "importance": 0.8
       }
     ],
@@ -1053,7 +1209,7 @@
   },
   {
     "citizen_id": "cit_031",
-    "name": "Hannah Brooks",
+    "name": "Yuko Watanabe",
     "age": 44,
     "profession": "Bank clerk",
     "active": true,
@@ -1084,22 +1240,34 @@
         "repair": "Makes a plan together and says thank you."
       },
       "appearance": {
-        "skin": "#f0c8a6",
-        "hair": "#c49a5c",
-        "shirt": "#c98ea7",
-        "background": "#f3dce6"
+        "skin": "#efd0b5",
+        "hair": "#37302c",
+        "shirt": "#a0768e",
+        "background": "#e7dfe0",
+        "hairstyle": "bob",
+        "outfit": "jacket",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Hannah Brooks"
+        ]
+      }
     },
-    "current_thought": "Leo seems happier at the substation. Maybe it is time to focus on my own promotion.",
+    "current_thought": "Sota seems happier at the substation. Maybe it is time to focus on my own promotion.",
     "short_term_goals": [
-      "Turn Leo's old room into a sewing corner",
+      "Turn Sota's old room into a sewing corner",
       "Prepare my branch supervisor application"
     ],
     "long_term_goals": [
       "Keep a calm, happy home for all of us"
     ],
-    "memory_summary": "I work at Aobadai Bank. Our son Leo is nineteen now and working at the substation, and I'm proud and a little lost. Walter, Tom's dad, lives with us.",
+    "memory_summary": "I work at Aobadai Bank. Our son Sota is nineteen now and working at the substation, and I'm proud and a little lost. Masao, Takashi's dad, lives with us.",
     "relationship_scores": {
       "cit_030": 88,
       "cit_032": 78,
@@ -1108,7 +1276,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_031",
-        "content": "I work at Aobadai Bank. Our son Leo is nineteen now and working at the substation, and I'm proud and a little lost. Walter, Tom's dad, lives with us.",
+        "content": "I work at Aobadai Bank. Our son Sota is nineteen now and working at the substation, and I'm proud and a little lost. Masao, Takashi's dad, lives with us.",
         "importance": 0.8
       }
     ],
@@ -1150,7 +1318,7 @@
   },
   {
     "citizen_id": "cit_032",
-    "name": "Walter Brooks",
+    "name": "Masao Watanabe",
     "age": 81,
     "profession": "Retired farmer",
     "active": true,
@@ -1181,22 +1349,34 @@
         "repair": "Tells a funny story and admits when he was wrong."
       },
       "appearance": {
-        "skin": "#e6b999",
-        "hair": "#d9d7d2",
-        "shirt": "#8c7a6b",
-        "background": "#ebe4da"
+        "skin": "#e3bfa2",
+        "hair": "#b8b7b0",
+        "shirt": "#88917f",
+        "background": "#dfe4ea",
+        "hairstyle": "parted",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#383a38",
+        "glasses": true
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Walter Brooks"
+        ]
+      }
     },
     "current_thought": "My ticker's been grumbling. I won't make a fuss about it.",
     "short_term_goals": [
-      "Play chess with Leo after his shift",
+      "Play chess with Sota after his shift",
       "Remember to take my heart pills"
     ],
     "long_term_goals": [
-      "See Leo find his feet"
+      "See Sota find his feet"
     ],
-    "memory_summary": "I farmed this land for fifty years. My wife Rose passed away four years ago. I live with my son Tom, his wife Hannah and my grandson Leo. My heart isn't what it was.",
+    "memory_summary": "I farmed this land for fifty years. My wife Rose passed away four years ago. I live with my son Takashi, his wife Yuko and my grandson Sota. My heart isn't what it was.",
     "relationship_scores": {
       "cit_030": 86,
       "cit_031": 80,
@@ -1205,7 +1385,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_032",
-        "content": "I farmed this land for fifty years. My wife Rose passed away four years ago. I live with my son Tom, his wife Hannah and my grandson Leo. My heart isn't what it was.",
+        "content": "I farmed this land for fifty years. My wife Rose passed away four years ago. I live with my son Takashi, his wife Yuko and my grandson Sota. My heart isn't what it was.",
         "importance": 0.8
       }
     ],
@@ -1224,7 +1404,7 @@
       "relationship_status": "widowed",
       "job": null,
       "ambition": {
-        "goal": "Teach Leo everything he knows about chess",
+        "goal": "Teach Sota everything he knows about chess",
         "kind": "social",
         "progress": 40
       },
@@ -1245,7 +1425,7 @@
   },
   {
     "citizen_id": "cit_033",
-    "name": "Priya Singh",
+    "name": "Kaori Takahashi",
     "age": 42,
     "profession": "Doctor",
     "active": true,
@@ -1272,33 +1452,45 @@
         ],
         "values": "Caring for people properly, even when she is exhausted.",
         "voice": "Clear and reassuring; asks 'how long has it hurt?'",
-        "sensitivity": "Missing Ava's important moments because of work.",
+        "sensitivity": "Missing Aoi's important moments because of work.",
         "repair": "Makes time, puts the phone away and really listens."
       },
       "appearance": {
-        "skin": "#b57a58",
-        "hair": "#2f2729",
-        "shirt": "#5f9fb3",
-        "background": "#d9ebf0"
+        "skin": "#d6ac8b",
+        "hair": "#292a2c",
+        "shirt": "#e9e9e4",
+        "background": "#dce4df",
+        "hairstyle": "bun",
+        "outfit": "coat",
+        "trousers": "#41484e",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Priya Singh"
+        ]
+      }
     },
     "current_thought": "Three flu cases this week already. I hope it doesn't spread through the offices.",
     "short_term_goals": [
-      "Get home in time for dinner with Ava",
+      "Get home in time for dinner with Aoi",
       "Keep an eye on the flu season"
     ],
     "long_term_goals": [
       "Lead the hospital one day"
     ],
-    "memory_summary": "I'm a doctor at Kyosai Hospital and Ava's mum. Ava is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.",
+    "memory_summary": "I'm a doctor at Kyosai Hospital and Aoi's mum. Aoi is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.",
     "relationship_scores": {
       "cit_009": 90
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_033",
-        "content": "I'm a doctor at Kyosai Hospital and Ava's mum. Ava is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.",
+        "content": "I'm a doctor at Kyosai Hospital and Aoi's mum. Aoi is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.",
         "importance": 0.8
       }
     ],
@@ -1344,7 +1536,7 @@
   },
   {
     "citizen_id": "cit_034",
-    "name": "Carlos Garcia",
+    "name": "Daisuke Ishikawa",
     "age": 45,
     "profession": "Cafe owner",
     "active": true,
@@ -1375,14 +1567,26 @@
         "repair": "Cooks something special and says sorry with a grin."
       },
       "appearance": {
-        "skin": "#c9956f",
-        "hair": "#3e3129",
-        "shirt": "#e0a54a",
-        "background": "#f4e2c6"
+        "skin": "#c99978",
+        "hair": "#37302c",
+        "shirt": "#b37b56",
+        "background": "#e7dfe0",
+        "hairstyle": "parted",
+        "outfit": "apron",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Carlos Garcia"
+        ]
+      }
     },
-    "current_thought": "Mateo wants to paint a mural on the cafe wall. Maybe it's a good idea.",
+    "current_thought": "Ren wants to paint a mural on the cafe wall. Maybe it's a good idea.",
     "short_term_goals": [
       "Try a new breakfast special",
       "Put money aside for the truck"
@@ -1390,14 +1594,14 @@
     "long_term_goals": [
       "Own a food truck by next summer"
     ],
-    "memory_summary": "I run the Sunny Side Cafe. My son Mateo makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.",
+    "memory_summary": "I run the Sunny Side Cafe. My son Ren makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.",
     "relationship_scores": {
       "cit_010": 88
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_034",
-        "content": "I run the Sunny Side Cafe. My son Mateo makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.",
+        "content": "I run the Sunny Side Cafe. My son Ren makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.",
         "importance": 0.8
       }
     ],
@@ -1441,7 +1645,7 @@
   },
   {
     "citizen_id": "cit_035",
-    "name": "Grace Mensah",
+    "name": "Keiko Hayashi",
     "age": 39,
     "profession": "Teacher",
     "active": true,
@@ -1472,29 +1676,41 @@
         "repair": "Admits a mistake in front of the class and laughs about it."
       },
       "appearance": {
-        "skin": "#7a4a36",
-        "hair": "#211f22",
-        "shirt": "#9d6fb5",
-        "background": "#e7dcef"
+        "skin": "#efd0b5",
+        "hair": "#40342e",
+        "shirt": "#8c9d77",
+        "background": "#dfe4ea",
+        "hairstyle": "bob",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Grace Mensah"
+        ]
+      }
     },
     "current_thought": "Exam week is coming. Half the class hasn't started revising.",
     "short_term_goals": [
       "Mark the science tests",
-      "Spend a proper evening with Noah"
+      "Spend a proper evening with Riku"
     ],
     "long_term_goals": [
       "Help run the school one day"
     ],
-    "memory_summary": "I teach at Nakameguro School. My son Noah is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.",
+    "memory_summary": "I teach at Nakameguro School. My son Riku is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.",
     "relationship_scores": {
       "cit_021": 88
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_035",
-        "content": "I teach at Nakameguro School. My son Noah is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.",
+        "content": "I teach at Nakameguro School. My son Riku is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.",
         "importance": 0.8
       }
     ],
@@ -1539,7 +1755,7 @@
   },
   {
     "citizen_id": "cit_036",
-    "name": "Wei Chen",
+    "name": "Naoki Ito",
     "age": 47,
     "profession": "Scientist",
     "active": true,
@@ -1570,14 +1786,26 @@
         "repair": "Writes a note so he never forgets again, and keeps it."
       },
       "appearance": {
-        "skin": "#e0ad86",
-        "hair": "#2b2a2f",
-        "shirt": "#d9d4c3",
-        "background": "#eef0e6"
+        "skin": "#e3bfa2",
+        "hair": "#292a2c",
+        "shirt": "#e1e4df",
+        "background": "#dce4df",
+        "hairstyle": "parted",
+        "outfit": "coat",
+        "trousers": "#41484e",
+        "shoes": "#383a38",
+        "glasses": true
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Wei Chen"
+        ]
+      }
     },
-    "current_thought": "If the solar cell test works tonight, I'll tell Eliot first. And Ava at the lab has good instincts.",
+    "current_thought": "If the solar cell test works tonight, I'll tell Kaito first. And Aoi at the lab has good instincts.",
     "short_term_goals": [
       "Finish the solar cell test",
       "Make it home for dinner"
@@ -1585,14 +1813,14 @@
     "long_term_goals": [
       "Publish my research"
     ],
-    "memory_summary": "I'm a scientist at the Meguro Science Lab and Eliot's dad. Eliot is twenty and cooks at the arcade food court now. I get lost in my work sometimes, but Eliot comes first.",
+    "memory_summary": "I'm a scientist at the Meguro Science Lab and Kaito's dad. Kaito is twenty and cooks at the arcade food court now. I get lost in my work sometimes, but Kaito comes first.",
     "relationship_scores": {
       "cit_029": 88
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_036",
-        "content": "I'm a scientist at the Meguro Science Lab and Eliot's dad. Eliot is twenty and cooks at the arcade food court now. I get lost in my work sometimes, but Eliot comes first.",
+        "content": "I'm a scientist at the Meguro Science Lab and Kaito's dad. Kaito is twenty and cooks at the arcade food court now. I get lost in my work sometimes, but Kaito comes first.",
         "importance": 0.8
       }
     ],
@@ -1634,7 +1862,7 @@
   },
   {
     "citizen_id": "cit_037",
-    "name": "Elena Novak",
+    "name": "Yuka Fujimoto",
     "age": 38,
     "profession": "Librarian",
     "active": true,
@@ -1659,28 +1887,40 @@
           "Romantic",
           "Shy"
         ],
-        "values": "Stories, quiet kindness and giving Iris a steady home.",
+        "values": "Stories, quiet kindness and giving Mio a steady home.",
         "voice": "Soft-spoken, quotes books, blushes easily.",
-        "sensitivity": "Being overlooked; Iris shutting her out.",
+        "sensitivity": "Being overlooked; Mio shutting her out.",
         "repair": "Writes a heartfelt note and leaves it somewhere to be found."
       },
       "appearance": {
-        "skin": "#efc3a5",
-        "hair": "#7d4a38",
-        "shirt": "#6f9c86",
-        "background": "#dcebe2"
+        "skin": "#d6ac8b",
+        "hair": "#37302c",
+        "shirt": "#9b7d9b",
+        "background": "#e7dfe0",
+        "hairstyle": "long",
+        "outfit": "casual",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Elena Novak"
+        ]
+      }
     },
-    "current_thought": "Officer Ali came in again for a book he'd already read. I think?",
+    "current_thought": "Officer Abe came in again for a book he'd already read. I think?",
     "short_term_goals": [
       "Start a reading club",
-      "Help Iris feel at home"
+      "Help Mio feel at home"
     ],
     "long_term_goals": [
       "Build a life here"
     ],
-    "memory_summary": "I'm the town librarian. My niece Iris, who is twenty-one, lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Samir Ali, the police officer, keeps borrowing books he has already read.",
+    "memory_summary": "I'm the town librarian. My niece Mio, who is twenty-one, lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Takeshi Abe, the police officer, keeps borrowing books he has already read.",
     "relationship_scores": {
       "cit_022": 82,
       "cit_038": 62
@@ -1688,7 +1928,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_037",
-        "content": "I'm the town librarian. My niece Iris, who is twenty-one, lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Samir Ali, the police officer, keeps borrowing books he has already read.",
+        "content": "I'm the town librarian. My niece Mio, who is twenty-one, lives with me while her parents work overseas. I moved to Nakameguro last year and I'm still a bit lonely. Takeshi Abe, the police officer, keeps borrowing books he has already read.",
         "importance": 0.8
       }
     ],
@@ -1731,7 +1971,7 @@
   },
   {
     "citizen_id": "cit_038",
-    "name": "Samir Ali",
+    "name": "Takeshi Abe",
     "age": 45,
     "profession": "Police officer",
     "active": true,
@@ -1756,28 +1996,40 @@
           "Honest",
           "Quietly grieving"
         ],
-        "values": "Keeping people safe and raising Zara the way her mum would have wanted.",
+        "values": "Keeping people safe and raising Rin the way her mum would have wanted.",
         "voice": "Calm, direct, a surprisingly goofy laugh.",
-        "sensitivity": "Anything about his late wife Amira; Zara working herself too hard.",
+        "sensitivity": "Anything about his late wife Amira; Rin working herself too hard.",
         "repair": "Owns it plainly and does better next time."
       },
       "appearance": {
-        "skin": "#a86e4a",
-        "hair": "#26252b",
-        "shirt": "#3f5f86",
-        "background": "#d6e0ee"
+        "skin": "#c99978",
+        "hair": "#40342e",
+        "shirt": "#546a7a",
+        "background": "#dfe4ea",
+        "hairstyle": "crop",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Samir Ali"
+        ]
+      }
     },
-    "current_thought": "Zara says I should 'get out more'. Maybe she's right. Maybe the library.",
+    "current_thought": "Rin says I should 'get out more'. Maybe she's right. Maybe the library.",
     "short_term_goals": [
       "Train for the half-marathon",
-      "Get Zara to take a real day off"
+      "Get Rin to take a real day off"
     ],
     "long_term_goals": [
       "Be happy again"
     ],
-    "memory_summary": "I'm a police officer and Zara's dad. Zara is twenty-one and writes software at the GT Tower. My wife Amira died three years ago. We're doing okay. I've started noticing Elena at the library.",
+    "memory_summary": "I'm a police officer and Rin's dad. Rin is twenty-one and writes software at the GT Tower. My wife Amira died three years ago. We're doing okay. I've started noticing Yuka at the library.",
     "relationship_scores": {
       "cit_028": 90,
       "cit_037": 62
@@ -1785,7 +2037,7 @@
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_038",
-        "content": "I'm a police officer and Zara's dad. Zara is twenty-one and writes software at the GT Tower. My wife Amira died three years ago. We're doing okay. I've started noticing Elena at the library.",
+        "content": "I'm a police officer and Rin's dad. Rin is twenty-one and writes software at the GT Tower. My wife Amira died three years ago. We're doing okay. I've started noticing Yuka at the library.",
         "importance": 0.8
       }
     ],
@@ -1832,7 +2084,7 @@
   },
   {
     "citizen_id": "cit_039",
-    "name": "Maya Laurent",
+    "name": "Natsumi Shimizu",
     "age": 29,
     "profession": "Fitness coach",
     "active": true,
@@ -1859,33 +2111,45 @@
         ],
         "values": "Health, independence and looking after her little sister.",
         "voice": "Energetic, sporty slang, cheers people on.",
-        "sensitivity": "Being treated as Sophie's parent instead of her sister.",
+        "sensitivity": "Being treated as Hana's parent instead of her sister.",
         "repair": "Apologises fast and plans something fun together."
       },
       "appearance": {
-        "skin": "#ecb793",
-        "hair": "#5d3630",
-        "shirt": "#e06c7a",
-        "background": "#f5dadd"
+        "skin": "#efd0b5",
+        "hair": "#292a2c",
+        "shirt": "#70a69b",
+        "background": "#dce4df",
+        "hairstyle": "bun",
+        "outfit": "casual",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": [
+          "Maya Laurent"
+        ]
+      }
     },
-    "current_thought": "Sophie's been quiet lately. Is she okay, or just lost in another comic?",
+    "current_thought": "Hana's been quiet lately. Is she okay, or just lost in another comic?",
     "short_term_goals": [
       "Get three new members at the gym",
-      "Take Sophie for pancakes"
+      "Take Hana for pancakes"
     ],
     "long_term_goals": [
       "Open my own studio"
     ],
-    "memory_summary": "I coach at Riverside Gym, where I'm training Noah Mensah. Our parents work abroad, so my younger sister Sophie lives with me. I love her, but sharing a flat with your sister is its own adventure.",
+    "memory_summary": "I coach at Riverside Gym, where I'm training Riku Hayashi. Our parents work abroad, so my younger sister Hana lives with me. I love her, but sharing a flat with your sister is its own adventure.",
     "relationship_scores": {
       "cit_027": 86
     },
     "seed_memories": [
       {
         "memory_id": "mem_seed_cit_039",
-        "content": "I coach at Riverside Gym, where I'm training Noah Mensah. Our parents work abroad, so my younger sister Sophie lives with me. I love her, but sharing a flat with your sister is its own adventure.",
+        "content": "I coach at Riverside Gym, where I'm training Riku Hayashi. Our parents work abroad, so my younger sister Hana lives with me. I love her, but sharing a flat with your sister is its own adventure.",
         "importance": 0.8
       }
     ],
@@ -1962,12 +2226,22 @@
         "repair": "Bows deeply, apologises properly, and fixes the schedule."
       },
       "appearance": {
-        "skin": "#e9c29f",
-        "hair": "#6d6a6a",
-        "shirt": "#2f4f7a",
-        "background": "#dbe3ef"
+        "skin": "#e3bfa2",
+        "hair": "#555450",
+        "shirt": "#465f76",
+        "background": "#e7dfe0",
+        "hairstyle": "parted",
+        "outfit": "jacket",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": []
+      }
     },
     "current_thought": "The 7:42 was two minutes late yesterday. Unacceptable.",
     "short_term_goals": [
@@ -2061,12 +2335,22 @@
         "repair": "Slips you a free snack and says 'let's forget it'."
       },
       "appearance": {
-        "skin": "#ecc6a4",
-        "hair": "#3a3033",
-        "shirt": "#3f8f6d",
-        "background": "#d9eee4"
+        "skin": "#d6ac8b",
+        "hair": "#555450",
+        "shirt": "#b67c81",
+        "background": "#dfe4ea",
+        "hairstyle": "bob",
+        "outfit": "apron",
+        "trousers": "#55515d",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": []
+      }
     },
     "current_thought": "The new salmon onigiri are selling out. Order double tomorrow.",
     "short_term_goals": [
@@ -2164,12 +2448,22 @@
         "repair": "Makes a joke to break the ice, then admits the truth."
       },
       "appearance": {
-        "skin": "#e9c29f",
-        "hair": "#1f1e22",
-        "shirt": "#e0e3e6",
-        "background": "#e6ecf2"
+        "skin": "#c99978",
+        "hair": "#292a2c",
+        "shirt": "#667fa2",
+        "background": "#dce4df",
+        "hairstyle": "parted",
+        "outfit": "jacket",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": []
+      }
     },
     "current_thought": "Tryouts for the company baseball team are next month. I have to practise every evening.",
     "short_term_goals": [
@@ -2263,12 +2557,22 @@
         "repair": "Owns it with humour and buys the coffee."
       },
       "appearance": {
-        "skin": "#efcaa8",
-        "hair": "#2b2a2f",
-        "shirt": "#b86e8e",
-        "background": "#f2dde6"
+        "skin": "#efd0b5",
+        "hair": "#37302c",
+        "shirt": "#ae8d9c",
+        "background": "#e7dfe0",
+        "hairstyle": "long",
+        "outfit": "jacket",
+        "trousers": "#555951",
+        "shoes": "#eeeae2",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": []
+      }
     },
     "current_thought": "If I skip lunch again I'll finish the deck. Or I could... not.",
     "short_term_goals": [
@@ -2363,12 +2667,22 @@
         "repair": "Apologises with a big grin and a plan."
       },
       "appearance": {
-        "skin": "#e3b58f",
-        "hair": "#4a3a30",
-        "shirt": "#6f93c9",
-        "background": "#dde6f2"
+        "skin": "#e3bfa2",
+        "hair": "#40342e",
+        "shirt": "#6e7f80",
+        "background": "#dfe4ea",
+        "hairstyle": "crop",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#eeeae2",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": []
+      }
     },
     "current_thought": "The woman from GT Tower buys the same matcha latte every day. Should I say hi?",
     "short_term_goals": [
@@ -2460,12 +2774,22 @@
         "repair": "Fixes something for you without being asked."
       },
       "appearance": {
-        "skin": "#e6bd98",
-        "hair": "#cfccc6",
-        "shirt": "#6b5f55",
-        "background": "#e6e0d8"
+        "skin": "#d6ac8b",
+        "hair": "#b8b7b0",
+        "shirt": "#85847b",
+        "background": "#dce4df",
+        "hairstyle": "crop",
+        "outfit": "jacket",
+        "trousers": "#41484e",
+        "shoes": "#383a38",
+        "glasses": true
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": []
+      }
     },
     "current_thought": "Keiko would have liked the new shrine lanterns.",
     "short_term_goals": [
@@ -2552,12 +2876,22 @@
         "repair": "Writes a thoughtful note and follows up."
       },
       "appearance": {
-        "skin": "#efcaa8",
-        "hair": "#262528",
-        "shirt": "#7fb0ac",
-        "background": "#dcefeb"
+        "skin": "#c99978",
+        "hair": "#37302c",
+        "shirt": "#e3e6e2",
+        "background": "#e7dfe0",
+        "hairstyle": "bun",
+        "outfit": "coat",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": []
+      }
     },
     "current_thought": "Mr Nakamura hasn't been in for his blood pressure check. I should call.",
     "short_term_goals": [
@@ -2653,12 +2987,22 @@
         "repair": "Plays a song as an apology."
       },
       "appearance": {
-        "skin": "#efcaa8",
-        "hair": "#2b2a2f",
-        "shirt": "#e6a3c2",
-        "background": "#f5e2ec"
+        "skin": "#efd0b5",
+        "hair": "#40342e",
+        "shirt": "#c48991",
+        "background": "#dfe4ea",
+        "hairstyle": "bob",
+        "outfit": "apron",
+        "trousers": "#55515d",
+        "shoes": "#eeeae2",
+        "glasses": false
       },
-      "playable": true
+      "playable": true,
+      "identity": {
+        "nationality": "Japanese",
+        "hometown": "Tokyo, Japan",
+        "former_names": []
+      }
     },
     "current_thought": "If I practise the Chopin piece forty more times, maybe I won't freeze at the café open mic.",
     "short_term_goals": [

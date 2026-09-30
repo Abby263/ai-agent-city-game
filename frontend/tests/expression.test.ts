@@ -16,7 +16,7 @@ test("the words of a line change how it is delivered", () => {
 });
 
 test("gestures vary with the words, the feeling and the person", () => {
-  assert.equal(gestureFor("Hey Tom!", "happy", 0, "a"), "wave");
+  assert.equal(gestureFor("Hey Takashi!", "happy", 0, "a"), "wave");
   assert.ok(["hips", "point", "fists"].includes(gestureFor("That's not fair.", "angry", 2, "a")));
   const variety = new Set(["cit_1", "cit_2", "cit_3", "cit_4", "cit_5", "cit_6"].map((id) => gestureFor("I think we should try the new ramen place near the station.", "neutral", 3, id)));
   assert.ok(variety.size >= 2, "different people gesture differently");

@@ -1,12 +1,12 @@
 citizen_id: cit_033
-name: Priya Singh
+name: Kaori Takahashi
 age: 42
 profession: Doctor
 active: true
 work_location_id: loc_hospital
 position:
-- 5
-- 3
+  - 5
+  - 3
 money: 2100
 health: 90
 hunger: 30
@@ -19,32 +19,42 @@ mood: Focused
 personality:
   nature:
     traits:
-    - Calm
-    - Precise
-    - Overworked
+      - Calm
+      - Precise
+      - Overworked
     values: Caring for people properly, even when she is exhausted.
     voice: Clear and reassuring; asks 'how long has it hurt?'
-    sensitivity: Missing Ava's important moments because of work.
+    sensitivity: Missing Aoi's important moments because of work.
     repair: Makes time, puts the phone away and really listens.
   appearance:
-    skin: '#b57a58'
-    hair: '#2f2729'
-    shirt: '#5f9fb3'
-    background: '#d9ebf0'
+    skin: "#d6ac8b"
+    hair: "#292a2c"
+    shirt: "#e9e9e4"
+    background: "#dce4df"
+    hairstyle: bun
+    outfit: coat
+    trousers: "#41484e"
+    shoes: "#383a38"
+    glasses: false
   playable: true
+  identity:
+    nationality: Japanese
+    hometown: Tokyo, Japan
+    former_names:
+      - Priya Singh
 current_thought: Three flu cases this week already. I hope it doesn't spread through the offices.
 short_term_goals:
-- Get home in time for dinner with Ava
-- Keep an eye on the flu season
+  - Get home in time for dinner with Aoi
+  - Keep an eye on the flu season
 long_term_goals:
-- Lead the hospital one day
-memory_summary: I'm a doctor at Kyosai Hospital and Ava's mum. Ava is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.
+  - Lead the hospital one day
+memory_summary: I'm a doctor at Kyosai Hospital and Aoi's mum. Aoi is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.
 relationship_scores:
   cit_009: 90
 seed_memories:
-- memory_id: mem_seed_cit_033
-  content: I'm a doctor at Kyosai Hospital and Ava's mum. Ava is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.
-  importance: 0.8
+  - memory_id: mem_seed_cit_033
+    content: I'm a doctor at Kyosai Hospital and Aoi's mum. Aoi is twenty now and works at the science lab; I raised her on my own and I still worry that I work too much.
+    importance: 0.8
 life:
   sex: female
   birthday_in_days: 11
@@ -55,7 +65,7 @@ life:
   parent_ids: []
   partner_id: null
   children_ids:
-  - cit_009
+    - cit_009
   relationship_status: single
   job:
     title: Doctor
@@ -64,11 +74,11 @@ life:
     start: 480
     end: 1020
     workdays:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
   ambition:
     goal: Become head of Kyosai Hospital
     kind: career
@@ -76,5 +86,5 @@ life:
   conditions: []
   wants_children: false
   gym_days:
-  - 1
-  - 3
+    - 1
+    - 3

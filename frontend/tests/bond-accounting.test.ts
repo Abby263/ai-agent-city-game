@@ -22,9 +22,9 @@ const postAction: Record<string, BondSnapshot> = {
   [targetId]: { ...initial, trust: 56, warmth: 58, familiarity: 43, resentment: 28 },
 };
 /** The game master's reading of "argue about the plan". */
-const argument = async (): Promise<ActInterpretation> => ({ allowed: true, refusal: "", headline: "Ava argued with Mateo about the plan.", target_id: targetId,
+const argument = async (): Promise<ActInterpretation> => ({ allowed: true, refusal: "", headline: "Aoi argued with Ren about the plan.", target_id: targetId,
   involved_ids: [actorId, targetId], location_id: "", tone: "tense", intensity: 1, harm: 0, money: 0, proposal: "none", closes_location: false,
-  reaction: "Ava just argued with you about the plan.", target_memory: "Ava argued with me about the plan." });
+  reaction: "Aoi just argued with you about the plan.", target_memory: "Aoi argued with me about the plan." });
 const argue = (generate: (request: SessionCognitionRequest) => Promise<SessionCognitionResponse>) => sessionAct(actorId, targetId, "argue about the plan", argument, generate);
 let networkCalls = 0;
 Object.defineProperty(globalThis, "window", { configurable: true, value: { localStorage: {

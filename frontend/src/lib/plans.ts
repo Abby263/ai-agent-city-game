@@ -46,7 +46,7 @@ export function parsePlan(text: string, city: CityState): ParsedPlan | null {
     hour = numberWords[worded[1]];
     minutes = !worded[2] ? 0 : worded[2] === "fifteen" ? 15 : worded[2] === "thirty" ? 30 : 45;
   }
-  // "Morning, Mateo!" is a greeting, not a time of day.
+  // "Morning, Ren!" is a greeting, not a time of day.
   const morning = /\bam\b|morning/.test(t.replace(/(^|[.!?]\s*)(good\s+)?morning\s*[,!.]/g, "$1"));
   if (hour !== null && hour < 12 && !clock?.[3] && !morning && hour >= 1 && hour <= 9) hour += 12; // "seven" after work means 19:00
   if (day === null || hour === null || hour > 23) return null;

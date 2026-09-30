@@ -1,22 +1,22 @@
 citizen_id: cit_027
-name: Sophie Laurent
+name: Hana Shimizu
 age: 20
 profession: Library assistant
 active: true
 work_location_id: loc_library
 position:
-- 5
-- 6
+  - 5
+  - 6
 skills:
-- illustration
-- storytelling
+  - illustration
+  - storytelling
 mood: Hopeful
 personality:
   nature:
     traits:
-    - Imaginative
-    - Reserved
-    - Sensitive
+      - Imaginative
+      - Reserved
+      - Sensitive
     values: Kindness toward unfinished work and room for quieter voices.
     voice: Uses concrete images and small observations; opens up when someone listens.
     sensitivity: Public teasing of her drawings and louder people speaking for her.
@@ -25,16 +25,31 @@ personality:
   openness: 88
   warmth: 70
   conscientiousness: 58
+  identity:
+    nationality: Japanese
+    hometown: Tokyo, Japan
+    former_names:
+      - Sophie Laurent
+  appearance:
+    shirt: "#ad697f"
+    skin: "#efd0b5"
+    hair: "#292a2c"
+    background: "#dce4df"
+    hairstyle: bob
+    outfit: casual
+    trousers: "#41484e"
+    shoes: "#eeeae2"
+    glasses: false
 current_thought: Maybe someone would like to make a comic with me.
 short_term_goals:
-- Find someone to illustrate a comic with
-- Learn one new neighbour's interests
+  - Find someone to illustrate a comic with
+  - Learn one new neighbour's interests
 long_term_goals:
-- Share my art without fearing criticism
-memory_summary: I'm twenty and work as a library assistant at Nakameguro Library. I draw comics and notice small acts of kindness. I live with my big sister Maya while our parents work abroad. I'm shy about unfinished work, and being left out can sting, but I try to ask what happened instead of assuming the worst.
+  - Share my art without fearing criticism
+memory_summary: I'm twenty and work as a library assistant at Nakameguro Library. I draw comics and notice small acts of kindness. I live with my big sister Natsumi while our parents work abroad. I'm shy about unfinished work, and being left out can sting, but I try to ask what happened instead of assuming the worst.
 seed_memories:
-- memory_id: mem_seed_cit_027
-  content: I always carry my sketchbook. I hope to find a patient collaborator, but I have not met one yet.
+  - memory_id: mem_seed_cit_027
+    content: I always carry my sketchbook. I hope to find a patient collaborator, but I have not met one yet.
 life:
   sex: female
   birthday_in_days: 17
@@ -43,7 +58,7 @@ life:
   fitness: 52
   household_id: home_h
   parent_ids:
-  - ext_laurent_parents
+    - ext_laurent_parents
   ambition:
     goal: Publish her own comic
     kind: creative
@@ -56,11 +71,11 @@ life:
     start: 600
     end: 1080
     workdays:
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
   relationship_status: single
   wants_children: false
 money: 420

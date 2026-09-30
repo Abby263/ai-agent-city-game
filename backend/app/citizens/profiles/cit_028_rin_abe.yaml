@@ -1,22 +1,22 @@
 citizen_id: cit_028
-name: Zara Ali
+name: Rin Abe
 age: 21
 profession: Junior software engineer
 active: true
 work_location_id: loc_office
 position:
-- 7
-- 6
+  - 7
+  - 6
 skills:
-- robotics
-- chess
+  - robotics
+  - chess
 mood: Determined
 personality:
   nature:
     traits:
-    - Ambitious
-    - Direct
-    - Fair-minded
+      - Ambitious
+      - Direct
+      - Fair-minded
     values: Earned achievement, useful feedback, and fair credit.
     voice: Gets to the point, asks challenging questions, and appreciates competence.
     sensitivity: Unfair praise, stolen credit, or feeling her hard work is overlooked.
@@ -25,16 +25,31 @@ personality:
   openness: 76
   warmth: 56
   conscientiousness: 90
+  identity:
+    nationality: Japanese
+    hometown: Tokyo, Japan
+    former_names:
+      - Zara Ali
+  appearance:
+    shirt: "#52817c"
+    skin: "#e3bfa2"
+    hair: "#37302c"
+    background: "#e7dfe0"
+    hairstyle: bun
+    outfit: jacket
+    trousers: "#555951"
+    shoes: "#eeeae2"
+    glasses: false
 current_thought: I want a teammate who challenges my ideas, not one who just agrees.
 short_term_goals:
-- Ask someone to try a robot-building challenge
-- Practise listening before correcting someone
+  - Ask someone to try a robot-building challenge
+  - Practise listening before correcting someone
 long_term_goals:
-- Build a team where everyone's contribution matters
-memory_summary: I'm twenty-one and a junior software engineer at Nakameguro GT Tower. I build robots and play chess for fun. I'm competitive and sometimes compare myself with others. I respect honest feedback, hate taking credit for someone else's work, and can apologise when I get carried away. I live with my dad, Samir.
+  - Build a team where everyone's contribution matters
+memory_summary: I'm twenty-one and a junior software engineer at Nakameguro GT Tower. I build robots and play chess for fun. I'm competitive and sometimes compare myself with others. I respect honest feedback, hate taking credit for someone else's work, and can apologise when I get carried away. I live with my dad, Takeshi.
 seed_memories:
-- memory_id: mem_seed_cit_028
-  content: I have an unfinished robot design and would like to build it with someone. I do not yet know who enjoys building things here.
+  - memory_id: mem_seed_cit_028
+    content: I have an unfinished robot design and would like to build it with someone. I do not yet know who enjoys building things here.
 life:
   sex: female
   birthday_in_days: 60
@@ -43,7 +58,7 @@ life:
   fitness: 66
   household_id: home_g
   parent_ids:
-  - cit_038
+    - cit_038
   ambition:
     goal: Save $1,500 for a telescope
     kind: money
@@ -57,11 +72,11 @@ life:
     start: 540
     end: 1110
     workdays:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
   relationship_status: single
   wants_children: false
 money: 1250

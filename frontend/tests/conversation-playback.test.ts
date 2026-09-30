@@ -11,7 +11,7 @@ test("phone conversation framing keeps both speakers inside the visible canvas",
     const target = new THREE.Vector3(0, 0.9, 0);
     const heads = [new THREE.Vector3(-1, 1.35, 0), new THREE.Vector3(1, 1.35, 0)];
     const camera = new THREE.PerspectiveCamera(42, aspect, 0.1, 1000);
-    const offset = conversationCameraOffset(target, heads, new THREE.Group(), conversationDistance(6.4, aspect), true);
+    const offset = conversationCameraOffset(target, heads, new THREE.Group(), conversationDistance(4.8, aspect), true);
     camera.position.copy(target).add(offset);
     camera.lookAt(target);
     camera.updateMatrixWorld();
@@ -20,13 +20,26 @@ test("phone conversation framing keeps both speakers inside the visible canvas",
       assert.ok(Math.abs(projected.x) < 0.8 && Math.abs(projected.y) < 0.8, `Speaker cropped at aspect ${aspect}`);
     }
   }
-  assert.equal(conversationDistance(6.4, 1.5), 6.4, "Wide shots should retain their close framing");
+  assert.equal(conversationDistance(4.8, 1.5), 4.8, "Wide shots should retain their close framing");
+});
+
+test("unobstructed conversations prefer a human-level camera", () => {
+  const target = new THREE.Vector3(0, 0.35, 0);
+  const heads = [-0.75, 0.75].map(x => new THREE.Vector3(x, 1.35, 0));
+  const offset = conversationCameraOffset(target, heads, new THREE.Group(), 4.8, true);
+  assert.equal(offset.y, 1.8);
+  const camera = new THREE.PerspectiveCamera(42, 1.7, 0.1, 1000);
+  camera.position.copy(target).add(offset);
+  camera.lookAt(target);
+  camera.updateMatrixWorld();
+  assert.ok(new THREE.Vector3(0.75, 2, 0).project(camera).y < 0.9, "Tall residents keep headroom");
+  assert.ok(new THREE.Vector3(0.75, 0, 0).project(camera).y > -0.3, "Feet stay above the desktop subtitles");
 });
 
 const exchange = (id: string, minute = 360): Conversation => ({
   conversation_id: id, game_day: 1, game_minute: minute, location_id: "loc_homes",
   actor_ids: ["cit_009", "cit_010"], summary: "Hello",
-  transcript: [{ speaker_id: "cit_009", text: "Hello Mateo." }, { speaker_id: "cit_010", text: "Hi Ava." }],
+  transcript: [{ speaker_id: "cit_009", text: "Hello Ren." }, { speaker_id: "cit_010", text: "Hi Aoi." }],
 });
 test("history does not replay, new exchanges play oldest first exactly once", () => {
   const known = new Set(["saved"]);

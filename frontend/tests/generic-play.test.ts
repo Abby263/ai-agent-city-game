@@ -44,15 +44,15 @@ const master = (reading: Partial<ActInterpretation>, seen: ActRequest[] = []) =>
 const bond = (from: string, to: string) => sessionRelationships(from).find((r) => r.other_citizen_id === to)!;
 
 test("anything the player writes is read in context and applied with capped effects", async () => {
-  const [tom, maya] = ["Tom", "Maya"].map(id);
+  const [tom, maya] = ["Takashi", "Natsumi"].map(id);
   const seen: ActRequest[] = [];
   const before = bond(maya, tom);
   const warmth = before.warmth;
-  const result = await sessionAct(tom, maya, "Tom shoves Maya in front of everyone", master({ headline: "Tom shoved Maya at the gym.", tone: "hostile", intensity: 2, harm: 1 }, seen), talker());
-  assert.equal(seen[0].text, "Tom shoves Maya in front of everyone");
+  const result = await sessionAct(tom, maya, "Takashi shoves Natsumi in front of everyone", master({ headline: "Takashi shoved Natsumi at the gym.", tone: "hostile", intensity: 2, harm: 1 }, seen), talker());
+  assert.equal(seen[0].text, "Takashi shoves Natsumi in front of everyone");
   assert.equal(seen[0].kind, "action");
   assert.ok(seen[0].people.some((p) => p.citizen_id === maya) && seen[0].places.length > 5, "the game master sees the whole scene");
-  assert.match(result.headline, /^Tom shoved Maya at the gym\./);
+  assert.match(result.headline, /^Takashi shoved Natsumi at the gym\./);
   assert.ok(result.talked, "they react in their own words");
   const after = bond(maya, tom);
   assert.ok(after.warmth < warmth && after.warmth >= warmth - 30, "hurt, but within the cap");
@@ -80,7 +80,7 @@ test("romance between relatives is refused whatever the words", async () => {
 });
 
 test("a situation happens to people nobody chose, and can close a place for the day", async () => {
-  const [elena, sophie] = ["Elena", "Sophie"].map(id);
+  const [elena, sophie] = ["Yuka", "Hana"].map(id);
   const result = await sessionAct(null, null, "A water pipe bursts at the library", master({
     headline: "A water pipe burst at Nakameguro Library.", target_id: elena, involved_ids: [elena, sophie], location_id: "loc_library", closes_location: true, tone: "tense",
   }), talker());
@@ -103,14 +103,14 @@ test("the AI never speaks for the resident you play", async () => {
 });
 
 test("a choice continues its story instead of starting a new one", async () => {
-  const [tom, maya] = ["Tom", "Maya"].map(id);
-  const first = await sessionAct(tom, maya, "Tom invites Maya for ramen", master({ headline: "Tom invited Maya for ramen.", tone: "warm" }), talker());
+  const [tom, maya] = ["Takashi", "Natsumi"].map(id);
+  const first = await sessionAct(tom, maya, "Takashi invites Natsumi for ramen", master({ headline: "Takashi invited Natsumi for ramen.", tone: "warm" }), talker());
   const before = (getSessionCity()!.stories ?? []).length;
-  await sessionAct(maya, tom, "Maya asks whether Hannah knows", master({ headline: "Maya asked Tom whether Hannah knows.", tone: "tense" }), talker(), { storyId: first.story_id });
+  await sessionAct(maya, tom, "Natsumi asks whether Yuko knows", master({ headline: "Natsumi asked Takashi whether Yuko knows.", tone: "tense" }), talker(), { storyId: first.story_id });
   const city = getSessionCity()!;
   assert.equal((city.stories ?? []).length, before, "no extra story");
   const story = activeStories(city).find((s) => s.id === first.story_id)!;
-  assert.ok(story.beats.some((b) => b.icon === "👉" && b.text.startsWith("You chose: Maya asked Tom")));
+  assert.ok(story.beats.some((b) => b.icon === "👉" && b.text.startsWith("You chose: Natsumi asked Takashi")));
   assert.ok(story.beats.at(-1)!.conversation_id, "their reaction is in the same story");
 });
 
@@ -130,18 +130,18 @@ test("what happens next comes from what the characters themselves want", async (
 });
 
 test("successive acts keep the dialogue as history but carry their own topic", async () => {
-  const [ava, mateo] = ["Ava", "Mateo"].map(id);
+  const [ava, mateo] = ["Aoi", "Ren"].map(id);
   const requests: SessionCognitionRequest[] = [];
   const generate = talker({}, requests);
-  await sessionAct(ava, mateo, "Ava gives Mateo a small wrapped gift", master({ headline: "Ava gave Mateo a gift.", tone: "warm", money: 20 }), generate);
+  await sessionAct(ava, mateo, "Aoi gives Ren a small wrapped gift", master({ headline: "Aoi gave Ren a gift.", tone: "warm", money: 20 }), generate);
   const first = sessionConversations()[0];
-  await sessionAct(ava, mateo, "Ava asks Mateo out for ramen", master({ headline: "Ava asked Mateo out for ramen.", tone: "romantic", proposal: "date" }), generate);
+  await sessionAct(ava, mateo, "Aoi asks Ren out for ramen", master({ headline: "Aoi asked Ren out for ramen.", tone: "romantic", proposal: "date" }), generate);
   assert.deepEqual(requests[1].prior_lines, first.transcript);
   assert.notEqual(requests[0].task, requests[1].task);
 });
 
 test("approaching someone brings you to them without an AI call", async () => {
-  const [ava, kenji] = ["Ava", "Kenji"].map(id);
+  const [ava, kenji] = ["Aoi", "Kenji"].map(id);
   await assert.rejects(sessionApproach(kenji), /Play as someone/);
   await sessionTakeControl(ava);
   const city = await sessionApproach(kenji);
@@ -151,14 +151,14 @@ test("approaching someone brings you to them without an AI call", async () => {
 });
 
 test("each resident's prompt is visible, editable, checked, and sent with every AI call", async () => {
-  const tom = id("Tom");
+  const tom = id("Takashi");
   const profile = getSessionCity()!.citizens.find((c) => c.citizen_id === tom)!;
   assert.equal(characterPrompt(profile), defaultCharacterPrompt(profile), "until edited, it is written from their profile");
-  assert.match(characterPrompt(profile), /Tom Brooks, 46/);
+  assert.match(characterPrompt(profile), /Takashi Watanabe, 46/);
   await assert.rejects(sessionSetCharacterPrompt(tom, "Call me on 555-123-4567"), /phone|personal|private|number/i);
-  const edited = await sessionSetCharacterPrompt(tom, "Tom secretly hates gardening and dreams of opening a jazz bar.");
+  const edited = await sessionSetCharacterPrompt(tom, "Takashi secretly hates gardening and dreams of opening a jazz bar.");
   const sent = withPrompt(edited.citizens.find((c) => c.citizen_id === tom)!);
-  assert.equal(sent.personality.prompt, "Tom secretly hates gardening and dreams of opening a jazz bar.");
+  assert.equal(sent.personality.prompt, "Takashi secretly hates gardening and dreams of opening a jazz bar.");
   assert.equal(sent.personality.prompt_edited, true);
   const reset = await sessionSetCharacterPrompt(tom, null);
   assert.equal(characterPrompt(reset.citizens.find((c) => c.citizen_id === tom)!), defaultCharacterPrompt(reset.citizens.find((c) => c.citizen_id === tom)!));
@@ -167,7 +167,7 @@ test("each resident's prompt is visible, editable, checked, and sent with every 
 test("a plan agreed out loud becomes a real meeting, a refusal does not", () => {
   const city = getSessionCity()!;
   city.clock.minute_of_day = 360;
-  const [tom, maya] = ["Tom", "Maya"].map(id);
+  const [tom, maya] = ["Takashi", "Natsumi"].map(id);
   const plan = agreedPlan([
     { speaker_id: tom, text: "Thought we might head over to the noodle shop by the station after I finish up at the garden." },
     { speaker_id: maya, text: "Oh, absolutely! I'm up for ramen after the garden today." },
@@ -201,7 +201,7 @@ test("the social planner knows who people are to them and what is on their mind"
 });
 
 test("only people awake and right there see an act, and odd residents never crash it", async () => {
-  const [tom, maya] = ["Tom", "Maya"].map(id);
+  const [tom, maya] = ["Takashi", "Natsumi"].map(id);
   const city = getSessionCity()!;
   const here = city.citizens.find((c) => c.citizen_id === maya)!.current_location_id;
   const [awake, asleep] = city.citizens.filter((c) => ![tom, maya].includes(c.citizen_id)).slice(0, 2);
@@ -211,20 +211,20 @@ test("only people awake and right there see an act, and odd residents never cras
   const noLife = city.citizens.find((c) => c.citizen_id === maya)!;
   delete (noLife as { life?: unknown }).life;
   saveSessionCity(city);
-  await sessionAct(tom, maya, "Tom shoves Maya", master({ tone: "hostile", harm: 2 }), talker());
+  await sessionAct(tom, maya, "Takashi shoves Natsumi", master({ tone: "hostile", harm: 2 }), talker());
   const memories = (who: string) => JSON.stringify(sessionMemories(who));
   assert.match(memories(awake.citizen_id), /I saw this happen/);
   assert.doesNotMatch(memories(asleep.citizen_id), /I saw this happen/);
 });
 
 test("a proposal is put to the person as a question, and their yes makes it official", async () => {
-  const [ava, mateo, yui, daichi] = ["Ava", "Mateo", "Yui", "Daichi"].map(id);
+  const [ava, mateo, yui, daichi] = ["Aoi", "Ren", "Yui", "Daichi"].map(id);
   const requests: SessionCognitionRequest[] = [];
-  const ask = master({ headline: "Ava asked Mateo to be her boyfriend.", tone: "romantic", proposal: "date" });
+  const ask = master({ headline: "Aoi asked Ren to be her boyfriend.", tone: "romantic", proposal: "date" });
   await sessionTakeControl(ava);
   await sessionApproach(mateo);
-  await sessionAct(ava, mateo, "take Mateo's hand and ask him to be her boyfriend", ask, talker({ [mateo]: { invitation_response: "accepted" } }, requests));
-  assert.equal(requests[0].proposal, "date", "Mateo is told a question is waiting for his answer");
+  await sessionAct(ava, mateo, "take Ren's hand and ask him to be her boyfriend", ask, talker({ [mateo]: { invitation_response: "accepted" } }, requests));
+  assert.equal(requests[0].proposal, "date", "Ren is told a question is waiting for his answer");
   assert.equal(getSessionCity()!.citizens.find((c) => c.citizen_id === mateo)!.life!.partner_id, ava);
   // Between two residents, too; an ordinary act asks nothing.
   await sessionAct(yui, daichi, "Yui asks Daichi out", master({ proposal: "date" }), talker({}, requests));
@@ -233,7 +233,7 @@ test("a proposal is put to the person as a question, and their yes makes it offi
 });
 
 test("your side of a bond grows from good conversations, but your feelings stay yours", async () => {
-  const [ava, mateo] = ["Ava", "Mateo"].map(id);
+  const [ava, mateo] = ["Aoi", "Ren"].map(id);
   await sessionTakeControl(ava);
   await sessionApproach(mateo);
   const before = bond(ava, mateo), theirs = bond(mateo, ava).feelings?.affection ?? 0;
@@ -247,7 +247,7 @@ test("your side of a bond grows from good conversations, but your feelings stay 
 });
 
 test("the resident you play sets off for a plan once, and talking there keeps it", async () => {
-  const [ava, mateo] = ["Ava", "Mateo"].map(id);
+  const [ava, mateo] = ["Aoi", "Ren"].map(id);
   const quiet = async () => ({ target_id: null, reason: "Nothing to say right now.", topic: "" });
   await sessionTakeControl(ava);
   await sessionSetMode("autonomous");
@@ -258,12 +258,12 @@ test("the resident you play sets off for a plan once, and talking there keeps it
   saveSessionCity(city);
   city = await sessionTick(talker(), undefined, quiet);
   assert.equal(city.policy.player_destination, "loc_park", "you head off like everyone else");
-  assert.match(city.events.at(-1)!.description + city.events.map((e) => e.description).join(" "), /set off for .* to meet Mateo/);
+  assert.match(city.events.at(-1)!.description + city.events.map((e) => e.description).join(" "), /set off for .* to meet Ren/);
   await sessionWalkTo("loc_library");
   city = await sessionTick(talker(), undefined, quiet);
   assert.notEqual(city.policy.player_destination, "loc_park", "changing your mind is respected");
 
-  // Kept: you talked with Mateo where and when you agreed.
+  // Kept: you talked with Ren where and when you agreed.
   city = await sessionApproach(mateo);
   city.meetings = [{ ...plan, id: "m2", player_set_off: true, location_id: city.citizens.find((c) => c.citizen_id === mateo)!.current_location_id, game_minute: city.clock.minute_of_day }];
   saveSessionCity(city);
@@ -278,9 +278,9 @@ const planner = (plan: Partial<SessionTaskPlanResponse>) => async (): Promise<Se
   ({ task_kind: "go_with_citizen", target_citizen_ids: [], location_id: "loc_restaurant", reasoning_summary: "", player_visible_plan: "Go together.", ...plan });
 
 test("asked to go somewhere with you, a resident heads there and you choose whether to join", async () => {
-  const [ava, mateo, noah] = ["Ava", "Mateo", "Noah"].map(id);
+  const [ava, mateo, noah] = ["Aoi", "Ren", "Riku"].map(id);
   await sessionTakeControl(mateo);
-  await sessionAssignTask(ava, { task: "Go to Sunny Side Cafe with Mateo" }, planner({ target_citizen_ids: [mateo] }));
+  await sessionAssignTask(ava, { task: "Go to Sunny Side Cafe with Ren" }, planner({ target_citizen_ids: [mateo] }));
   assert.equal(taskOf(ava)!.task_kind, "go_to_location", "the AI never agrees for you, so she doesn't wait for you");
   let city = getSessionCity()!;
   for (let i = 0; i < 40 && taskOf(ava)!.status === "active"; i++) city = await sessionTick(talker());
@@ -288,16 +288,16 @@ test("asked to go somewhere with you, a resident heads there and you choose whet
   assert.equal(her.current_location_id, "loc_restaurant");
   assert.equal(taskOf(ava)!.status, "completed");
   // Anyone else still goes along; only you are left to decide for yourself.
-  await sessionAssignTask(ava, { task: "Go to the cafe with Mateo and Noah" }, planner({ target_citizen_ids: [mateo, noah] }));
+  await sessionAssignTask(ava, { task: "Go to the cafe with Ren and Riku" }, planner({ target_citizen_ids: [mateo, noah] }));
   assert.equal(taskOf(ava)!.task_kind, "go_with_citizen");
   assert.deepEqual(taskOf(ava)!.target_citizen_ids, [noah]);
 });
 
 test("a resident waiting on you says so, not that their AI failed, and can be cancelled", async () => {
-  const [ava, mateo] = ["Ava", "Mateo"].map(id);
+  const [ava, mateo] = ["Aoi", "Ren"].map(id);
   await sessionTakeControl(mateo);
   await sessionApproach(ava);
-  await sessionAssignTask(ava, { task: "Ask Mateo about his song" }, planner({ task_kind: "targeted_talk", target_citizen_ids: [mateo], location_id: null }));
+  await sessionAssignTask(ava, { task: "Ask Ren about his song" }, planner({ task_kind: "targeted_talk", target_citizen_ids: [mateo], location_id: null }));
   let city = getSessionCity()!;
   for (let i = 0; i < 10 && taskOf(ava)!.status === "active"; i++) city = await sessionTick(talker());
   const her = city.citizens.find((c) => c.citizen_id === ava)!;
@@ -309,7 +309,7 @@ test("a resident waiting on you says so, not that their AI failed, and can be ca
 });
 
 test("plans settle in Manual too: kept if you talked around the time, missed if not", async () => {
-  const [ava, mateo, noah] = ["Ava", "Mateo", "Noah"].map(id);
+  const [ava, mateo, noah] = ["Aoi", "Ren", "Riku"].map(id);
   await sessionTakeControl(mateo);
   let city = await sessionApproach(ava);
   assert.equal(city.simulation_mode, "manual");

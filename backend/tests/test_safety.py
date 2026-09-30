@@ -6,7 +6,7 @@ from app.safety import CITIZEN_SAFETY_RULES, check_player_text
 
 def test_friendly_text_is_allowed():
     for text in [
-        "Hi Noah, want to study for the science test together?",
+        "Hi Riku, want to study for the science test together?",
         "3 kids crossed the road to the park",
         "Meet me at the library at 15:30 on day 2",
         "I scored 12 points in the class quiz!",

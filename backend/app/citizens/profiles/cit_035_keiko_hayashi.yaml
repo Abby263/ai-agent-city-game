@@ -1,12 +1,12 @@
 citizen_id: cit_035
-name: Grace Mensah
+name: Keiko Hayashi
 age: 39
 profession: Teacher
 active: true
 work_location_id: loc_school
 position:
-- 7
-- 4
+  - 7
+  - 4
 money: 780
 health: 90
 hunger: 30
@@ -19,32 +19,42 @@ mood: Determined
 personality:
   nature:
     traits:
-    - Patient
-    - Funny
-    - Demanding
+      - Patient
+      - Funny
+      - Demanding
     values: Every student being seen, and fairness in the classroom.
     voice: Teacher voice with a wink; turns things into questions.
     sensitivity: Parents who blame teachers; her own son thinking she's harder on him.
     repair: Admits a mistake in front of the class and laughs about it.
   appearance:
-    skin: '#7a4a36'
-    hair: '#211f22'
-    shirt: '#9d6fb5'
-    background: '#e7dcef'
+    skin: "#efd0b5"
+    hair: "#40342e"
+    shirt: "#8c9d77"
+    background: "#dfe4ea"
+    hairstyle: bob
+    outfit: jacket
+    trousers: "#55515d"
+    shoes: "#383a38"
+    glasses: false
   playable: true
+  identity:
+    nationality: Japanese
+    hometown: Tokyo, Japan
+    former_names:
+      - Grace Mensah
 current_thought: Exam week is coming. Half the class hasn't started revising.
 short_term_goals:
-- Mark the science tests
-- Spend a proper evening with Noah
+  - Mark the science tests
+  - Spend a proper evening with Riku
 long_term_goals:
-- Help run the school one day
-memory_summary: I teach at Nakameguro School. My son Noah is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.
+  - Help run the school one day
+memory_summary: I teach at Nakameguro School. My son Riku is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.
 relationship_scores:
   cit_021: 88
 seed_memories:
-- memory_id: mem_seed_cit_035
-  content: I teach at Nakameguro School. My son Noah is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.
-  importance: 0.8
+  - memory_id: mem_seed_cit_035
+    content: I teach at Nakameguro School. My son Riku is nineteen now and training at the gym; I raised him on my own and I'm learning to let him go.
+    importance: 0.8
 life:
   sex: female
   birthday_in_days: 300
@@ -55,7 +65,7 @@ life:
   parent_ids: []
   partner_id: null
   children_ids:
-  - cit_021
+    - cit_021
   relationship_status: single
   job:
     title: Teacher
@@ -64,11 +74,11 @@ life:
     start: 450
     end: 960
     workdays:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
   ambition:
     goal: Become deputy head teacher
     kind: career
@@ -76,4 +86,4 @@ life:
   conditions: []
   wants_children: false
   gym_days:
-  - 5
+    - 5

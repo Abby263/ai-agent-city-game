@@ -30,11 +30,12 @@ for (const path of [
   "frontend/package.json", "frontend/package-lock.json", "frontend/tsconfig.json",
   "frontend/next.config.ts", "frontend/next-env.d.ts", "frontend/postcss.config.mjs",
   "frontend/scripts/generate-citizens.mjs",
+  "frontend/scripts/check-characters.mjs",
 ]) copy(path);
 tree("backend/app", [".py", ".yaml"]);
 tree("frontend/src", [".ts", ".tsx", ".css"]);
 // The generated roster is rebuilt from source YAML, never copied from a running world's state.
-tree("frontend/public", [".png", ".svg", ".webp", ".jpg", ".glb", ".gltf", ".md"]);
+tree("frontend/public", [".png", ".svg", ".webp", ".jpg", ".glb", ".gltf", ".json", ".bin", ".md"]);
 const forbidden = /(^|\/)(\.env[^/]*|productions|exports|snapshots|__pycache__)(\/|$)|\.(db|sqlite|log)$/;
 if (files.some((path) => forbidden.test(path))) throw new Error("Runtime data in release manifest.");
 for (const path of files.filter((path) => [".ts", ".tsx", ".py", ".yaml", ".json"].includes(extname(path)))) {

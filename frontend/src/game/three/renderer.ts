@@ -236,6 +236,7 @@ export class CityRenderer {
       if (!ids.has(id)) {
         model.dispose();
         this.people.delete(id);
+        this.humanRequested.delete(id);
       }
     const households = new Map<string, number>();
     city.citizens.forEach((citizen, index) => {
@@ -490,12 +491,12 @@ export class CityRenderer {
     // Compact layouts reserve a separate subtitle area; centre people in the remaining canvas.
     const cinematic = this.conversation?.phase !== "arrival";
     const compact = window.matchMedia("(max-width: 760px), (max-width: 1024px) and (max-height: 500px)").matches;
-    this.focusTarget.y = compact ? 0.9 : cinematic ? -0.25 : -1.2;
+    this.focusTarget.y = compact ? 0.9 : cinematic ? 0.35 : -1.2;
     const heads = this.conversation?.actorIds.flatMap((id) => {
       const model = this.people.get(id);
       return model?.destination ? [new THREE.Vector3(model.destination.x, 1.35, model.destination.z)] : [];
     }) ?? [];
-    const distance = conversationDistance(cinematic ? 6.4 : 11, this.camera.aspect);
+    const distance = conversationDistance(cinematic ? 4.8 : 11, this.camera.aspect);
     const offset = conversationCameraOffset(this.focusTarget, heads, this.town.root, distance, cinematic);
     this.shotPosition = this.focusTarget.clone().add(offset);
   }
@@ -692,7 +693,8 @@ export class CityRenderer {
         Number(a.citizen.citizen_id === this.selected),
     );
     for (const model of models) {
-      if (this.conversation && !this.conversation.actorIds.includes(model.citizen.citizen_id)) {
+      // Dialogue identifies speakers in the subtitle area; floating labels obscure mobile close-ups.
+      if (this.conversation && (this.conversation.phase !== "arrival" || !this.conversation.actorIds.includes(model.citizen.citizen_id))) {
         model.label.hidden = true;
         continue;
       }

@@ -1,6 +1,11 @@
 # AgentCity
 
-AgentCity is a playable 3D AI city simulation where citizens are autonomous agents with daily routines, needs, money, relationships, memory, and goals. Explore a cel-shaded neighborhood with animated citizens, blossom trees, shopfronts, a market, a schoolyard, and a riverside. The current cast has 26 active residents, all aged 18 or older, from young workers to seniors. Other citizen profiles remain inactive in the codebase.
+AgentCity is a playable 3D AI city simulation where citizens are autonomous agents with daily routines, needs, money, relationships, memory, and goals. Explore a Japanese neighborhood with animated citizens, blossom trees, shopfronts, a market, a schoolyard, and a riverside. The current cast has 26 active Japanese residents, all aged 18 or older, from young workers to seniors. Other citizen profiles remain inactive in the codebase.
+
+The first three textured residents (Aoi, Ren and Sota) use free CC0 MakeHuman art,
+exported through Blender/MPFB with facial animation and mobile-sized GLB assets.
+The remaining cast uses procedural bodies. See [the open character art guide](docs/open-character-art.md)
+for sources, licences, rebuilding instructions, and remaining visual limitations.
 
 **Follow what you start.** Every situation, action or election you create becomes a
 **Happening now** story: the reaction plays straight away, and the card on the map
@@ -55,6 +60,8 @@ The optional server-memory mode and shared simulation endpoints do not implement
 AgentCity is released under the [PolyForm Noncommercial License 1.0.0](LICENSE).
 You may use, modify, and distribute it for non-commercial purposes. Commercial
 use requires a separate commercial license from the project owner.
+Third-party art retains its original licence: the bundled MakeHuman character
+assets and Poly Haven surface textures are CC0. See [character credits](frontend/public/characters/CREDITS.md).
 
 ## Stack
 
@@ -261,9 +268,9 @@ For durable memory, set `MEMORY_STORAGE=postgres` and provide Supabase, Neon, or
 
 ## Core Gameplay
 
-- Watch eight student agents move through a 3D neighborhood.
-- Tap or click any student to see thoughts, memory, relationships, mood, needs, money, schedule, and goals.
-- Use Manual Mode to assign a focused natural-language task to any student; the citizen decides who to approach and how to answer.
+- Watch 26 adult residents move through a 3D neighborhood.
+- Tap or click any resident to see thoughts, memory, relationships, mood, needs, money, schedule, and goals.
+- Use Manual Mode to assign a focused natural-language task to any resident; the citizen decides who to approach and how to answer.
 - Use Autonomous Mode to trigger city events such as flu outbreak, traffic accident, food shortage, school exam, festival, bank policy change, and power outage.
 - Change mayor policies for tax, hospitals, school funding, roads, farming subsidies, and public health in Autonomous Mode.
 - Observe WebSocket-streamed thoughts, conversations, memories, reflections, and city metrics.
@@ -272,7 +279,7 @@ For durable memory, set `MEMORY_STORAGE=postgres` and provide Supabase, Neon, or
 ## How To Play
 
 1. Start in `Manual`.
-2. Tap Ava, Mateo, Noah, Iris, or Leo on the map to follow one student.
+2. Tap Aoi, Ren, Riku, Mio, Sota, or another resident on the map to follow them.
 3. Use `Give [name] a task`, type what you want, and click `Assign Task`; the citizen chooses the target and route.
 4. Open `Talk` to read the latest conversation as a transcript.
 5. Let the task finish automatically, or use `Pause` / `Close Task`.

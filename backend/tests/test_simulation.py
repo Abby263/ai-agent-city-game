@@ -100,13 +100,13 @@ def test_assign_task_creates_goal_memory_and_event():
     state = engine.assign_task(
         db,
         "cit_009",
-        AssignTaskRequest(task="Ask Iris if she wants to study together"),
+        AssignTaskRequest(task="Ask Mio if she wants to study together"),
         FakePlanningPipeline(target_ids=["cit_022"], location_id="loc_library"),
     )
     citizen = db.get(CitizenORM, "cit_009")
 
     assert len(state.citizens) == 26
-    assert citizen.current_activity == "Task: Ask Iris if she wants to study together"
+    assert citizen.current_activity == "Task: Ask Mio if she wants to study together"
     assert citizen.personality["player_task"]["status"] == "active"
     assert citizen.short_term_goals[0].startswith("Player task:")
     assert db.query(MemoryORM).filter(MemoryORM.citizen_id == "cit_009").count() >= 2
@@ -136,7 +136,7 @@ def test_recent_events_hide_inactive_citizen_history():
                 game_minute=480,
                 event_type="social_opportunity",
                 actors=["cit_009", "cit_010"],
-                description="Ava Singh and Mateo Garcia talk after class.",
+                description="Aoi Takahashi and Ren Ishikawa talk after class.",
             ),
             CityEventORM(
                 event_id="evt_mixed_inactive",
@@ -144,7 +144,7 @@ def test_recent_events_hide_inactive_citizen_history():
                 game_minute=480,
                 event_type="social_opportunity",
                 actors=["cit_009", "cit_002"],
-                description="Ava Singh and inactive Milo Chen talk after class.",
+                description="Aoi Takahashi and inactive Milo Ito talk after class.",
             ),
         ]
     )
@@ -168,7 +168,7 @@ def test_city_conversations_endpoint_filters_inactive_history():
                 game_minute=540,
                 actor_ids=["cit_009", "cit_010"],
                 transcript=[{"speaker_id": "cit_009", "text": "Want to study later?"}],
-                summary="Ava and Mateo make a study plan.",
+                summary="Aoi and Ren make a study plan.",
             ),
             ConversationORM(
                 conversation_id="conv_mixed_inactive",
@@ -231,7 +231,7 @@ def test_manual_task_runs_then_autopauses_when_completed():
     assigned = engine.assign_task(
         db,
         "cit_009",
-        AssignTaskRequest(task="Talk with Mateo about the science project"),
+        AssignTaskRequest(task="Talk with Ren about the science project"),
         FakeTaskCognition(target_ids=["cit_010"], location_id="loc_school"),
     )
 
@@ -260,7 +260,7 @@ def test_close_task_stops_manual_task_run():
     engine.assign_task(
         db,
         "cit_009",
-        AssignTaskRequest(task="Ask Iris how she is feeling"),
+        AssignTaskRequest(task="Ask Mio how she is feeling"),
         FakePlanningPipeline(target_ids=["cit_022"], location_id="loc_school"),
     )
 
@@ -297,7 +297,7 @@ def test_companion_location_task_coordinates_then_travels():
     engine.assign_task(
         db,
         "cit_009",
-        AssignTaskRequest(task="Go to the Bank along with Mateo"),
+        AssignTaskRequest(task="Go to the Bank along with Ren"),
         FakeTaskCognition(target_ids=["cit_010"], location_id="loc_bank", task_kind="go_with_citizen"),
     )
     actor = db.get(CitizenORM, "cit_009")
@@ -320,18 +320,18 @@ def test_companion_location_task_coordinates_then_travels():
 
 def test_task_alignment_flags_stale_topic_leakage():
     client = CitizenCognitionClient(Settings(database_url="sqlite+pysqlite:///:memory:"))
-    speaker = {"name": "Ava Singh"}
-    listener = {"name": "Iris Novak"}
+    speaker = {"name": "Aoi Takahashi"}
+    listener = {"name": "Mio Fujimoto"}
 
     assert client._line_is_off_task(
-        "Hi Iris, did you catch who won the World Cup?",
-        "Go to the Bank along with Iris.",
+        "Hi Mio, did you catch who won the World Cup?",
+        "Go to the Bank along with Mio.",
         speaker,
         listener,
     )
     assert not client._line_is_off_task(
-        "Hey Iris, should we head to the bank together now?",
-        "Go to the Bank along with Iris.",
+        "Hey Mio, should we head to the bank together now?",
+        "Go to the Bank along with Mio.",
         speaker,
         listener,
     )
@@ -340,10 +340,10 @@ def test_task_alignment_flags_stale_topic_leakage():
 def test_unknown_named_person_is_not_substituted_with_available_citizen():
     client = CitizenCognitionClient(Settings(database_url="sqlite+pysqlite:///:memory:"))
     citizens = [
-        {"citizen_id": "cit_009", "name": "Ava Singh", "is_actor": True},
-        {"citizen_id": "cit_021", "name": "Noah Mensah", "is_actor": False},
+        {"citizen_id": "cit_009", "name": "Aoi Takahashi", "is_actor": True},
+        {"citizen_id": "cit_021", "name": "Riku Hayashi", "is_actor": False},
     ]
     locations = [{"location_id": "loc_bank", "name": "Bank", "type": "bank"}]
 
-    assert client._unavailable_named_people("Reach out to Sophie and ask how was her day", citizens, locations) == ["Sophie"]
-    assert client._known_people_mentioned("Talk to Noah at home to ask how the day was", citizens)
+    assert client._unavailable_named_people("Reach out to Hana and ask how was her day", citizens, locations) == ["Hana"]
+    assert client._known_people_mentioned("Talk to Riku at home to ask how the day was", citizens)

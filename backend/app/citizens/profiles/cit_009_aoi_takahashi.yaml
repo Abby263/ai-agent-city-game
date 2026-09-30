@@ -1,0 +1,122 @@
+citizen_id: cit_009
+name: Aoi Takahashi
+age: 20
+profession: Lab assistant
+active: true
+work_location_id: loc_lab
+position:
+  - 3
+  - 3
+money: 820
+health: 90
+hunger: 35
+energy: 80
+stress: 24
+happiness: 72
+reputation: 56
+skills:
+  - science
+  - debate
+mood: Curious
+personality:
+  nature:
+    traits:
+      - Curious
+      - Earnest
+      - Impatient
+    values: Being reliable and understanding why things work.
+    voice: Asks specific questions; sometimes jumps to a solution before listening.
+    sensitivity: Being dismissed as bossy after trying to help; a promise left vague.
+    repair: Listens without fixing, admits when she rushed, and follows through.
+  playable: true
+  openness: 82
+  conscientiousness: 68
+  warmth: 74
+  risk_tolerance: 42
+  identity:
+    nationality: Japanese
+    hometown: Tokyo, Japan
+    former_names:
+      - Ava Singh
+  appearance:
+    shirt: "#e8e9e3"
+    skin: "#d6ac8b"
+    hair: "#292a2c"
+    background: "#dce4df"
+    hairstyle: bob
+    outfit: coat
+    trousers: "#41484e"
+    shoes: "#eeeae2"
+    glasses: false
+current_thought: Dr. Ito called my data table 'promising'. I want to know what he really meant.
+short_term_goals:
+  - Ask one friend how they are really doing
+  - Finish the reagent inventory at the lab
+long_term_goals:
+  - Build a real friendship circle in Nakameguro
+  - Get into a graduate research programme
+memory_summary: I'm twenty and work as a lab assistant at the Meguro Science Lab while I save for a master's degree. I love science and a good debate. I want to be someone people can rely on, but I sometimes offer help before listening. I still live with my mum, Kaori.
+friend_ids:
+  - cit_010
+  - cit_021
+relationship_scores:
+  cit_010: 42
+  cit_021: 42
+  cit_022: 42
+  cit_026: 42
+relationships:
+  - other_citizen_id: cit_010
+    trust: 36
+    warmth: 38
+    familiarity: 18
+    notes: They grew up together in Nakameguro and went to the same school; they can become closer through repeated conversations.
+  - other_citizen_id: cit_021
+    trust: 36
+    warmth: 38
+    familiarity: 18
+    notes: They grew up together in Nakameguro and went to the same school; they can become closer through repeated conversations.
+  - other_citizen_id: cit_022
+    trust: 36
+    warmth: 38
+    familiarity: 18
+    notes: They grew up together in Nakameguro and went to the same school; they can become closer through repeated conversations.
+  - other_citizen_id: cit_026
+    trust: 36
+    warmth: 38
+    familiarity: 18
+    notes: They grew up together in Nakameguro and went to the same school; they can become closer through repeated conversations.
+seed_memories:
+  - memory_id: mem_seed_cit_009
+    content: I enjoy science and debate and feel good when I can help someone understand something.
+  - memory_id: mem_student_arc_cit_009
+    content: I want friendships built on listening and keeping promises, not just knowing everyone's name.
+    importance: 0.72
+    salience: 0.7
+life:
+  sex: female
+  birthday_in_days: 4
+  height_cm: 162
+  weight_kg: 54
+  fitness: 55
+  household_id: home_b
+  parent_ids:
+    - cit_033
+  ambition:
+    goal: Get into a graduate research programme
+    kind: study
+    progress: 30
+  conditions: []
+  job:
+    title: Lab assistant
+    location_id: loc_lab
+    hourly_wage: 17
+    start: 540
+    end: 1050
+    workdays:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+  relationship_status: single
+  wants_children: false

@@ -75,7 +75,7 @@ test("rival picks a target through its agent rather than a fixed voter order", a
   await sessionTick(async () => { throw new Error("Only planning this tick"); }, async (request) => {
     assert.equal(request.citizen.citizen_id, "cit_010");
     assert.equal(request.purpose, "campaign");
-    return { ...decision, target_id: "cit_028", intention: "Ask Zara about a robotics club." };
+    return { ...decision, target_id: "cit_028", intention: "Ask Rin about a robotics club." };
   });
   assert.equal(currentElection(getSessionCity()!)?.agenda?.target_id, "cit_028");
 });
@@ -92,12 +92,12 @@ test("an AI campaign conversation is witnessed and remembered before voting", as
   const city = getSessionCity()!;
   city.clock.tick = 5;
   for (const citizen of city.citizens) { citizen.x = citizen.target_x = 6; citizen.y = citizen.target_y = 5; }
-  currentElection(city)!.agenda = { candidate_id: "cit_010", target_id: "cit_021", intention: "Ask Noah how an art club could include sports." };
+  currentElection(city)!.agenda = { candidate_id: "cit_010", target_id: "cit_021", intention: "Ask Riku how an art club could include sports." };
   saveSessionCity(city);
   const next = await sessionTick(async (request) => {
     assert.equal(request.actor_id, "cit_010"); assert.equal(request.target_id, "cit_021");
-    return { thought: "Listen to Noah", mood: "Curious", memory: "We discussed an art club.", reflection: "Sport can bring people together.", importance: .7,
-      participant_memories: { cit_010: "Noah suggested drawing sports stories.", cit_021: "Mateo asked how art could include sports." },
+    return { thought: "Listen to Riku", mood: "Curious", memory: "We discussed an art club.", reflection: "Sport can bring people together.", importance: .7,
+      participant_memories: { cit_010: "Riku suggested drawing sports stories.", cit_021: "Ren asked how art could include sports." },
       conversation: { conversation_id: "campaign-conversation", game_day: 1, game_minute: 375, location_id: "loc_homes", actor_ids: ["cit_010", "cit_021"],
         transcript: [{ speaker_id: "cit_010", text: "How could art include sports?" }, { speaker_id: "cit_021", text: "We could draw sports stories." }], summary: "An art and sport proposal." } };
   }, async () => { throw new Error("Already planned"); });
@@ -106,7 +106,7 @@ test("an AI campaign conversation is witnessed and remembered before voting", as
   assert.equal(sessionConversations()[0].conversation_id, "campaign-conversation");
   await sessionElectionPhase("vote");
   await sessionNextBallot(async (request) => {
-    assert.ok(request.memories.join(" ").includes("Noah suggested drawing sports stories."));
+    assert.ok(request.memories.join(" ").includes("Riku suggested drawing sports stories."));
     return decision;
   });
 });

@@ -64,7 +64,7 @@ const citizen = (id = actorId) => getSessionCity()!.citizens.find((c) => c.citiz
 const task = () => citizen().personality.player_task as { task: string; status: string; target_citizen_ids: string[] };
 const plan: SessionTaskPlanResponse = {
   task_kind: "targeted_talk", target_citizen_ids: [targetId], location_id: "loc_homes",
-  reasoning_summary: "Ask the other resident", player_visible_plan: "Talk with Mateo.",
+  reasoning_summary: "Ask the other resident", player_visible_plan: "Talk with Ren.",
 };
 const decision: ElectionDecision = {
   platform: "More public gardens.", target_id: null, intention: "Ask about local needs.",
@@ -88,7 +88,7 @@ function response(request: SessionCognitionRequest): SessionCognitionResponse {
 }
 const talk = async (request: SessionCognitionRequest) => response(request);
 const noTalk = async (): Promise<SessionCognitionResponse> => { throw new Error("Unexpected cognition call"); };
-const assign = (text = "Discuss today's plans with Mateo") => sessionAssignTask(actorId, { task: text }, async () => plan);
+const assign = (text = "Discuss today's plans with Ren") => sessionAssignTask(actorId, { task: text }, async () => plan);
 const startElection = () => sessionStartElectionAuto(actorId, targetId, async () => decision);
 
 test("task target normalization removes self, missing residents and duplicates", async () => {
@@ -102,7 +102,7 @@ test("task target normalization removes self, missing residents and duplicates",
 for (const badPlan of [null, {}, { ...plan, target_citizen_ids: null }]) {
   test(`malformed task plan ${JSON.stringify(badPlan)} blocks without inventing a task memory`, async () => {
     const before = sessionMemories(actorId);
-    await sessionAssignTask(actorId, { task: "Talk with Mateo" }, async () => badPlan as unknown as SessionTaskPlanResponse);
+    await sessionAssignTask(actorId, { task: "Talk with Ren" }, async () => badPlan as unknown as SessionTaskPlanResponse);
     assert.equal(task().status, "blocked");
     assert.deepEqual(sessionMemories(actorId), before);
     assert.equal(getSessionCity()!.clock.running, false);
@@ -117,20 +117,20 @@ for (const settle of ["resolve", "reject"] as const) {
     const pending = sessionTick((r) => { request = r; return gate.promise; });
     assert.ok(request, "task cognition actually started");
     await sessionCloseTask(actorId);
-    await assign("Discuss the new plan with Mateo");
+    await assign("Discuss the new plan with Ren");
     const before = snapshot();
     if (settle === "resolve") gate.resolve(response(request));
     else gate.reject(new Error("Late task service failure"));
     await pending;
     assert.deepEqual(snapshot(), before, "old response cannot alter any persisted key");
-    assert.equal(task().task, "Discuss the new plan with Mateo");
+    assert.equal(task().task, "Discuss the new plan with Ren");
     assert.equal(task().status, "active");
   });
 }
 
 test("repeated task assignment and close keep goals and event buffers bounded", async () => {
   for (let i = 0; i < 45; i++) {
-    await assign(`Discuss plan ${i} with Mateo`);
+    await assign(`Discuss plan ${i} with Ren`);
     assert.equal(citizen().short_term_goals.filter((g) => g.startsWith("Player task:")).length, 1);
     await sessionCloseTask(actorId);
     assert.equal(task().status, "closed");
@@ -177,8 +177,8 @@ const reading = (overrides: Partial<ActInterpretation>) => async (): Promise<Act
   tone: "neutral", intensity: 1, harm: 0, money: 0, proposal: "none", closes_location: false, reaction: "What just happened.", target_memory: "", ...overrides,
 });
 const acts: Array<[string, string | null, string | null, string, Partial<ActInterpretation>]> = [
-  ["a gift", actorId, targetId, "gives Mateo a small wrapped gift", { tone: "warm", money: 20, headline: "Ava gave Mateo a small gift." }],
-  ["a shove", actorId, targetId, "shoves Mateo", { tone: "hostile", harm: 1, headline: "Ava shoved Mateo." }],
+  ["a gift", actorId, targetId, "gives Ren a small wrapped gift", { tone: "warm", money: 20, headline: "Aoi gave Ren a small gift." }],
+  ["a shove", actorId, targetId, "shoves Ren", { tone: "hostile", harm: 1, headline: "Aoi shoved Ren." }],
   ["a burst pipe", null, null, "a water pipe bursts at the homes", { tone: "tense", closes_location: true, location_id: "loc_homes", headline: "A water pipe burst at Aobadai Homes." }],
 ];
 const waitFor = async (ready: () => unknown) => { for (let i = 0; !ready() && i < 200; i++) await new Promise((resolve) => setTimeout(resolve, 0)); };
@@ -230,7 +230,7 @@ for (const controlled of [false, true]) {
       const money = citizen().money;
       const gate = deferred<SessionCognitionResponse>();
       let request: SessionCognitionRequest | undefined;
-      const pending = sessionAct(actorId, targetId, "gives Mateo a small gift", reading({ tone: "warm", money: 20 }), (r) => { request = r; return gate.promise; });
+      const pending = sessionAct(actorId, targetId, "gives Ren a small gift", reading({ tone: "warm", money: 20 }), (r) => { request = r; return gate.promise; });
       await waitFor(() => request);
       assert.equal(citizen().money, money - 20, "effects intentionally commit before the optional reaction");
       await sessionPause();
@@ -249,8 +249,8 @@ test("gifts never overspend: the giver hands over only what they have", async ()
   city.citizens.find((c) => c.citizen_id === actorId)!.money = 30;
   saveSessionCity(city);
   const receiver = citizen(targetId).money;
-  await sessionAct(actorId, targetId, "gives Mateo $20", reading({ tone: "warm", money: 20 }), async (r) => response(r));
-  await sessionAct(actorId, targetId, "gives Mateo another $20", reading({ tone: "warm", money: 20 }), async (r) => response(r));
+  await sessionAct(actorId, targetId, "gives Ren $20", reading({ tone: "warm", money: 20 }), async (r) => response(r));
+  await sessionAct(actorId, targetId, "gives Ren another $20", reading({ tone: "warm", money: 20 }), async (r) => response(r));
   assert.equal(citizen().money, 0);
   assert.equal(citizen(targetId).money, receiver + 30);
 });
@@ -269,7 +269,7 @@ for (const [label, corrupt] of malformedReplies) {
   test(`malformed reaction: ${label} leaves no partial cognition writes`, async () => {
     await sessionTakeControl(actorId);
     let before!: ReturnType<typeof snapshot>;
-    const result = await sessionAct(actorId, targetId, "waves at Mateo", reading({}), async (request) => {
+    const result = await sessionAct(actorId, targetId, "waves at Ren", reading({}), async (request) => {
       before = snapshot();
       return corrupt(response(request)) as SessionCognitionResponse;
     });

@@ -1,3 +1,7 @@
 {
-  "residents": {}
+  "residents": {
+    "cit_009": { "file": "cit_009.glb" },
+    "cit_010": { "file": "cit_010.glb" },
+    "cit_026": { "file": "cit_026.glb" }
+  }
 }
