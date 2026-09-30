@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Art } from "./materials";
 import { makeTown } from "./town";
+import { HumanLibrary } from "./human";
 import { CitizenModel } from "./citizen";
 import { PostPipeline } from "./post";
 import { FrameMonitor, initialQuality, lowerQuality, type QualityPreset } from "./quality";
@@ -50,6 +51,10 @@ export class CityRenderer {
   /** How dark it is right now (0 day .. 1 night), for bloom and the immediate redraw after a resize. */
   private night = 0;
   private readonly people = new Map<string, CitizenModel>();
+  // Realistic bodies are downloaded only for residents you can see up close.
+  private readonly humans = new HumanLibrary();
+  private readonly humanRequested = new Set<string>();
+  private nextHumanCheck = 0;
   private readonly names = document.createElement("div");
   private readonly signs: Array<{
     element: HTMLElement;
@@ -332,6 +337,20 @@ export class CityRenderer {
     for (const key of ["ground", "ground-east"]) this.art.materials.get(key)?.color.copy(this.tint);
     this.shake.copy(fx.offset);
   }
+  private loadNearbyHumans() {
+    const reach = this.quality.level === "high" ? 30 : this.quality.level === "medium" ? 18 : 0;
+    for (const [id, model] of this.people) {
+      if (this.humanRequested.has(id)) continue;
+      const near = model.root.position.distanceTo(this.controls.target) < reach;
+      if (!near && id !== this.selected && !this.conversation?.actorIds.includes(id)) continue;
+      this.humanRequested.add(id);
+      void this.humans.load(id).then((human) => {
+        if (!human) return;
+        if (!this.alive || this.people.get(id) !== model) return human.dispose();
+        model.attachHuman(human);
+      });
+    }
+  }
   private captureSky(gloom: number) {
     this.envMinute = this.displayMinute;
     this.envGloom = gloom;
@@ -593,6 +612,10 @@ export class CityRenderer {
       model.root.visible = !indoors && (!this.conversation || this.conversation.phase === "arrival" || participant);
       model.update(dt, this.reducedMotion.matches);
       if (model.root.visible) pedestrians.push(model.root.position);
+    }
+    if (this.seconds >= this.nextHumanCheck) {
+      this.nextHumanCheck = this.seconds + 1;
+      this.loadNearbyHumans();
     }
     this.light(dt);
     const stormy = this.weather?.condition === "typhoon";

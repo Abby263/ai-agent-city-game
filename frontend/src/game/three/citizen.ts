@@ -5,6 +5,7 @@ import { appearanceFor } from "@/lib/appearance";
 import { activityIcon } from "@/lib/activity-icon";
 import type { Point } from "./layout";
 import { armPose, emotionOf, gestureFor, lineEmotion, listenPoseFor, type Emotion, type Gesture } from "./expression";
+import type { Human } from "./human";
 
 const NECK = 1.16;
 
@@ -47,6 +48,10 @@ export class CitizenModel {
   lookAt: THREE.Vector3 | null = null;
   /** After a conversation, stay put here until the resident's plans change. */
   hold: { locationId: string; point: Point } | null = null;
+  /** A realistic body (MetaHuman) standing in for the simple figure, when one has been loaded. */
+  private human: Human | null = null;
+  private readonly figure: THREE.Object3D[] = [];
+  private heightScale = 1;
 
   constructor(
     public citizen: CitizenAgent,
@@ -123,6 +128,7 @@ export class CitizenModel {
     }
     this.belly = art.ball(this.body, 0, 0.74, 0.14, 0.2, 0.2, 0.18, colors.shirt);
     this.belly.visible = false;
+    this.figure.push(...this.body.children);
     // A folding umbrella, opened when it rains and the resident is outside.
     const canopy = new THREE.Mesh(art.geometry(new THREE.ConeGeometry(0.62, 0.32, 8, 1, true)),
       art.material([0xd8473c, 0x3f7fc2, 0xf2d24b, 0x3a9a6b, 0xe8e6df, 0x8d6fb5][citizen.citizen_id.charCodeAt(citizen.citizen_id.length - 1) % 6]));
@@ -163,9 +169,11 @@ export class CitizenModel {
     const life = citizen.life;
     if (life) {
       // The model is drawn at a 155 cm teenager's size; scale to real height and build.
-      const scale = Math.max(0.36, life.height_cm / 155);
+      const scale = (this.heightScale = Math.max(0.36, life.height_cm / 155));
       const build = Math.min(1.35, Math.max(0.85, life.weight_kg / (life.height_cm / 100) ** 2 / 20));
-      this.body.scale.set(scale * build, scale, scale * Math.min(1.2, build));
+      // A real body already has its own build; stretching it would distort the face.
+      if (this.human) this.body.scale.setScalar(scale);
+      else this.body.scale.set(scale * build, scale, scale * Math.min(1.2, build));
       this.labelLift = 1.9 * scale + 0.1;
       this.belly.visible = Boolean(life.pregnancy);
       this.walkSpeed = citizen.age >= 75 ? 2.2 : citizen.age >= 65 ? 2.6 : 3.2;
@@ -177,7 +185,15 @@ export class CitizenModel {
     this.label.title = `${citizen.name}: ${citizen.current_activity}`;
     this.label.setAttribute("aria-label", `Select ${citizen.name} on map, ${citizen.current_activity}`);
   }
-  setUmbrella(open: boolean) {
+  /** Swaps the simple figure for a realistic body; the nameplate, ring, walking and look-at logic stay. */
+  attachHuman(human: Human) {
+    this.human?.dispose();
+    this.human = human;
+    for (const part of this.figure) part.visible = false;
+    this.body.add(human.root);
+    this.body.scale.setScalar(this.heightScale);
+  }
+    setUmbrella(open: boolean) {
     this.umbrella.visible = open;
   }
   select(selected: boolean) {
@@ -279,8 +295,19 @@ export class CitizenModel {
     this.ring.scale.setScalar(
       this.selected && !reducedMotion ? 1 + Math.sin(this.phase) * 0.025 : 1,
     );
+    // The realistic body mirrors the simple rig: same stride, gestures, head turns, blinks and voice.
+    this.human?.pose({
+      legs: [this.limbs[0].rotation.x, this.limbs[1].rotation.x],
+      arms: [[this.limbs[2].rotation.x, this.limbs[2].rotation.z], [this.limbs[3].rotation.x, this.limbs[3].rotation.z]],
+      head: { yaw: this.head.rotation.y, pitch: this.head.rotation.x, tilt: this.head.rotation.z },
+      lean: { x: 0, z: 0 },
+      blink: closed,
+      voice,
+      emotion,
+    }, dt);
   }
   dispose() {
+    this.human?.dispose();
     this.label.remove();
     (this.ring.material as THREE.Material).dispose();
     this.root.removeFromParent();
