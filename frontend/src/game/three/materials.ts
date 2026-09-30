@@ -11,6 +11,8 @@ export class Art {
   readonly geometries: THREE.BufferGeometry[] = [];
   readonly unitBox = this.geometry(new THREE.BoxGeometry(1, 1, 1));
   readonly sphere = this.geometry(new THREE.IcosahedronGeometry(1, 1));
+  // Smooth facial silhouettes without multiplying geometry allocations per resident.
+  readonly humanSphere = this.geometry(new THREE.SphereGeometry(1, 16, 12));
   readonly ramp: THREE.DataTexture;
 
   constructor() {

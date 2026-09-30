@@ -42,15 +42,15 @@ test("player weather overrides and real Tokyo codes map to conditions", () => {
 
 test("weather changes where people go", () => {
   const city = createInitialCity();
-  const resident = city.citizens.find((c) => c.name.startsWith("Eliot"))!;
+  const resident = city.citizens.find((c) => c.name.startsWith("Kaito"))!;
   resident.skills = ["biology"];
-  const dry = routineStop(resident, 2, 660, {}); // Tuesday is Eliot's day off.
+  const dry = routineStop(resident, 2, 660, {}); // Tuesday is Kaito's day off.
   assert.equal(dry.location_id, "loc_park");
   assert.equal(routineStop(resident, 2, 660, { weather: { condition: "rain", heatwave: false } }).location_id, "loc_mall");
   assert.match(routineStop(resident, 2, 660, { weather: { condition: "snow", heatwave: false } }).activity, /warm at home/);
-  const priya = city.citizens.find((c) => c.name.startsWith("Priya"))!;
+  const priya = city.citizens.find((c) => c.name.startsWith("Kaori"))!;
   assert.equal(routineStop(priya, 1, 600, { weather: { condition: "typhoon", heatwave: false } }).location_id, "loc_hospital");
-  const wei = city.citizens.find((c) => c.name.startsWith("Wei"))!;
+  const wei = city.citizens.find((c) => c.name.startsWith("Naoki"))!;
   assert.match(routineStop(wei, 1, 600, { weather: { condition: "typhoon", heatwave: false } }).activity, /typhoon/);
   assert.match(routineStop(wei, 1, 600, { publicHoliday: true }).location_id, /loc_homes|loc_market|loc_gym/);
   assert.equal(routineStop(priya, 1, 600, { evacuating: true }).location_id, "loc_school");

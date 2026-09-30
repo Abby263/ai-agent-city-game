@@ -7,8 +7,8 @@ home_location_id: loc_apartments
 current_location_id: loc_apartments
 work_location_id: loc_mall
 position:
-- 55
-- 5
+  - 55
+  - 5
 money: 2400
 health: 92
 hunger: 30
@@ -21,32 +21,41 @@ mood: Easygoing
 personality:
   nature:
     traits:
-    - Easygoing
-    - Generous
-    - Disorganised
+      - Easygoing
+      - Generous
+      - Disorganised
     values: Good vibes, fair treatment for his staff, and travel.
     voice: Relaxed, friendly, always mentions the food court.
     sensitivity: Being thought of as lazy; conflict at work.
     repair: Apologises with a big grin and a plan.
   appearance:
-    skin: '#e3b58f'
-    hair: '#4a3a30'
-    shirt: '#6f93c9'
-    background: '#dde6f2'
+    skin: "#e3bfa2"
+    hair: "#40342e"
+    shirt: "#6e7f80"
+    background: "#dfe4ea"
+    hairstyle: crop
+    outfit: jacket
+    trousers: "#55515d"
+    shoes: "#eeeae2"
+    glasses: false
   playable: true
+  identity:
+    nationality: Japanese
+    hometown: Tokyo, Japan
+    former_names: []
 current_thought: The woman from GT Tower buys the same matcha latte every day. Should I say hi?
 short_term_goals:
-- Fix the broken escalator
-- Say hi to Yui properly
+  - Fix the broken escalator
+  - Say hi to Yui properly
 long_term_goals:
-- Travel around the world
+  - Travel around the world
 memory_summary: I manage Kokashita Arcade. I'm saving up to travel the world. I keep noticing Yui from GT Tower at the food court.
 relationship_scores:
   cit_043: 55
 seed_memories:
-- memory_id: mem_seed_cit_044
-  content: I manage Kokashita Arcade. I'm saving up to travel the world. I keep noticing Yui from GT Tower at the food court.
-  importance: 0.8
+  - memory_id: mem_seed_cit_044
+    content: I manage Kokashita Arcade. I'm saving up to travel the world. I keep noticing Yui from GT Tower at the food court.
+    importance: 0.8
 life:
   sex: male
   birthday_in_days: 190
@@ -65,12 +74,12 @@ life:
     start: 600
     end: 1140
     workdays:
-    - 0
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
+      - 0
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
   ambition:
     goal: Save $8,000 to travel around the world
     kind: money

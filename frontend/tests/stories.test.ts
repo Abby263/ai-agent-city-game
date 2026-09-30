@@ -77,7 +77,7 @@ test("a situation starts a story and the people involved react straight away", a
 
 test("an election from Create runs its campaign and ends with a winner in the story", async () => {
   const city = getSessionCity()!;
-  const [ava, noah] = ["Ava", "Noah"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
+  const [ava, noah] = ["Aoi", "Riku"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
   const decide: DecideElection = async (request) => ({
     platform: request.purpose === "platform" ? `${request.citizen.name} will fix the vending machines.` : "",
     target_id: request.purpose === "campaign" ? request.residents.find((r) => ![ava, noah].includes(r.citizen_id))!.citizen_id : null,
@@ -91,12 +91,12 @@ test("an election from Create runs its campaign and ends with a winner in the st
   const story = (done.stories ?? []).find((s) => s.kind === "election")!;
   assert.ok(story.beats.some((b) => b.icon === "📣"), "platforms are in the story");
   assert.ok(story.beats.some((b) => b.conversation_id), "campaign conversations are in the story");
-  assert.ok(story.beats.some((b) => b.icon === "🏆" && /Ava Singh won/.test(b.text)));
+  assert.ok(story.beats.some((b) => b.icon === "🏆" && /Aoi Takahashi won/.test(b.text)));
 });
 
 test("a tied election is settled by drawing lots", async () => {
   const city = getSessionCity()!;
-  const [ava, noah] = ["Ava", "Noah"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
+  const [ava, noah] = ["Aoi", "Riku"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
   const voters = city.citizens.map((c) => c.citizen_id);
   assert.equal(voters.length, 26);
   const decide: DecideElection = async (request) => ({
@@ -116,10 +116,10 @@ test("a tied election is settled by drawing lots", async () => {
 
 test("the resident you play casts their own ballot, and the election waits for it", async () => {
   const city = getSessionCity()!;
-  const [ava, noah, iris] = ["Ava", "Noah", "Iris"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
+  const [ava, noah, iris] = ["Aoi", "Riku", "Mio"].map((name) => city.citizens.find((c) => c.name.startsWith(name))!.citizen_id);
   await sessionTakeControl(iris);
   const decide: DecideElection = async (request) => ({
-    platform: "More clubs.", target_id: request.purpose === "campaign" ? iris : null, intention: "Win Iris over", reason: "Kind.", mood: "Calm",
+    platform: "More clubs.", target_id: request.purpose === "campaign" ? iris : null, intention: "Win Mio over", reason: "Kind.", mood: "Calm",
     vote_for: request.purpose === "vote" ? (request.citizen.citizen_id === iris ? noah : ava) : null,
   });
   await sessionStartElectionAuto(ava, noah, decide);

@@ -110,7 +110,16 @@ export function seedSession(city: CityState) {
     const arrivals = city.citizens.filter((c) => !known.has(c.citizen_id));
     let natureChanged = false;
     for (const resident of existing.citizens) {
-      const nature = city.citizens.find((c) => c.citizen_id === resident.citizen_id)?.personality.nature;
+      const profile = city.citizens.find((c) => c.citizen_id === resident.citizen_id);
+      const nature = profile?.personality.nature;
+      if (profile && (resident.name !== profile.name ||
+        JSON.stringify(resident.personality.appearance) !== JSON.stringify(profile.personality.appearance) ||
+        JSON.stringify(resident.personality.identity) !== JSON.stringify(profile.personality.identity))) {
+        // Identity/art are profile-owned. Never reset journals, scores, tasks or player-written prompts.
+        resident.name = profile.name;
+        resident.personality = { ...resident.personality, appearance: clone(profile.personality.appearance ?? {}), identity: clone(profile.personality.identity ?? {}) };
+        natureChanged = true;
+      }
       if (nature && JSON.stringify(resident.personality.nature) !== JSON.stringify(nature)) {
         // Only profile-owned nature changes; preserve tasks, learned memories and current emotions.
         resident.personality = { ...resident.personality, nature: clone(nature) };
@@ -1286,7 +1295,7 @@ export type InterpretAct = (request: ActRequest) => Promise<ActInterpretation>;
 export type ActResult = { city: CityState; headline: string; talked: boolean; story_id: string; error?: string };
 
 /**
- * Anything the player writes, with no fixed list of actions: "Tom asks Maya to move in", "Kenji finds Haruto's
+ * Anything the player writes, with no fixed list of actions: "Takashi asks Natsumi to move in", "Kenji finds Haruto's
  * sketchbook", or, with nobody acting, "a water pipe bursts at the library". The words are interpreted, capped
  * effects applied, the story tracked, and the people involved react in their own words. A relationship step
  * (a date, an engagement, moving in) happens only if the person asked says yes in that reaction.

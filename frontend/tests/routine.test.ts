@@ -22,13 +22,13 @@ test("residents do not all move in lockstep", () => {
 });
 
 test("hobbies follow each resident's skills", () => {
-  assert.equal(hobbyStop(byName("Ava")).location_id, "loc_lab");
-  assert.equal(hobbyStop(byName("Eliot")).location_id, "loc_farm");
+  assert.equal(hobbyStop(byName("Aoi")).location_id, "loc_lab");
+  assert.equal(hobbyStop(byName("Kaito")).location_id, "loc_farm");
   assert.equal(hobbyStop({ skills: [] }).location_id, "loc_park");
 });
 
 test("young adults go to their own jobs and keep hobbies on days off", () => {
-  const ava = byName("Ava");
+  const ava = byName("Aoi");
   assert.equal(routineStop(ava, 1, 600).activity, "Working as lab assistant");
   const saturday = routineStop(ava, 6, 600);
   assert.notEqual(saturday.location_id, "loc_school");
@@ -37,10 +37,10 @@ test("young adults go to their own jobs and keep hobbies on days off", () => {
 });
 
 test("hobbies fit around shifts instead of replacing work", () => {
-  const eliot = byName("Eliot");
+  const eliot = byName("Kaito");
   assert.equal(routineStop(eliot, 1, 960).location_id, "loc_mall");
   assert.equal(routineStop(eliot, 2, 960).location_id, "loc_farm");
-  const ava = byName("Ava");
+  const ava = byName("Aoi");
   assert.equal(routineStop(ava, 1, 1125).activity, hobbyStop(ava).activity);
   const sakura = byName("Sakura");
   assert.equal(hobbyStop(sakura).location_id, "loc_restaurant");
@@ -52,7 +52,7 @@ test("nameplate icons describe what residents are doing", async () => {
   const { activityIcon } = await import("../src/lib/activity-icon");
   assert.equal(activityIcon("Sleeping in"), "💤");
   assert.equal(activityIcon("Attend school"), "📚");
-  assert.equal(activityIcon("Going to talk with Noah"), "💬");
+  assert.equal(activityIcon("Going to talk with Riku"), "💬");
   assert.equal(activityIcon("Walking to Library"), "🚶");
   assert.equal(activityIcon("Helping in the Sunny Side Cafe kitchen"), "🍳");
   assert.equal(activityIcon("Something new"), "✨");

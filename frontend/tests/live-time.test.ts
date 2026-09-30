@@ -25,7 +25,7 @@ test("a live world catches up with real time, living through the missed days", a
   const synced = await sessionSyncToRealTime(now);
   assert.equal(synced.clock.day, 6);
   assert.equal(synced.clock.minute_of_day, 840);
-  assert.ok(synced.citizens.find((c) => c.name.startsWith("Eliot"))!.age === 21, "Eliot's birthday on day 3 happened while away");
+  assert.ok(synced.citizens.find((c) => c.name.startsWith("Kaito"))!.age === 21, "Kaito's birthday on day 3 happened while away");
   assert.ok(synced.life_log?.some((e) => e.kind === "time_skip"));
   assert.ok(synced.weather, "weather is current");
   assert.ok(Math.abs(minutesBehindRealTime(synced, now)) < 15);

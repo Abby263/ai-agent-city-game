@@ -103,7 +103,7 @@ def test_deep_agent_uses_gemini_model_and_keeps_private_tools(monkeypatch):
     monkeypatch.setattr(deepagents, "create_deep_agent", build_agent)
     DeepAgentRuntime._agent_for.cache_clear()
     runtime = DeepAgentRuntime(settings(llm_provider="gemini", gemini_api_key="test-secret"))
-    runtime.prepare_citizen_agent({"citizen_id":"test-ava", "name":"Ava", "profession":"Student"})
+    runtime.prepare_citizen_agent({"citizen_id":"test-ava", "name":"Aoi", "profession":"Student"})
     assert observed["model"]["model"] == "gemini-3.5-flash-lite"
     assert observed["model"]["max_retries"] == 0
     assert observed["agent"]["model"] == "gemini-model"

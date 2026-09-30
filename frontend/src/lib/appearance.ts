@@ -1,6 +1,25 @@
 import type { CitizenAgent } from "./types";
 
 export type Palette = { shirt: string; skin: string; hair: string; background: string };
+export type ResidentStyle = {
+  hairstyle: "crop" | "parted" | "bob" | "long" | "bun";
+  outfit: "casual" | "jacket" | "apron" | "coat";
+  trousers: string;
+  shoes: string;
+  glasses: boolean;
+};
+
+/** Shared by the map and portraits, with profile-owned wardrobe rather than ID-specific costumes. */
+export function styleFor(citizen: AppearanceSource): ResidentStyle {
+  const custom = citizen.personality?.appearance as Partial<ResidentStyle> | undefined;
+  return {
+    hairstyle: custom?.hairstyle ?? "parted",
+    outfit: custom?.outfit ?? "casual",
+    trousers: custom?.trousers ?? "#41484e",
+    shoes: custom?.shoes ?? "#eeeeea",
+    glasses: custom?.glasses ?? false,
+  };
+}
 
 export const citizenPalette: Record<string, Palette> = {
   cit_027: { shirt: "#d86f96", skin: "#edb898", hair: "#5d3630", background: "#f2d9e4" },

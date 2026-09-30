@@ -97,7 +97,7 @@ export class ConversationAudio {
     this.key = line.key;
     this.setVolume(line.volume);
     if (!spokenText(line.text)) {
-      // A pure action like *hugs Leo* has nothing to say aloud.
+      // A pure action like *hugs Sota* has nothing to say aloud.
       const version = this.version;
       this.timer = setTimeout(() => { if (version === this.version) line.onEnd(); }, 1200);
       return;

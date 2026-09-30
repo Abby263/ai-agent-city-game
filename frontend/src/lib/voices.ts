@@ -52,7 +52,7 @@ export function deliveryStyle(casting: Casting, text: string, mood = "") {
   return `${tone}, ${casting.voiceTag}`.slice(0, 120);
 }
 
-/** Words for the ear: drop stage directions like *hugs Leo*, emojis and extra symbols. */
+/** Words for the ear: drop stage directions like *hugs Sota*, emojis and extra symbols. */
 export function spokenText(text: string) {
   return text
     .replace(/\*[^*]{0,120}\*/g, " ")

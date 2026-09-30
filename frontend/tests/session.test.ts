@@ -64,18 +64,42 @@ test("v12 starts fresh without importing a v11 world, conversations or private m
   assert.ok(!sessionMemories("cit_009").some((m) => m.content.includes("OLD PRIVATE MEMORY")));
   assert.ok(storage.has("agentcity.v11.city"), "old data is left untouched, not migrated or deleted");
 });
+
+test("cast refresh preserves journals, bonds, life state and player-authored prompts", () => {
+  const original = getSessionCity()!;
+  const resident = original.citizens[0];
+  resident.name = "Previous name";
+  resident.personality.identity = {};
+  resident.personality.appearance = {};
+  resident.personality.prompt = "A private player-written persona";
+  resident.personality.prompt_edited = true;
+  resident.memory_summary = "PRIVATE: a conversation I remember";
+  resident.relationship_scores[targetId] = 76;
+  resident.money = 1234;
+  const memories = sessionMemories(actorId);
+  const relationships = sessionRelationships(actorId);
+  saveSessionCity(original);
+  const refreshed = seedSession(createInitialCity()).citizens[0];
+  assert.equal(refreshed.name, "Aoi Takahashi");
+  assert.equal(refreshed.personality.prompt, "A private player-written persona");
+  assert.equal(refreshed.memory_summary, "PRIVATE: a conversation I remember");
+  assert.equal(refreshed.relationship_scores[targetId], 76);
+  assert.equal(refreshed.money, 1234);
+  assert.deepEqual(sessionMemories(actorId), memories);
+  assert.deepEqual(sessionRelationships(actorId), relationships);
+});
 const plan: SessionTaskPlanResponse = {
   task_kind: "go_with_citizen",
   target_citizen_ids: [targetId],
   location_id: "loc_bank",
   reasoning_summary: "Ask first",
-  player_visible_plan: "Invite Mateo to the bank.",
+  player_visible_plan: "Invite Ren to the bank.",
 };
 function reply(): SessionCognitionResponse {
   return {
-    thought: "Mateo declined.",
+    thought: "Ren declined.",
     mood: "Disappointed",
-    memory: "Mateo said no.",
+    memory: "Ren said no.",
     reflection: "Respect the answer.",
     importance: 0.6,
     conversation: {
@@ -91,7 +115,7 @@ function reply(): SessionCognitionResponse {
       ],
     },
     participant_memories: {
-      [actorId]: "Mateo declined.",
+      [actorId]: "Ren declined.",
       [targetId]: "I declined.",
     },
     participant_outcomes: {
@@ -121,7 +145,7 @@ test("profile nature updates preserve learned memory, mood and active tasks", ()
 
 test("task exchanges persist directional impacts and original moods", async () => {
   const previousMood = getSessionCity()!.citizens.find((c) => c.citizen_id === actorId)!.mood;
-  await sessionAssignTask(actorId, { task: "Go to the bank with Mateo" }, async () => plan);
+  await sessionAssignTask(actorId, { task: "Go to the bank with Ren" }, async () => plan);
   const response = reply();
   response.participant_outcomes![actorId] = { mood: "Disappointed", relationship_effect: "neutral", feelings: { affection: -1, reason: "I was hoping for company." } };
   await sessionTick(async () => response);
@@ -136,7 +160,7 @@ test("task exchanges persist directional impacts and original moods", async () =
 test("a refusal never creates a companion journey", async () => {
   await sessionAssignTask(
     actorId,
-    { task: "Go to the bank with Mateo" },
+    { task: "Go to the bank with Ren" },
     async () => plan,
   );
   const city = await sessionTick(async () => reply());
@@ -154,8 +178,8 @@ test("a refusal never creates a companion journey", async () => {
   );
 });
 test("task listeners never receive the initiator's private instructions", async () => {
-  const secret = "PRIVATE_REASON: I want to compare loan fees without telling Mateo";
-  await sessionAssignTask(actorId, { task: `Go to the bank with Mateo. ${secret}` }, async () => plan);
+  const secret = "PRIVATE_REASON: I want to compare loan fees without telling Ren";
+  await sessionAssignTask(actorId, { task: `Go to the bank with Ren. ${secret}` }, async () => plan);
   let called = false;
   await sessionTick(async (request) => {
     called = true;
@@ -193,12 +217,12 @@ test("memory retrieval deduplicates experiences and recalls the listener without
     memory_id: `m${i}`, citizen_id: actorId, content: `Other recent experience ${i}`,
     created_at: "Day 1 06:00", related_citizen_id: "cit_011", extra: {},
   }));
-  const shared = { ...memories[0], content: "I gave Mateo a gift", related_citizen_id: targetId };
+  const shared = { ...memories[0], content: "I gave Ren a gift", related_citizen_id: targetId };
   storage.set(`agentcity.v12.memory.${actorId}`, JSON.stringify([...memories, shared, { ...shared, memory_id: "duplicate" }]));
   storage.set(`agentcity.v12.memory.${targetId}`, JSON.stringify([{ ...shared, citizen_id: targetId, content: "PRIVATE_MATEO_FEELING" }]));
   await sessionSpeak(targetId, "Want ramen?", async (request) => {
     const recalled = request.private_memories![actorId].join(" ");
-    assert.equal(recalled.split("I gave Mateo a gift").length - 1, 1);
+    assert.equal(recalled.split("I gave Ren a gift").length - 1, 1);
     assert.ok(!recalled.includes("PRIVATE_MATEO_FEELING"));
     assert.ok(request.private_memories![targetId].join(" ").includes("PRIVATE_MATEO_FEELING"));
     assert.ok(!recalled.includes("Other recent experience 8"), "memory window remains bounded");
@@ -210,7 +234,7 @@ test("memory retrieval deduplicates experiences and recalls the listener without
 test("pause invalidates a pending response and its memories", async () => {
   await sessionAssignTask(
     actorId,
-    { task: "Go to the bank with Mateo" },
+    { task: "Go to the bank with Ren" },
     async () => plan,
   );
   const count = sessionMemories(actorId).length;
@@ -232,7 +256,7 @@ test("pause invalidates a pending response and its memories", async () => {
 test("invalid dialogue does not create memories", async () => {
   await sessionAssignTask(
     actorId,
-    { task: "Go to the bank with Mateo" },
+    { task: "Go to the bank with Ren" },
     async () => plan,
   );
   const count = sessionMemories(actorId).length;

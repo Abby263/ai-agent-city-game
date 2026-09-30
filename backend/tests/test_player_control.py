@@ -24,12 +24,12 @@ def person(citizen_id: str, name: str, **personality) -> dict:
 
 
 def test_the_character_prompt_the_player_writes_is_what_the_resident_follows():
-    tom = person("tom", "Tom", prompt="  Grumpy in the mornings, secretly writes poetry.  ", prompt_edited=True)
+    tom = person("tom", "Takashi", prompt="  Grumpy in the mornings, secretly writes poetry.  ", prompt_edited=True)
     assert character_prompt(tom) == "Grumpy in the mornings, secretly writes poetry."
-    system = system_prompt_for("tom", "Tom", "30-year-old Barista", character_prompt(tom))
+    system = system_prompt_for("tom", "Takashi", "30-year-old Barista", character_prompt(tom))
     assert "secretly writes poetry" in system
     assert system.index("secretly writes poetry") < system.index("never contradict it"), "the character comes before the fixed rules"
-    assert "YOUR CHARACTER" not in system_prompt_for("tom", "Tom", "Barista", ""), "no prompt, no character block"
+    assert "YOUR CHARACTER" not in system_prompt_for("tom", "Takashi", "Barista", ""), "no prompt, no character block"
     assert len(character_prompt(person("x", "X", prompt="a" * 5000))) == 2400
 
 
@@ -68,15 +68,15 @@ def test_a_quick_reply_is_not_duplicated_and_errors_are_not_retried():
 def test_free_text_actions_stay_inside_the_scene():
     class Client:
         def _generate_json(self, system, prompt, schema, name):
-            assert prompt["player_wrote"] == "Tom asks Maya to move in with him"
-            return {"allowed": True, "refusal": "", "headline": "Tom asked Maya to move in with him at the cafe.",
+            assert prompt["player_wrote"] == "Takashi asks Natsumi to move in with him"
+            return {"allowed": True, "refusal": "", "headline": "Takashi asked Natsumi to move in with him at the cafe.",
                     "target_id": "invented", "involved_ids": ["tom", "maya", "ghost", "tom"], "location_id": "moon",
                     "tone": "romantic", "intensity": 3, "harm": 0, "money": 0, "proposal": "move_in",
-                    "closes_location": False, "reaction": "Tom just asked you to move in.", "target_memory": "Tom asked me to move in."}
+                    "closes_location": False, "reaction": "Takashi just asked you to move in.", "target_memory": "Takashi asked me to move in."}
 
-    request = ActRequest(kind="action", text="Tom asks Maya to move in with him", city_time="Monday 18:00",
-        actor=CitizenAgent(**person("tom", "Tom")), target=CitizenAgent(**person("maya", "Maya")),
-        people=[{"citizen_id": "tom", "name": "Tom", "age": 30, "location": "cafe"}, {"citizen_id": "maya", "name": "Maya", "age": 29, "location": "cafe"}],
+    request = ActRequest(kind="action", text="Takashi asks Natsumi to move in with him", city_time="Monday 18:00",
+        actor=CitizenAgent(**person("tom", "Takashi")), target=CitizenAgent(**person("maya", "Natsumi")),
+        people=[{"citizen_id": "tom", "name": "Takashi", "age": 30, "location": "cafe"}, {"citizen_id": "maya", "name": "Natsumi", "age": 29, "location": "cafe"}],
         places=[{"location_id": "cafe", "name": "Cafe"}])
     result = interpret(Client(), request)
     assert result.target_id == "maya", "an unknown target falls back to the one the player chose"
@@ -94,8 +94,8 @@ def api():
 
 
 def test_an_edited_prompt_gets_the_same_safety_checks_as_player_text(api):
-    body = {"kind": "action", "text": "Tom waves", "city_time": "Monday",
-            "actor": person("tom", "Tom", prompt="Call me on 555-123-4567", prompt_edited=True)}
+    body = {"kind": "action", "text": "Takashi waves", "city_time": "Monday",
+            "actor": person("tom", "Takashi", prompt="Call me on 555-123-4567", prompt_edited=True)}
     response = api.post("/cognition/act", json=body)
     assert response.status_code == 400
     assert "character prompt" in response.json()["detail"]

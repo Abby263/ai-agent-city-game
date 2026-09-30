@@ -5,13 +5,13 @@ from app.schemas import CitizenAgent
 
 
 def request():
-    return SocialDecisionRequest(citizen=CitizenAgent(citizen_id="ava", name="Ava", age=12, profession="Student",
+    return SocialDecisionRequest(citizen=CitizenAgent(citizen_id="ava", name="Aoi", age=12, profession="Student",
         home_location_id="home", work_location_id="school", current_location_id="home", x=1, y=1,
         target_x=1, target_y=1, money=40, health=90, hunger=20, energy=80, stress=10,
         happiness=75, reputation=50, current_activity="Drawing", current_thought="I want to draw.",
         memory_summary="Learning to draw", mood="Focused"),
         city_time="Day 1, 06:00", location="Homes", memories=["I am learning to draw."],
-        nearby=[{"citizen_id": "noah", "name": "Noah", "activity": "Eating breakfast"}])
+        nearby=[{"citizen_id": "noah", "name": "Riku", "activity": "Eating breakfast"}])
 
 
 def test_initiative_uses_only_own_memory_and_visible_nearby_context():

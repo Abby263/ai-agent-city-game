@@ -32,7 +32,7 @@ test("device voices skip novelty voices and match gender, preferring premium qua
 });
 
 test("stage directions and emojis are not read aloud; delivery follows the words", () => {
-  assert.equal(spokenText("*Ava hugs Leo* Missed you! 🤗"), "Missed you!");
+  assert.equal(spokenText("*Aoi hugs Sota* Missed you! 🤗"), "Missed you!");
   assert.match(deliveryStyle(casting, "I'm so sorry, I miss her."), /sad/);
   assert.match(deliveryStyle(casting, "That's amazing!"), /excited/);
   assert.match(deliveryStyle(casting, "Hi"), /20-year-old woman$/);
@@ -76,7 +76,7 @@ test("pause, skip and unmount cancellation prevent stale audio from advancing di
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const { player, spoken, cancelled } = harness();
   let ended = 0, errors = 0;
-  const line = { key: "one", citizenId: "cit_009", casting, text: "Hi Leo.", volume: 0.8, onEnd: () => ended++, onError: () => errors++ };
+  const line = { key: "one", citizenId: "cit_009", casting, text: "Hi Sota.", volume: 0.8, onEnd: () => ended++, onError: () => errors++ };
   player.play(line);
   player.play(line);
   assert.equal(spoken.length, 1, "rendering again must not restart speech");

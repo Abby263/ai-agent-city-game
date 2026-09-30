@@ -96,7 +96,7 @@ def test_private_tool_context_is_restored_after_each_turn(monkeypatch, turn, fai
     monkeypatch.setattr(runtime, "prepare_citizen_agent", lambda citizen: SimpleNamespace(invoke=invoke))
     token = _turn_context.set({"private_memories_for_speaker_only": ["outer context"]})
     try:
-        for memory in ["only Ava knows", "only Noah knows"]:
+        for memory in ["only Aoi knows", "only Riku knows"]:
             if failure:
                 error_type = CognitionUnavailableError if failure == "provider" else CognitionValidationError
                 with pytest.raises(error_type) as error:
@@ -105,7 +105,7 @@ def test_private_tool_context_is_restored_after_each_turn(monkeypatch, turn, fai
             else:
                 runtime.generate_private_turn(citizen={}, prompt={"private_memories_for_speaker_only": [memory]})
             assert inspect_private_memory.invoke({}) == "outer context"
-        assert observed == ["only Ava knows", "only Noah knows"]
+        assert observed == ["only Aoi knows", "only Riku knows"]
     finally:
         _turn_context.reset(token)
 
@@ -113,7 +113,7 @@ def test_private_tool_context_is_restored_after_each_turn(monkeypatch, turn, fai
 @pytest.fixture
 def payload():
     citizen = {
-        "citizen_id": "ava", "name": "Ava", "age": 21, "profession": "Student",
+        "citizen_id": "ava", "name": "Aoi", "age": 21, "profession": "Student",
         "home_location_id": "park", "work_location_id": None, "current_location_id": "park",
         "x": 1, "y": 1, "target_x": 1, "target_y": 1, "money": 50, "health": 80,
         "hunger": 20, "energy": 80, "stress": 20, "happiness": 70, "reputation": 50,
@@ -126,7 +126,7 @@ def payload():
         "metrics": {"population": 2, "average_happiness": 70, "city_health": 80,
                     "economy_status": 50, "education_status": 50, "traffic_status": 50,
                     "sick_count": 0, "active_events": 0},
-        "citizens": [citizen, {**citizen, "citizen_id": "noah", "name": "Noah"}],
+        "citizens": [citizen, {**citizen, "citizen_id": "noah", "name": "Riku"}],
     }
     return {"city": city, "actor_id": "ava", "target_id": "noah", "task": "Say hello"}
 
@@ -184,7 +184,7 @@ def test_failed_exchange_has_no_fabricated_response(api, monkeypatch, payload, e
 
 def test_required_target_uses_private_exchange_and_own_memories(api, monkeypatch, payload):
     payload.update(target_id=None, required_target_id="noah", require_conversation=True,
-                   memories=["Actor fallback"], private_memories={"noah": ["Noah private"], "outsider": ["Never share"]})
+                   memories=["Actor fallback"], private_memories={"noah": ["Riku private"], "outsider": ["Never share"]})
     captured = {}
 
     def capture(**kwargs):
@@ -195,7 +195,7 @@ def test_required_target_uses_private_exchange_and_own_memories(api, monkeypatch
     assert api.post("/cognition/session", json=payload).status_code == 503
     assert captured["target"]["citizen_id"] == "noah"
     assert captured["actor_memories"] == ["Actor fallback"]
-    assert captured["target_memories"] == ["Noah private"]
+    assert captured["target_memories"] == ["Riku private"]
     assert "Never share" not in str(captured)
 
 
@@ -262,11 +262,11 @@ def test_a_proposal_made_by_action_is_put_to_the_target_as_a_question(api, monke
 
     monkeypatch.setattr(client.deep_agents, "prepare_citizen_agent", lambda citizen: SimpleNamespace(invoke=invoke))
     monkeypatch.setattr(routes.cognition, "client", client)
-    payload.update(player_utterance="*takes Noah's hand and asks him to be her boyfriend*", proposal=proposal)
+    payload.update(player_utterance="*takes Riku's hand and asks him to be her boyfriend*", proposal=proposal)
     response = api.post("/cognition/session", json=payload)
     assert response.status_code == 200
     assert len(prompts) == 1  # only the target speaks after a player's line
-    assert ("Ava is asking you to be their partner and start dating" in prompts[0]) is asked
+    assert ("Aoi is asking you to be their partner and start dating" in prompts[0]) is asked
     assert response.json()["participant_outcomes"]["noah"]["invitation_response"] == ("accepted" if asked else "none")
 
 

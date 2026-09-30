@@ -5,7 +5,8 @@
   "license": "PolyForm-Noncommercial-1.0.0",
   "scripts": {
     "predev": "node scripts/generate-citizens.mjs",
-    "prebuild": "node scripts/generate-citizens.mjs",
+    "prebuild": "node scripts/generate-citizens.mjs && node scripts/check-characters.mjs",
+    "characters:check": "node scripts/check-characters.mjs",
     "test": "AGENTCITY_CALENDAR_START=2026-10-26 AGENTCITY_TIME_MODE=fast node --import tsx --test tests/*.test.ts",
     "dev": "next dev",
     "build": "next build",

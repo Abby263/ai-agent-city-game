@@ -1,12 +1,12 @@
 citizen_id: cit_034
-name: Carlos Garcia
+name: Daisuke Ishikawa
 age: 45
 profession: Cafe owner
 active: true
 work_location_id: loc_restaurant
 position:
-- 4
-- 6
+  - 4
+  - 6
 money: 900
 health: 90
 hunger: 30
@@ -19,32 +19,42 @@ mood: Cheerful
 personality:
   nature:
     traits:
-    - Generous
-    - Loud
-    - Restless
+      - Generous
+      - Loud
+      - Restless
     values: Good food, a full table and people feeling welcome.
     voice: Big laugh, calls regulars by name, offers food mid-sentence.
     sensitivity: Empty tables; being compared to his late father's cooking.
     repair: Cooks something special and says sorry with a grin.
   appearance:
-    skin: '#c9956f'
-    hair: '#3e3129'
-    shirt: '#e0a54a'
-    background: '#f4e2c6'
+    skin: "#c99978"
+    hair: "#37302c"
+    shirt: "#b37b56"
+    background: "#e7dfe0"
+    hairstyle: parted
+    outfit: apron
+    trousers: "#555951"
+    shoes: "#383a38"
+    glasses: false
   playable: true
-current_thought: Mateo wants to paint a mural on the cafe wall. Maybe it's a good idea.
+  identity:
+    nationality: Japanese
+    hometown: Tokyo, Japan
+    former_names:
+      - Carlos Garcia
+current_thought: Ren wants to paint a mural on the cafe wall. Maybe it's a good idea.
 short_term_goals:
-- Try a new breakfast special
-- Put money aside for the truck
+  - Try a new breakfast special
+  - Put money aside for the truck
 long_term_goals:
-- Own a food truck by next summer
-memory_summary: I run the Sunny Side Cafe. My son Mateo makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.
+  - Own a food truck by next summer
+memory_summary: I run the Sunny Side Cafe. My son Ren makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.
 relationship_scores:
   cit_010: 88
 seed_memories:
-- memory_id: mem_seed_cit_034
-  content: I run the Sunny Side Cafe. My son Mateo makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.
-  importance: 0.8
+  - memory_id: mem_seed_cit_034
+    content: I run the Sunny Side Cafe. My son Ren makes the coffee now; his mum and I split up years ago but we're friendly. I'm saving for a food truck.
+    importance: 0.8
 life:
   sex: male
   birthday_in_days: 210
@@ -55,7 +65,7 @@ life:
   parent_ids: []
   partner_id: null
   children_ids:
-  - cit_010
+    - cit_010
   relationship_status: single
   job:
     title: Cafe owner
@@ -64,12 +74,12 @@ life:
     start: 360
     end: 900
     workdays:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
   ambition:
     goal: Save $3,000 for a food truck
     kind: money

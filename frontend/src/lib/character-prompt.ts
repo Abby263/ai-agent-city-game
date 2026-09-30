@@ -10,8 +10,11 @@ type Nature = { traits?: string[]; values?: string; voice?: string; sensitivity?
 export function defaultCharacterPrompt(c: CitizenAgent): string {
   const nature = (c.personality?.nature ?? {}) as Nature;
   const job = c.life?.job?.title ?? c.profession;
+  const identity = c.personality.identity as { nationality?: string; former_names?: string[] } | undefined;
   const lines = [
     `${c.name}, ${c.age}, ${job.toLowerCase()} in Nakameguro.`,
+    identity?.nationality ? `${identity.nationality} resident of Tokyo, Japan. Be an individual, not a cultural stereotype. Respond in the player's language.` : "",
+    identity?.former_names?.length ? `Older saved journals may call you ${identity.former_names.join(", ")}; this is the same person, now named ${c.name}. Do not treat the old name as another resident.` : "",
     c.memory_summary,
     nature.traits?.length ? `Personality: ${nature.traits.join(", ").toLowerCase()}.` : "",
     nature.values ? `Cares about: ${nature.values}` : "",

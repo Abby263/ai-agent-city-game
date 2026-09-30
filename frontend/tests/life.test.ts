@@ -21,9 +21,9 @@ test("the shipped cast is 26 adults with consistent ages, jobs and families", ()
   const { city } = world();
   assert.equal(city.citizens.length, 26);
   const jobs: Record<string, string> = {
-    Ava: "Lab assistant", Mateo: "Barista", Noah: "Trainee fitness instructor", Iris: "Pharmacy technician",
-    Leo: "Apprentice technician", Sophie: "Library assistant", Zara: "Junior software engineer",
-    Eliot: "Food-court cook", Haruto: "Station staff", Sakura: "Konbini clerk",
+    Aoi: "Lab assistant", Ren: "Barista", Riku: "Trainee fitness instructor", Mio: "Pharmacy technician",
+    Sota: "Apprentice technician", Hana: "Library assistant", Rin: "Junior software engineer",
+    Kaito: "Food-court cook", Haruto: "Station staff", Sakura: "Konbini clerk",
   };
   for (const resident of city.citizens) {
     assert.ok(resident.age >= 18, resident.name);
@@ -44,17 +44,17 @@ test("the shipped cast is 26 adults with consistent ages, jobs and families", ()
 
 test("families are wired together from the profiles", () => {
   const { city } = world();
-  const leo = find(city, "Leo");
-  assert.equal(relationName(city, leo, find(city, "Hannah")), "mother");
-  assert.equal(relationName(city, leo, find(city, "Walter")), "grandfather");
-  assert.equal(relationName(city, find(city, "Sophie"), find(city, "Maya")), "sister");
-  assert.ok(relatives(city, find(city, "Tom")).includes(leo.citizen_id));
-  assert.equal(lifeStage(find(city, "Walter").age), "elder");
+  const leo = find(city, "Sota");
+  assert.equal(relationName(city, leo, find(city, "Yuko")), "mother");
+  assert.equal(relationName(city, leo, find(city, "Masao")), "grandfather");
+  assert.equal(relationName(city, find(city, "Hana"), find(city, "Natsumi")), "sister");
+  assert.ok(relatives(city, find(city, "Takashi")).includes(leo.citizen_id));
+  assert.equal(lifeStage(find(city, "Masao").age), "elder");
 });
 
 test("everyone ages one day per day and birthdays throw a party", () => {
   const { city, news, factory, sink } = world();
-  const eliot = find(city, "Eliot");
+  const eliot = find(city, "Kaito");
   assert.equal(daysUntilBirthday(eliot.life!, 1), 2);
   city.clock.day = 3;
   lifeDay(city, sink, noBonds, factory);
@@ -66,12 +66,12 @@ test("everyone ages one day per day and birthdays throw a party", () => {
 
 test("the adult-only cast never conceives or gives birth, even with a stale pregnancy", () => {
   const { city, news, factory, sink } = world();
-  const hannah = find(city, "Hannah");
+  const hannah = find(city, "Yuko");
   assert.equal(BIRTHS_ENABLED, false);
   assert.equal(hannah.life!.pregnancy, null);
   assert.doesNotMatch(hannah.current_thought, /due date|cot|pregnan|baby/i);
   const population = city.citizens.length;
-  hannah.life!.pregnancy = { partner_id: find(city, "Tom").citizen_id, due_day: 12 };
+  hannah.life!.pregnancy = { partner_id: find(city, "Takashi").citizen_id, due_day: 12 };
   city.clock.day = 12;
   lifeDay(city, sink, noBonds, factory);
   assert.equal(city.citizens.length, population);
@@ -82,11 +82,11 @@ test("the adult-only cast never conceives or gives birth, even with a stale preg
 
 test("death removes a resident, leaves grief and schedules a memorial", () => {
   const { city, news, departed, factory, sink } = world();
-  const walter = find(city, "Walter");
+  const walter = find(city, "Masao");
   passAway(city, walter, "old age", sink, factory);
   assert.ok(!city.citizens.includes(walter));
   assert.equal(departed[0].cause, "old age");
-  const leo = find(city, "Leo");
+  const leo = find(city, "Sota");
   assert.ok(leo.life!.emotions.sadness > 50);
   assert.equal(leo.mood, "Grieving");
   assert.ok(city.gatherings?.some((g) => g.kind === "funeral" && g.guest_ids.includes(leo.citizen_id)));
@@ -96,7 +96,7 @@ test("death removes a resident, leaves grief and schedules a memorial", () => {
 
 test("children never die, even when very ill", () => {
   const { city, factory, sink } = world();
-  const ava = find(city, "Ava");
+  const ava = find(city, "Aoi");
   // A synthetic minor preserves the guard if a future cast reintroduces children.
   ava.age = 12;
   ava.life!.birth_day = 1 - 12 * DAYS_PER_YEAR;
@@ -108,26 +108,26 @@ test("children never die, even when very ill", () => {
 
 test("sick residents seek care, and the doctor treats them at the hospital", () => {
   const { city, news, sink } = world();
-  const noah = find(city, "Noah");
+  const noah = find(city, "Riku");
   const flu = catchCondition(noah, "flu", 1)!;
   flu.severity = 45;
   assert.equal(careNeeded(noah, 1)?.place, "loc_hospital");
-  const priya = find(city, "Priya");
+  const priya = find(city, "Kaori");
   for (const c of [noah, priya]) { c.current_location_id = "loc_hospital"; c.x = c.target_x; c.y = c.target_y; }
   priya.current_activity = "Working as doctor";
   lifeTick(city, noah, sink, noBonds);
   assert.equal(flu.treated, true);
-  assert.ok(news.some((n) => n.kind === "treated" && n.headline.includes("Dr. Priya Singh")));
+  assert.ok(news.some((n) => n.kind === "treated" && n.headline.includes("Dr. Kaori Takahashi")));
 });
 
 test("adults who grow close start dating; children never do", () => {
   const { city, news, factory, sink } = world();
-  const minor = find(city, "Ava");
+  const minor = find(city, "Aoi");
   minor.age = 12;
   minor.life!.birth_day = 1 - 12 * DAYS_PER_YEAR;
   const bond = (from: string, to: string) => ({ trust: 75, warmth: 80, familiarity: 60 }) as Relationship;
   lifeDay(city, sink, bond, factory);
-  const samir = find(city, "Samir"), elena = find(city, "Elena");
+  const samir = find(city, "Takeshi"), elena = find(city, "Yuka");
   assert.equal(samir.life!.partner_id, elena.citizen_id);
   assert.equal(elena.life!.relationship_status, "dating");
   assert.ok(city.citizens.filter((c) => c.age < 18).every((c) => c.life!.partner_id === null));
@@ -136,8 +136,8 @@ test("adults who grow close start dating; children never do", () => {
 
 test("in-laws and guardians get the right names", () => {
   const { city } = world();
-  assert.equal(relationName(city, find(city, "Hannah"), find(city, "Walter")), "father-in-law");
-  assert.equal(relationName(city, find(city, "Walter"), find(city, "Hannah")), "daughter-in-law");
-  assert.equal(relationName(city, find(city, "Iris"), find(city, "Elena")), "aunt");
-  assert.equal(relationName(city, find(city, "Elena"), find(city, "Iris")), "niece");
+  assert.equal(relationName(city, find(city, "Yuko"), find(city, "Masao")), "father-in-law");
+  assert.equal(relationName(city, find(city, "Masao"), find(city, "Yuko")), "daughter-in-law");
+  assert.equal(relationName(city, find(city, "Mio"), find(city, "Yuka")), "aunt");
+  assert.equal(relationName(city, find(city, "Yuka"), find(city, "Mio")), "niece");
 });

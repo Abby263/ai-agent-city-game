@@ -3,15 +3,23 @@ import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import type { Emotion } from "./expression";
 
-// Realistic residents: MetaHumans exported as GLB (UE MetaHuman skeleton + the 51 ARKit face shapes).
+// Textured residents exported as GLB: MPFB game-engine rigs or compatible MetaHuman rigs.
 // No animation files are needed: the body is posed from the same motion the simple figures use (walk swing,
 // gestures, head turns), applied in the character's own space, and the face runs on ARKit shapes.
-// See docs/metahuman-characters.md for how to export a resident.
+// See docs/open-character-art.md and docs/metahuman-characters.md for authoring workflows.
 
 /** Height of a loaded human before the resident's own height scaling, matching the simple figure (155 cm). */
 const BASE_HEIGHT = 1.55;
 
-type Manifest = { residents?: Record<string, { file: string }> };
+export type HumanAsset = { file: string; facingDegrees?: number };
+type Manifest = { residents?: Record<string, HumanAsset> };
+
+export function validHumanAsset(value: unknown): value is HumanAsset {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as HumanAsset;
+  return typeof entry.file === "string" && /^[a-zA-Z0-9_-]+\.glb$/.test(entry.file) &&
+    (entry.facingDegrees === undefined || (Number.isFinite(entry.facingDegrees) && Math.abs(entry.facingDegrees) <= 360));
+}
 
 /** What the resident's simple rig is doing this frame, mirrored onto the real skeleton and face. */
 export type HumanPose = {
@@ -39,6 +47,8 @@ const FACES: Record<Emotion, Record<string, number>> = {
   curious: { browOuterUpLeft: 0.45, browInnerUp: 0.2, mouthSmileLeft: 0.12 },
 };
 const FACE_SHAPES = [...new Set(Object.values(FACES).flatMap((f) => Object.keys(f)))];
+const ANIMATED_SHAPES = new Set([...FACE_SHAPES, "jawOpen", "mouthFunnel", "eyeBlinkLeft", "eyeBlinkRight"]);
+const REQUIRED_BONES = ["pelvis", "spine_03", "neck_01", "head", "thigh_l", "thigh_r", "calf_l", "calf_r", "upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r"];
 
 type Joint = {
   bone: THREE.Bone;
@@ -58,7 +68,7 @@ export class Human {
   private readonly armsDown = new Map<string, THREE.Quaternion>();
   private readonly weights = new Map<string, number>();
 
-  constructor(gltf: GLTF) {
+  constructor(gltf: GLTF, asset?: HumanAsset) {
     const model = gltf.scene;
     model.updateMatrixWorld(true);
     const bones = new Map<string, THREE.Bone>();
@@ -70,7 +80,7 @@ export class Human {
       if (materials.every((m) => /hide/i.test(m.name))) mesh.visible = false;
       for (const material of materials) {
         // Hair, brows and lashes are cards with see-through strands: cut-out plus MSAA smoothing sorts correctly.
-        if (material.transparent && /hair|brow|lash|beard|mustache/i.test(`${material.name} ${mesh.name}`)) {
+        if ((material.transparent || material.alphaTest > 0) && /hair|brow|lash|beard|mustache/i.test(`${material.name} ${mesh.name}`)) {
           material.transparent = false;
           material.alphaTest = 0.35;
           material.alphaToCoverage = true;
@@ -81,24 +91,41 @@ export class Human {
       mesh.receiveShadow = true;
       // Skinned bounds follow the bind pose, not the animated body; never cull a resident by mistake.
       mesh.frustumCulled = false;
-      if (mesh.morphTargetDictionary && "jawOpen" in mesh.morphTargetDictionary) this.faces.push(mesh);
+      // Lashes and brows often contain blink/expression shapes but no jaw shape.
+      if (mesh.morphTargetInfluences && mesh.morphTargetDictionary &&
+        Object.keys(mesh.morphTargetDictionary).some((name) => ANIMATED_SHAPES.has(name))) this.faces.push(mesh);
     });
 
     // Face the character along +Z (the town's forward), whatever the exporter's convention.
     const thighL = bones.get("thigh_l"), thighR = bones.get("thigh_r");
+    const holder = new THREE.Group();
+    holder.add(model);
     if (thighL && thighR) {
       const left = thighL.getWorldPosition(new THREE.Vector3()).sub(thighR.getWorldPosition(new THREE.Vector3())).setY(0).normalize();
       const forward = new THREE.Vector3().crossVectors(left, Y);
-      model.rotation.y = -Math.atan2(forward.x, forward.z);
+      holder.rotation.y = -Math.atan2(forward.x, forward.z);
     }
-    const holder = new THREE.Group();
-    holder.add(model);
+    if (asset?.facingDegrees !== undefined) holder.rotation.y = THREE.MathUtils.degToRad(asset.facingDegrees);
     holder.updateMatrixWorld(true);
     // Stand on the ground at the figure's base height.
-    const box = new THREE.Box3().setFromObject(holder, true);
+    const box = new THREE.Box3();
+    holder.traverseVisible((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      // expandByObject would include hidden export helper meshes in the measured height.
+      if ((mesh as THREE.SkinnedMesh).isSkinnedMesh) {
+        const skinned = mesh as THREE.SkinnedMesh;
+        skinned.computeBoundingBox();
+        if (skinned.boundingBox) box.union(skinned.boundingBox.clone().applyMatrix4(mesh.matrixWorld));
+      } else {
+        mesh.geometry.computeBoundingBox();
+        if (mesh.geometry.boundingBox) box.union(mesh.geometry.boundingBox.clone().applyMatrix4(mesh.matrixWorld));
+      }
+    });
+    if (box.isEmpty()) box.set(new THREE.Vector3(-0.25, 0, -0.25), new THREE.Vector3(0.25, BASE_HEIGHT, 0.25));
     const scale = BASE_HEIGHT / Math.max(0.1, box.max.y - box.min.y);
     holder.scale.setScalar(scale);
-    holder.position.y = -box.min.y * scale;
+    holder.position.set(-(box.max.x + box.min.x) * 0.5 * scale, -box.min.y * scale, -(box.max.z + box.min.z) * 0.5 * scale);
     this.root.add(holder);
     this.root.updateMatrixWorld(true);
 
@@ -120,7 +147,7 @@ export class Human {
   }
 
   get animated() {
-    return this.joints.has("thigh_l") && this.joints.has("upperarm_l");
+    return REQUIRED_BONES.every((name) => this.joints.has(name));
   }
 
   /** Rotates a joint by a rotation given in the character's space, on top of its rest pose. */
@@ -173,13 +200,17 @@ export class Human {
   }
 
   dispose() {
+    const disposed = new Set<THREE.BufferGeometry | THREE.Material | THREE.Texture>();
+    const release = (resource: THREE.BufferGeometry | THREE.Material | THREE.Texture) => {
+      if (!disposed.has(resource)) { disposed.add(resource); resource.dispose(); }
+    };
     this.root.traverse((object) => {
       const mesh = object as THREE.Mesh;
       if (!mesh.isMesh) return;
-      mesh.geometry.dispose();
+      release(mesh.geometry);
       for (const material of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[]) {
-        for (const value of Object.values(material)) if ((value as THREE.Texture)?.isTexture) (value as THREE.Texture).dispose();
-        material.dispose();
+        for (const value of Object.values(material)) if ((value as THREE.Texture)?.isTexture) release(value as THREE.Texture);
+        release(material);
       }
     });
     this.root.removeFromParent();
@@ -207,7 +238,7 @@ export class HumanLibrary {
   }
 
   async has(citizenId: string) {
-    return Boolean((await this.list()).residents?.[citizenId]);
+    return validHumanAsset((await this.list()).residents?.[citizenId]);
   }
 
   load(citizenId: string) {
@@ -215,18 +246,19 @@ export class HumanLibrary {
     if (!pending) {
       pending = this.list().then(async (manifest) => {
         const entry = manifest.residents?.[citizenId];
-        if (!entry) return null;
+        if (!validHumanAsset(entry)) return null;
         await this.slot();
         try {
           const gltf = await this.loader.loadAsync(`${this.base}${entry.file}`);
-          const human = new Human(gltf);
+          const human = new Human(gltf, entry);
           return human.animated ? human : (human.dispose(), null);
         } catch {
+          console.warn(`Character asset could not load for ${citizenId}; using the lightweight resident.`);
           return null;
         } finally {
           this.release();
         }
-      });
+      }).finally(() => this.pending.delete(citizenId));
       this.pending.set(citizenId, pending);
     }
     return pending;

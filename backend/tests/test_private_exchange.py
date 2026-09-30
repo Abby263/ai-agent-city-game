@@ -23,10 +23,10 @@ def setup_client(monkeypatch, turns):
 
 
 def exchange(client, **kwargs):
-    return client.generate_private_exchange(actor={"citizen_id": "ava", "name": "Ava", "profession": "Student"},
-        target={"citizen_id": "noah", "name": "Noah", "profession": "Student"}, city_time="Day 1, 06:00",
-        task="Invite Noah to dinner", observations=["Ava privately learned a secret from Iris."],
-        actor_memories=["Iris invited only Leo."], target_memories=["I want to study."],
+    return client.generate_private_exchange(actor={"citizen_id": "ava", "name": "Aoi", "profession": "Student"},
+        target={"citizen_id": "noah", "name": "Riku", "profession": "Student"}, city_time="Day 1, 06:00",
+        task="Invite Riku to dinner", observations=["Aoi privately learned a secret from Mio."],
+        actor_memories=["Mio invited only Sota."], target_memories=["I want to study."],
         event_context="Another private conversation.", **kwargs)
 
 
@@ -37,7 +37,7 @@ def test_listener_does_not_receive_actor_private_observations(monkeypatch):
     target_prompt = prompts[1][1]
     assert target_prompt["private_memories_for_speaker_only"] == ["I want to study."]
     assert "secret" not in str(target_prompt)
-    assert "Iris invited" not in str(target_prompt)
+    assert "Mio invited" not in str(target_prompt)
     assert target_prompt["event_context"] == ""
     assert result.participant_outcomes["noah"]["invitation_response"] == "declined"
 
@@ -105,9 +105,9 @@ def test_nature_is_speaker_private_and_shapes_emotional_prompt(monkeypatch):
         {"spoken_line": "Sure.", "end_conversation": True},
     ])
     client.generate_private_exchange(
-        actor={"citizen_id": "ava", "name": "Ava", "profession": "Student",
+        actor={"citizen_id": "ava", "name": "Aoi", "profession": "Student",
                "personality": {"nature": {"traits": ["Reserved"], "sensitivity": "Unfinished drawings"}}},
-        target={"citizen_id": "noah", "name": "Noah", "profession": "Student",
+        target={"citizen_id": "noah", "name": "Riku", "profession": "Student",
                 "personality": {"nature": {"traits": ["Energetic"]}}},
         city_time="06:00", task="Talk", observations=[], actor_memories=[], target_memories=[], event_context="",
     )
@@ -141,7 +141,7 @@ def test_unaccepted_and_mismatched_offers_do_not_make_shared_plans(monkeypatch):
 
 def test_ongoing_chat_remembers_what_was_just_said(monkeypatch):
     client, prompts = setup_client(monkeypatch, [{"spoken_line": "Ha, the same answer as last time: curry, obviously."}])
-    prior = [{"speaker_id": "ava", "text": "Hey Noah!"}, {"speaker_id": "noah", "text": "Hi Ava, what's up?"},
+    prior = [{"speaker_id": "ava", "text": "Hey Riku!"}, {"speaker_id": "noah", "text": "Hi Aoi, what's up?"},
              {"speaker_id": "someone_else", "text": "I should never be shared."}]
     result = exchange(client, player_utterance="What should we cook tonight?", prior_lines=prior)
     heard = prompts[0][1]["public_transcript_so_far"]
@@ -158,12 +158,12 @@ def test_topic_change_keeps_gift_history_out_of_active_ramen_exchange(monkeypatc
     prior = [{"speaker_id": "ava", "text": "I brought you a gift."},
              {"speaker_id": "noah", "text": "What's in the box?"}]
     result = client.generate_private_exchange(
-        actor={"citizen_id": "ava", "name": "Ava", "age": 21, "profession": "Lab assistant",
+        actor={"citizen_id": "ava", "name": "Aoi", "age": 21, "profession": "Lab assistant",
                "memory_summary": "STALE_SUMMARY", "current_thought": "STALE_THOUGHT",
                "personality": {"player_task": {"task": "STALE_TASK"}}},
-        target={"citizen_id": "noah", "name": "Noah", "age": 21, "profession": "Gym instructor"},
-        city_time="Day 1, 18:00", task="Invite Noah for ramen", observations=[],
-        actor_memories=["I gave Noah a gift."], target_memories=["Ava gave me a gift."],
+        target={"citizen_id": "noah", "name": "Riku", "age": 21, "profession": "Gym instructor"},
+        city_time="Day 1, 18:00", task="Invite Riku for ramen", observations=[],
+        actor_memories=["I gave Riku a gift."], target_memories=["Aoi gave me a gift."],
         event_context="", autonomous=True, prior_lines=prior,
     )
     for i, (_, prompt) in enumerate(prompts):
@@ -186,8 +186,8 @@ def test_direct_exchange_rejects_ambiguous_participant_identity(monkeypatch, act
     monkeypatch.setattr(client.deep_agents, "prepare_citizen_agent", lambda citizen: prepared.append(citizen))
     with pytest.raises(CognitionValidationError):
         client.generate_private_exchange(
-            actor={"citizen_id": actor_id, "name": "Ava", "profession": "Student"},
-            target={"citizen_id": target_id, "name": "Noah", "profession": "Student"},
+            actor={"citizen_id": actor_id, "name": "Aoi", "profession": "Student"},
+            target={"citizen_id": target_id, "name": "Riku", "profession": "Student"},
             city_time="06:00", task="Talk", observations=[], actor_memories=[], target_memories=[], event_context="",
         )
     assert prompts == []
@@ -207,8 +207,8 @@ def test_private_task_does_not_leak_into_public_summary(monkeypatch):
         {"spoken_line": "Hello there."}, {"spoken_line": "Hello!", "end_conversation": True},
     ])
     result = client.generate_private_exchange(
-        actor={"citizen_id": "ava", "name": "Ava", "profession": "Student"},
-        target={"citizen_id": "noah", "name": "Noah", "profession": "Student"},
+        actor={"citizen_id": "ava", "name": "Aoi", "profession": "Student"},
+        target={"citizen_id": "noah", "name": "Riku", "profession": "Student"},
         city_time="06:00", task="Say hello without mentioning PRIVATE_TASK_SECRET", observations=[],
         actor_memories=[], target_memories=[], event_context="",
     )

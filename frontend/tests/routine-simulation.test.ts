@@ -30,10 +30,10 @@ async function runUntil(day: number, fromMinute: number, toMinute: number) {
 
 test("on a Monday morning young adults and parents follow their jobs", async () => {
   const city = await runUntil(1, 360, 600);
-  assert.equal(city.citizens.find((c) => c.name === "Ava Singh")!.current_activity, "Working as lab assistant");
+  assert.equal(city.citizens.find((c) => c.name === "Aoi Takahashi")!.current_activity, "Working as lab assistant");
   assert.ok(city.citizens.every((c) => c.current_activity !== "Attend school"));
   // Parents go to their own jobs.
-  const priya = city.citizens.find((c) => c.name === "Priya Singh")!;
+  const priya = city.citizens.find((c) => c.name === "Kaori Takahashi")!;
   assert.equal(priya.current_activity, "Working as doctor");
   assert.ok(city.citizens.every((c) => c.current_activity !== "Buying food"), city.citizens.map((c) => `${c.name}:${c.current_activity}:${Math.round(c.hunger)}:${c.x},${c.y}`).join(" | "));
 });

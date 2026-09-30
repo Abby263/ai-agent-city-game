@@ -1,12 +1,12 @@
 citizen_id: cit_036
-name: Wei Chen
+name: Naoki Ito
 age: 47
 profession: Scientist
 active: true
 work_location_id: loc_lab
 position:
-- 8
-- 5
+  - 8
+  - 5
 money: 1800
 health: 90
 hunger: 30
@@ -19,32 +19,42 @@ mood: Absorbed
 personality:
   nature:
     traits:
-    - Curious
-    - Absent-minded
-    - Kind
+      - Curious
+      - Absent-minded
+      - Kind
     values: Understanding the world and leaving it better for his son.
     voice: Explains with analogies, loses track of time mid-sentence.
     sensitivity: Forgetting promises because he was busy working.
     repair: Writes a note so he never forgets again, and keeps it.
   appearance:
-    skin: '#e0ad86'
-    hair: '#2b2a2f'
-    shirt: '#d9d4c3'
-    background: '#eef0e6'
+    skin: "#e3bfa2"
+    hair: "#292a2c"
+    shirt: "#e1e4df"
+    background: "#dce4df"
+    hairstyle: parted
+    outfit: coat
+    trousers: "#41484e"
+    shoes: "#383a38"
+    glasses: true
   playable: true
-current_thought: If the solar cell test works tonight, I'll tell Eliot first. And Ava at the lab has good instincts.
+  identity:
+    nationality: Japanese
+    hometown: Tokyo, Japan
+    former_names:
+      - Wei Chen
+current_thought: If the solar cell test works tonight, I'll tell Kaito first. And Aoi at the lab has good instincts.
 short_term_goals:
-- Finish the solar cell test
-- Make it home for dinner
+  - Finish the solar cell test
+  - Make it home for dinner
 long_term_goals:
-- Publish my research
-memory_summary: I'm a scientist at the Meguro Science Lab and Eliot's dad. Eliot is twenty and cooks at the arcade food court now. I get lost in my work sometimes, but Eliot comes first.
+  - Publish my research
+memory_summary: I'm a scientist at the Meguro Science Lab and Kaito's dad. Kaito is twenty and cooks at the arcade food court now. I get lost in my work sometimes, but Kaito comes first.
 relationship_scores:
   cit_029: 88
 seed_memories:
-- memory_id: mem_seed_cit_036
-  content: I'm a scientist at the Meguro Science Lab and Eliot's dad. Eliot is twenty and cooks at the arcade food court now. I get lost in my work sometimes, but Eliot comes first.
-  importance: 0.8
+  - memory_id: mem_seed_cit_036
+    content: I'm a scientist at the Meguro Science Lab and Kaito's dad. Kaito is twenty and cooks at the arcade food court now. I get lost in my work sometimes, but Kaito comes first.
+    importance: 0.8
 life:
   sex: male
   birthday_in_days: 90
@@ -55,7 +65,7 @@ life:
   parent_ids: []
   partner_id: null
   children_ids:
-  - cit_029
+    - cit_029
   relationship_status: single
   job:
     title: Scientist
@@ -64,11 +74,11 @@ life:
     start: 540
     end: 1080
     workdays:
-    - 0
-    - 1
-    - 2
-    - 3
-    - 4
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
   ambition:
     goal: Publish his clean-energy research
     kind: career

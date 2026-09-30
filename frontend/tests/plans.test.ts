@@ -24,7 +24,7 @@ test("spoken minutes and greetings don't move the time", () => {
   assert.equal(at("Meet me tomorrow, half past six, at the library"), "2 18.5");
   assert.equal(at("Tomorrow, quarter to eight at the station"), "2 19.75");
   city.clock.minute_of_day = 360;
-  assert.equal(at("Morning, Mateo! Play it for me tonight? Sunny Side Cafe at seven."), "1 19");
+  assert.equal(at("Morning, Ren! Play it for me tonight? Sunny Side Cafe at seven."), "1 19");
   assert.equal(at("Good morning! Let's get coffee tomorrow at seven."), "2 19");
   assert.equal(at("Let's run tomorrow morning at seven by the river"), "2 7");
 });
