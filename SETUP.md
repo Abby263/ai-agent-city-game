@@ -87,7 +87,7 @@ The frontend builds its initial citizens from the YAML profiles. The backend pro
 
 The new game UI and player takeover use `NEXT_PUBLIC_MEMORY_MODE=browser`. No Neon or Redis is required. Set the selected provider's API key only in the backend environment. Never use a `NEXT_PUBLIC_` prefix for any API key.
 
-For a frontend on port 3010, add `http://127.0.0.1:3010,http://localhost:3010` to backend `CORS_ORIGINS`. Run the backend on port 8000 and the frontend with `npm run dev -- --port 3010`. No deployment is required. The existing Vercel deployment is intentionally left paused.
+For a frontend on port 3010, add `http://127.0.0.1:3010,http://localhost:3010` to backend `CORS_ORIGINS`. Run the backend on port 8000 and the frontend with `npm run dev -- --port 3010`. No deployment is required for local development.
 
 `npm run dev` and `npm run build` generate `frontend/src/lib/generated/citizens.json` from `backend/app/citizens/profiles/*.yaml`. Add a profile or change `active: true`, then restart/rebuild the frontend. Existing saved worlds keep their cast; back up your world before clearing its localStorage to start with the new cast. The browser cast uses YAML `active`; `ACTIVE_CITIZEN_IDS` is a backend-only override.
 
@@ -208,7 +208,11 @@ In OpenAI mode, missing `OPENAI_API_KEY` blocks citizen tasks instead of using f
 
 ### Deploy Without Local Play History
 
-Run `node scripts/stage-deployment.mjs` from the repository root. It creates a
+Normal releases deploy automatically from the committed GitHub source on `main`.
+Never commit runtime saves, conversation exports, databases or secrets. Git-based
+builds use repository files, not your local working directory or browser storage.
+
+For a manual CLI release, run `node scripts/stage-deployment.mjs` from the repository root. It creates a
 temporary, code-only release folder and prints its full file manifest. Deploy
 that folder with `vercel --cwd <printed-directory> --prod --yes`.
 The generated citizen roster is rebuilt from source YAML during the build.
@@ -240,7 +244,24 @@ The repo uses Vercel Services in `vercel.json`:
 - `frontend/` is mounted at `/`.
 - `backend/main.py` is mounted at `/api` for LLM cognition and optional server mode.
 
-Connect the Vercel project to the GitHub repo. With Vercel Git integration enabled, every merge to `main` creates a new production deployment and every pull request gets a preview deployment.
+### Automatic GitHub Deployments
+
+The Vercel project `ai-agent-city-game` is connected to
+`Abby263/ai-agent-city-game`, with `main` as its production branch.
+
+- Every commit pushed to GitHub's `main`, including a merged pull request, triggers a production build.
+- A successful build updates `https://ai-agent-city-game.vercel.app` automatically. A failed build leaves the previous successful release live.
+- Local commits do not deploy until pushed to GitHub.
+- Other branches and pull requests use preview deployments, not the production domain.
+- No GitHub Actions deployment workflow, deployment hook or `VERCEL_TOKEN` repository secret is required.
+
+To verify or restore this connection, open the project's Vercel Settings > Git
+and check the repository, then check that the Production environment tracks
+`main`. From an already linked local checkout, `vercel git connect
+https://github.com/Abby263/ai-agent-city-game.git` restores the repository link.
+Check the Vercel Deployments page or the commit's GitHub deployment status for
+the build result. Automatic deployments still consume the existing plan's build
+and runtime allowances; no paid add-on is required.
 
 Set these Vercel environment variables for Production, Preview, and Development:
 
@@ -290,7 +311,7 @@ npx vercel --prod
 
 Repeat env additions for `preview` and `development`, or set them in the Vercel dashboard for all environments.
 
-Important: a missing key for the selected provider makes cognition unavailable and blocks tasks. For OpenAI instead, set `LLM_PROVIDER=openai`, `OPENAI_API_KEY`, and `OPENAI_MODEL`. Public Vercel hosting remains paused; these instructions do not authorize resuming deployment.
+Important: a missing key for the selected provider makes cognition unavailable and blocks tasks. For OpenAI instead, set `LLM_PROVIDER=openai`, `OPENAI_API_KEY`, and `OPENAI_MODEL`. Production hosting is active; pushes to `main` deploy automatically through the GitHub connection described above.
 
 ### Avoiding Vercel Free-Tier Pauses
 
