@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Art } from "./materials";
+import { GROUND_KINDS, paintedGround } from "./surfaces";
 
 const INK = 0x465c68;
 export const EAST = { x0: 49, x1: 91, depth: 40, avenue: 69, roads: [13.5, 26.5], rail: [85.8, 87.4], deck: 2.6 };
@@ -18,10 +19,7 @@ export function makeDistrict(root: THREE.Group, art: Art, helpers: Helpers) {
   art.box(root, cx, -0.82, 20, width + 1.2, 0.22, 43.2, 0x638b74);
 
   // One painted ground texture keeps roads, crossings and the plaza crisp without z-fighting.
-  const canvas = document.createElement("canvas");
-  canvas.width = 2048;
-  canvas.height = Math.round((2048 * EAST.depth) / width);
-  const ctx = canvas.getContext("2d")!;
+  const { canvas, maskCanvas, ctx } = paintedGround(2048, Math.round((2048 * EAST.depth) / width), GROUND_KINDS);
   const u = canvas.width / width;
   const X = (x: number) => (x - EAST.x0) * u;
   ctx.fillStyle = "#9cbd8b";
@@ -55,8 +53,7 @@ export function makeDistrict(root: THREE.Group, art: Art, helpers: Helpers) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   art.textures.push(texture);
-  const material = new THREE.MeshToonMaterial({ map: texture, gradientMap: art.ramp });
-  art.materials.set("ground-east", material);
+  const material = art.ground(texture, maskCanvas, "ground-east");
   const ground = new THREE.Mesh(art.geometry(new THREE.PlaneGeometry(width, EAST.depth)), material);
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(cx, 0.006, 20);

@@ -1,8 +1,12 @@
 import * as THREE from "three";
+import { SurfaceLibrary, type Surface } from "./surfaces";
 
 // Shared geometry and material ownership makes both draw-call batching and teardown explicit.
 export class Art {
-  readonly materials = new Map<string, THREE.MeshToonMaterial>();
+  readonly materials = new Map<string, THREE.MeshStandardMaterial>();
+  readonly surfaces = new SurfaceLibrary();
+  /** What each colour is made of; unlabelled colours are plain painted material. */
+  private readonly madeOf = new Map<number, Surface>();
   readonly textures: THREE.Texture[] = [];
   readonly geometries: THREE.BufferGeometry[] = [];
   readonly unitBox = this.geometry(new THREE.BoxGeometry(1, 1, 1));
@@ -64,14 +68,40 @@ export class Art {
     this.geometries.push(geometry);
     return geometry;
   }
+  /** Labels colours with what they are made of. Call before those colours are first used. */
+  tag(surface: Surface, ...colors: number[]) {
+    for (const color of colors) this.madeOf.set(color, surface);
+  }
   material(color: THREE.ColorRepresentation) {
     const key = String(color);
-    if (!this.materials.has(key))
-      this.materials.set(
-        key,
-        new THREE.MeshToonMaterial({ color, gradientMap: this.ramp }),
-      );
+    if (!this.materials.has(key)) {
+      const surface = typeof color === "number" ? this.madeOf.get(color) : undefined;
+      const look = this.surfaces.look(surface);
+      const material = new THREE.MeshStandardMaterial({ color, roughness: look.roughness, metalness: look.metalness ?? 0 });
+      material.userData.surface = surface;
+      this.surfaces.dress(material, surface);
+      this.materials.set(key, material);
+    }
     return this.materials.get(key)!;
+  }
+  /** A painted ground layout whose lawns, pavements and roads become scanned grass, paving and asphalt. */
+  ground(layout: THREE.Texture, mask: HTMLCanvasElement, key: string) {
+    const maskTexture = new THREE.CanvasTexture(mask);
+    maskTexture.colorSpace = THREE.NoColorSpace;
+    this.textures.push(maskTexture);
+    const material = new THREE.MeshStandardMaterial({ map: layout, roughness: 0.9 });
+    material.userData.groundMask = maskTexture;
+    this.surfaces.dressGround(material, maskTexture);
+    this.materials.set(key, material);
+    return material;
+  }
+  /** Loads the scans, then dresses every material made so far (later ones are dressed as they are made). */
+  async loadSurfaces(anisotropy: number) {
+    await this.surfaces.load(anisotropy);
+    this.materials.forEach((material) => {
+      if (material.userData.surface && !material.map) this.surfaces.dress(material, material.userData.surface);
+      if (material.userData.groundMask) this.surfaces.dressGround(material, material.userData.groundMask);
+    });
   }
   box(
     parent: THREE.Object3D,
@@ -160,10 +190,7 @@ export class Art {
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     this.textures.push(texture);
-    const material = new THREE.MeshToonMaterial({
-      map: texture,
-      gradientMap: this.ramp,
-    });
+    const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.6 });
     this.materials.set(`sign-${this.materials.size}`, material);
     const mesh = new THREE.Mesh(
       this.geometry(new THREE.PlaneGeometry(w, h)),
@@ -174,6 +201,7 @@ export class Art {
     return mesh;
   }
   dispose() {
+    this.surfaces.dispose();
     this.materials.forEach((m) => m.dispose());
     this.blob?.materials.forEach((m) => m.dispose());
     this.textures.forEach((t) => t.dispose());

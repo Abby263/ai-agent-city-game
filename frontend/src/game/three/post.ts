@@ -3,12 +3,11 @@ import { BloomEffect, Effect, EffectAttribute, EffectComposer, EffectPass, Rende
 import { N8AOPostPass } from "n8ao";
 import type { QualityPreset } from "./quality";
 
-// The frame, in HDR: scene -> ambient occlusion (grounds buildings, trees and people) -> ink outlines and the
-// conversation depth blur -> bloom (lit windows, lamps, signs at night) -> ACES tone mapping -> a light vignette.
+// The frame, in HDR: scene -> ambient occlusion (grounds buildings, trees and people) -> the conversation depth
+// blur -> bloom (lit windows, lamps, signs at night) -> neutral PBR tone mapping (true-to-material colours) -> a light vignette.
 
 const inkShader = /* glsl */ `
   uniform float focusDistance;
-  float distanceAt(vec2 at) { return -getViewZ(readDepth(at)); }
   void mainImage(const in vec4 inputColor, const in vec2 uv, const in float depth, out vec4 outputColor) {
     vec3 color = inputColor.rgb;
     float center = -getViewZ(depth);
@@ -20,14 +19,7 @@ const inkShader = /* glsl */ `
         + texture2D(inputBuffer, uv + vec2(blur.x, -blur.y)).rgb + texture2D(inputBuffer, uv - blur).rgb;
       color = (color * 2. + softened) / 6.;
     }
-    // Depth curvature draws ink on silhouettes and roof creases while flat roads stay quiet.
-    float curvature = abs(distanceAt(uv + vec2(texelSize.x, 0.)) + distanceAt(uv - vec2(texelSize.x, 0.)) - 2. * center)
-      + abs(distanceAt(uv + vec2(0., texelSize.y)) + distanceAt(uv - vec2(0., texelSize.y)) - 2. * center);
-    float ink = smoothstep(.05, .35, curvature) * (1. - smoothstep(35., 90., center));
-    if (center > cameraFar * .9) ink = 0.;
-    color *= mix(vec3(1.), vec3(.46, .52, .61), ink * .52);
-    float grey = dot(color, vec3(.2126, .7152, .0722));
-    outputColor = vec4(mix(vec3(grey), color, 1.08), inputColor.a);
+    outputColor = vec4(color, inputColor.a);
   }`;
 
 class InkEffect extends Effect {
@@ -65,8 +57,8 @@ export class PostPipeline {
       this.ao = ao;
     }
     this.composer.addPass(new EffectPass(camera, this.ink));
-    this.composer.addPass(new EffectPass(camera, this.bloom, new ToneMappingEffect({ mode: ToneMappingMode.ACES_FILMIC }),
-      new VignetteEffect({ offset: 0.32, darkness: 0.32 })));
+    this.composer.addPass(new EffectPass(camera, this.bloom, new ToneMappingEffect({ mode: ToneMappingMode.NEUTRAL }),
+      new VignetteEffect({ offset: 0.35, darkness: 0.28 })));
   }
 
   setSize(width: number, height: number) {
