@@ -35,15 +35,27 @@ export function makeAtmosphere(art: Art, lampHeads: THREE.Vector3[]) {
   disposables.push(starGeometry, starMaterial, moonMaterial, moon.geometry);
 
   // Soft light pools read as lamp light without paying for 18 real point lights.
-  const poolMaterial = new THREE.MeshBasicMaterial({ color: 0xffd48a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
-  const poolGeometry = new THREE.CircleGeometry(1.05, 24);
+  // Light spilling from a lamp fades out from the pole, it doesn't stop at a hard edge.
+  const falloff = document.createElement("canvas");
+  falloff.width = falloff.height = 128;
+  const fctx = falloff.getContext("2d")!;
+  const gradient = fctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gradient.addColorStop(0, "rgba(255,255,255,1)");
+  gradient.addColorStop(0.35, "rgba(255,255,255,0.55)");
+  gradient.addColorStop(0.7, "rgba(255,255,255,0.15)");
+  gradient.addColorStop(1, "rgba(255,255,255,0)");
+  fctx.fillStyle = gradient;
+  fctx.fillRect(0, 0, 128, 128);
+  const falloffTexture = new THREE.CanvasTexture(falloff);
+  const poolMaterial = new THREE.MeshBasicMaterial({ color: 0xffc97a, map: falloffTexture, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  const poolGeometry = new THREE.CircleGeometry(1.6, 32);
   const pools = new THREE.InstancedMesh(poolGeometry, poolMaterial, lampHeads.length);
   const matrix = new THREE.Matrix4();
   const flat = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
   lampHeads.forEach((head, i) => pools.setMatrixAt(i, matrix.compose(new THREE.Vector3(head.x, 0.04, head.z), flat, new THREE.Vector3(1, 1, 1))));
   pools.renderOrder = 1;
   root.add(pools);
-  disposables.push(poolMaterial, poolGeometry, pools);
+  disposables.push(poolMaterial, poolGeometry, pools, falloffTexture);
 
   const clouds: THREE.Group[] = [];
   for (let i = 0; i < 14; i++) {
@@ -74,7 +86,7 @@ export function makeAtmosphere(art: Art, lampHeads: THREE.Vector3[]) {
     night = Math.max(night, darkness * 0.45);
     starMaterial.opacity = Math.max(0, night - 0.35) / 0.65;
     moonMaterial.opacity = Math.max(0, night - 0.3) / 0.7;
-    poolMaterial.opacity = night * 0.3;
+    poolMaterial.opacity = night * 0.45;
     stars.visible = moon.visible = pools.visible = night > 0.3;
     // Above 1 at night, so bloom makes lit windows and lamps glow.
     for (const material of glass) material.emissiveIntensity = night * 2.1;

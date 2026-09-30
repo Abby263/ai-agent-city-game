@@ -56,6 +56,12 @@ export class CityRenderer {
     point: THREE.Vector3;
   }> = [];
   private readonly sun = new THREE.DirectionalLight(0xffecd7, 2.2);
+  // The sky, re-captured as the time of day changes, lights and reflects in every realistic surface.
+  private readonly envScene = new THREE.Scene();
+  private pmrem!: THREE.PMREMGenerator;
+  private envTarget?: THREE.WebGLRenderTarget;
+  private envMinute = -Infinity;
+  private envGloom = -1;
   private readonly ambient = new THREE.HemisphereLight(
     0xf4f3ee,
     0x8e90ad,
@@ -123,6 +129,10 @@ export class CityRenderer {
     // The sky dome draws the sky; fog fades the town into its horizon colour.
     this.scene.fog = new THREE.Fog(0xcfe4ef, 52, 140);
     this.scene.add(this.skyDome.dome);
+    this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    const envSky = new THREE.Mesh(this.skyDome.dome.geometry, this.skyDome.dome.material);
+    envSky.scale.setScalar(0.05);
+    this.envScene.add(envSky);
     this.scene.add(this.ambient);
     this.sun.position.set(-15, 32, 18);
     this.sun.target.position.set(20, 0, 20);
@@ -153,6 +163,7 @@ export class CityRenderer {
     this.scene.add(this.incidents.root);
     this.scene.add(this.atmosphere.root, this.traffic.root, this.train.root, this.weatherFx.root);
     this.post = new PostPipeline(this.renderer, this.scene, this.camera, this.quality, Math.max(1, host.clientWidth), Math.max(1, host.clientHeight));
+    void this.art.loadSurfaces(Math.min(8, this.renderer.capabilities.getMaxAnisotropy()));
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.09;
@@ -301,7 +312,8 @@ export class CityRenderer {
     this.sun.intensity = sky.sunIntensity * (1 - gloom * 0.6);
     this.sun.color.copy(sky.sun);
     this.sun.position.copy(this.sun.target.position).addScaledVector(sky.sunDirection, 45);
-    this.ambient.intensity = sky.ambient * (1 - gloom * 0.15) + fx.flash * 2.2;
+    // Most fill light now comes from the sky itself (scene.environment); this only lifts deep shade.
+    this.ambient.intensity = sky.ambient * 0.35 * (1 - gloom * 0.15) + fx.flash * 2.2;
     this.ambient.color.setHex(0xf4f3ee).lerp(nightAmbient, sky.night);
     const skyColor = sky.sky.clone().lerp(overcast.clone().multiplyScalar(1 - sky.night * 0.7), gloom * 0.75);
     if (w?.condition === "snow") skyColor.lerp(snowSky, 0.4 * (1 - sky.night));
@@ -311,6 +323,7 @@ export class CityRenderer {
     const zenith = sky.zenith.clone().lerp(overcast.clone().multiplyScalar(0.85 - sky.night * 0.6), gloom * 0.8);
     if (fx.flash) zenith.lerp(lightningSky, fx.flash * 0.6);
     this.skyDome.update(sky, skyColor, zenith, gloom);
+    if (Math.abs(this.displayMinute - this.envMinute) > 6 || Math.abs(gloom - this.envGloom) > 0.08) this.captureSky(gloom);
     this.horizon.update(skyColor, sky.night, gloom);
     this.night = sky.night;
     (this.scene.fog as THREE.Fog).color.copy(skyColor);
@@ -318,6 +331,14 @@ export class CityRenderer {
     groundTint(w, this.tint);
     for (const key of ["ground", "ground-east"]) this.art.materials.get(key)?.color.copy(this.tint);
     this.shake.copy(fx.offset);
+  }
+  private captureSky(gloom: number) {
+    this.envMinute = this.displayMinute;
+    this.envGloom = gloom;
+    const next = this.pmrem.fromScene(this.envScene, 0.02);
+    this.envTarget?.dispose();
+    this.envTarget = next;
+    this.scene.environment = next.texture;
   }
   setConversation(frame: ConversationFrame | null, onReady?: () => void) {
     const previous = this.conversation;
@@ -824,6 +845,8 @@ export class CityRenderer {
     this.post.dispose();
     this.horizon.dispose();
     this.skyDome.dispose();
+    this.envTarget?.dispose();
+    this.pmrem.dispose();
     this.art.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();

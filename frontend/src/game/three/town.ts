@@ -3,6 +3,24 @@ import { Art } from "./materials";
 import { buildings, type Building } from "./layout";
 import { makeDistrict } from "./district";
 import { makeLanterns } from "./seasons";
+import { GROUND_KINDS, paintedGround } from "./surfaces";
+
+/** Labels the palette with real materials before anything is built. */
+function tagSurfaces(art: Art) {
+  art.tag("grass", P.grass, 0x80a776, 0x638b74, 0x91b69b);
+  art.tag("paving", P.path, P.curb);
+  art.tag("asphalt", P.road);
+  art.tag("wood", P.wood);
+  art.tag("glass", 0x709ba6, 0x789eaa);
+  art.tag("water", 0x63b8bd);
+  art.tag("metal", P.ink);
+  art.tag("foliage", P.hedge, 0x6d9e78, 0x80ac7d, 0x5d916c, 0x9cbd8b, 0x658e67, 0xefb0c2, 0xf6c2cf, 0xe999b4, 0xffd6de);
+  art.tag("wood", 0x8b7766);
+  for (const b of buildings) {
+    art.tag("plaster", b.wall);
+    art.tag("roof", b.roof);
+  }
+}
 
 const P = {
   grass: 0x8ebc82,
@@ -22,14 +40,13 @@ export function makeTown(art: Art) {
   const root = new THREE.Group();
   const dynamic = new THREE.Group();
   const lampHeads: THREE.Vector3[] = [];
+  tagSurfaces(art);
   art.box(root, 20, -0.38, 20, 43, 0.7, 43, 0x80a776);
   art.box(root, 20, -0.82, 20, 43.2, 0.22, 43.2, 0x638b74);
   art.box(root, 0, -0.95, 0, 300, 0.1, 300, 0x91b69b);
 
   // One ground texture avoids coplanar road intersections and keeps the mobile draw cost low.
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 2048;
-  const ctx = canvas.getContext("2d")!;
+  const { canvas, maskCanvas, ctx } = paintedGround(2048, 2048, GROUND_KINDS);
   const unit = 2048 / 40;
   ctx.fillStyle = "#9cbd8b";
   ctx.fillRect(0, 0, 2048, 2048);
@@ -91,11 +108,7 @@ export function makeTown(art: Art) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
   art.textures.push(texture);
-  const groundMat = new THREE.MeshToonMaterial({
-    map: texture,
-    gradientMap: art.ramp,
-  });
-  art.materials.set("ground", groundMat);
+  const groundMat = art.ground(texture, maskCanvas, "ground");
   const ground = new THREE.Mesh(
     art.geometry(new THREE.PlaneGeometry(40, 40)),
     groundMat,

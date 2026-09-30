@@ -26,8 +26,8 @@ export function applyFoliage(art: Art, foliage: Foliage) {
 /** Paper lanterns (chōchin) strung along the Meguro River during hanami. */
 export function makeLanterns(art: Art) {
   const root = new THREE.Group();
-  const pink = new THREE.MeshToonMaterial({ color: 0xf6b8c8, emissive: 0xff9fb8, emissiveIntensity: 0.35, gradientMap: art.ramp });
-  const white = new THREE.MeshToonMaterial({ color: 0xfff6e8, emissive: 0xffe9c8, emissiveIntensity: 0.35, gradientMap: art.ramp });
+  const pink = new THREE.MeshStandardMaterial({ color: 0xf6b8c8, emissive: 0xff9fb8, emissiveIntensity: 0.35, roughness: 0.7 });
+  const white = new THREE.MeshStandardMaterial({ color: 0xfff6e8, emissive: 0xffe9c8, emissiveIntensity: 0.35, roughness: 0.7 });
   art.materials.set("lantern-pink", pink);
   art.materials.set("lantern-white", white);
   const shape = art.geometry(new THREE.CylinderGeometry(0.16, 0.16, 0.34, 10));
