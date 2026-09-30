@@ -6,12 +6,13 @@ import { createInitialCity } from "../src/lib/initial-city";
 import { relationName } from "../src/lib/life";
 import { nextMoves } from "../src/lib/next-moves";
 import { agreedPlan, planTopic } from "../src/lib/plans";
+import { cityMinute } from "../src/lib/encounters";
 import {
   getSessionCity, saveSessionCity, seedSession, sessionAct, sessionApproach, sessionConversations, sessionMemories, sessionRelationships, sessionSetCharacterPrompt, sessionSetMode,
-  sessionSpeak, sessionTakeControl, sessionTick, sessionWalkTo,
+  sessionAssignTask, sessionCloseTask, sessionSpeak, sessionTakeControl, sessionTick, sessionWalkTo,
 } from "../src/lib/session-simulation";
 import { activeStories } from "../src/lib/stories";
-import type { SessionCognitionRequest, SessionCognitionResponse, SocialOutcome } from "../src/lib/types";
+import type { SessionCognitionRequest, SessionCognitionResponse, SessionTaskPlanResponse, SocialOutcome } from "../src/lib/types";
 
 const storage = new Map<string, string>();
 Object.defineProperty(globalThis, "window", {
@@ -269,4 +270,60 @@ test("the resident you play sets off for a plan once, and talking there keeps it
   await sessionSpeak(mateo, "Hi! I made it.", talker());
   for (let i = 0; i < 6; i++) city = await sessionTick(talker(), undefined, quiet);
   assert.equal(city.meetings!.find((m) => m.id === "m2")!.status, "completed");
+});
+
+type Task = { task_kind?: string; status?: string; target_citizen_ids?: string[] };
+const taskOf = (who: string) => getSessionCity()!.citizens.find((c) => c.citizen_id === who)!.personality.player_task as Task | null;
+const planner = (plan: Partial<SessionTaskPlanResponse>) => async (): Promise<SessionTaskPlanResponse> =>
+  ({ task_kind: "go_with_citizen", target_citizen_ids: [], location_id: "loc_restaurant", reasoning_summary: "", player_visible_plan: "Go together.", ...plan });
+
+test("asked to go somewhere with you, a resident heads there and you choose whether to join", async () => {
+  const [ava, mateo, noah] = ["Ava", "Mateo", "Noah"].map(id);
+  await sessionTakeControl(mateo);
+  await sessionAssignTask(ava, { task: "Go to Sunny Side Cafe with Mateo" }, planner({ target_citizen_ids: [mateo] }));
+  assert.equal(taskOf(ava)!.task_kind, "go_to_location", "the AI never agrees for you, so she doesn't wait for you");
+  let city = getSessionCity()!;
+  for (let i = 0; i < 40 && taskOf(ava)!.status === "active"; i++) city = await sessionTick(talker());
+  const her = city.citizens.find((c) => c.citizen_id === ava)!;
+  assert.equal(her.current_location_id, "loc_restaurant");
+  assert.equal(taskOf(ava)!.status, "completed");
+  // Anyone else still goes along; only you are left to decide for yourself.
+  await sessionAssignTask(ava, { task: "Go to the cafe with Mateo and Noah" }, planner({ target_citizen_ids: [mateo, noah] }));
+  assert.equal(taskOf(ava)!.task_kind, "go_with_citizen");
+  assert.deepEqual(taskOf(ava)!.target_citizen_ids, [noah]);
+});
+
+test("a resident waiting on you says so, not that their AI failed, and can be cancelled", async () => {
+  const [ava, mateo] = ["Ava", "Mateo"].map(id);
+  await sessionTakeControl(mateo);
+  await sessionApproach(ava);
+  await sessionAssignTask(ava, { task: "Ask Mateo about his song" }, planner({ task_kind: "targeted_talk", target_citizen_ids: [mateo], location_id: null }));
+  let city = getSessionCity()!;
+  for (let i = 0; i < 10 && taskOf(ava)!.status === "active"; i++) city = await sessionTick(talker());
+  const her = city.citizens.find((c) => c.citizen_id === ava)!;
+  assert.equal(taskOf(ava)!.status, "blocked");
+  assert.equal(her.current_activity, "Waiting to talk it over");
+  assert.doesNotMatch(her.current_thought, /AI cognition/, "the character's own mind never hears about the AI");
+  city = await sessionCloseTask(ava);
+  assert.equal(taskOf(ava)!.status, "closed");
+});
+
+test("plans settle in Manual too: kept if you talked around the time, missed if not", async () => {
+  const [ava, mateo, noah] = ["Ava", "Mateo", "Noah"].map(id);
+  await sessionTakeControl(mateo);
+  let city = await sessionApproach(ava);
+  assert.equal(city.simulation_mode, "manual");
+  const now = city.clock.minute_of_day;
+  const meeting = { source_conversation_id: "c", location_id: "loc_restaurant", game_day: city.clock.day, game_minute: now, topic: "tea", status: "scheduled" as const };
+  city.meetings = [{ ...meeting, id: "kept", actor_ids: [mateo, ava] }, { ...meeting, id: "stood-up", actor_ids: [mateo, noah] }];
+  saveSessionCity(city);
+  await sessionSpeak(ava, "Found you! The cafe was closed, so here we are.", talker());
+  // In Manual, time passes while you walk.
+  for (let trip = 0; trip < 6 && cityMinute(getSessionCity()!) <= city.clock.day * 1440 + now + 60; trip++) {
+    await sessionWalkTo(trip % 2 ? "loc_station" : "loc_farm");
+    for (let i = 0; i < 30 && getSessionCity()!.policy.player_destination; i++) await sessionTick(talker());
+  }
+  const status = (m: string) => getSessionCity()!.meetings!.find((x) => x.id === m)!.status;
+  assert.equal(status("kept"), "completed", "meeting somewhere else still counts");
+  assert.equal(status("stood-up"), "missed");
 });

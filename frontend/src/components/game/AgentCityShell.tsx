@@ -1070,7 +1070,7 @@ export function AgentCityShell() {
                         <div className="task-status">
                           <small>{activeTask.status}</small>
                           <p>{activeTask.task}</p>
-                          {activeTask.status === "active" && (
+                          {(activeTask.status === "active" || activeTask.status === "blocked") && (
                             <button
                               className="text-action"
                               onClick={() =>

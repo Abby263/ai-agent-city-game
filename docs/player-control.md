@@ -57,8 +57,13 @@ The game master only refuses sexually explicit content, graphic gore, real-world
   flag it (`agreedPlan`). "Morning, Mateo!" is a greeting, not a morning plan.
 - **Your plans too.** When it's time, the resident you play sets off for a plan they agreed to, like
   everyone else (once: pick another place in **Go to…** and you can still stand someone up). Talking
-  with them there, around the agreed time, marks the plan kept; otherwise it is missed. **Go to…**
-  waits for a town moment in progress instead of being ignored.
+  with them around the agreed time marks the plan kept, even if you found each other somewhere else;
+  otherwise it is missed. Plans settle this way in Manual too. **Go to…** waits for a town moment in
+  progress instead of being ignored.
+- **Tasks that involve you.** Ask a resident to go somewhere *with* the person you play and they
+  head there on their own (the AI never agrees for you); you choose whether to join. A resident
+  waiting on you says "Waiting to talk it over" rather than claiming their AI failed, and any
+  blocked task can be cancelled from their profile.
 - **Intentions.** Every conversation turn can say what the speaker now wants to do; these become the
   "what happens next" choices.
 

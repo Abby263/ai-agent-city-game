@@ -334,12 +334,12 @@ function recentChat(city: CityState, a: string, b: string) {
     .slice(-10);
 }
 
-/** Talking with someone where and when you agreed to meet them keeps that plan. */
+/** Talking with someone around the time you agreed to meet keeps that plan, even if you found each other elsewhere. */
 function keepPlayerMeeting(city: CityState, player: CitizenAgent, otherId: string) {
   const now = cityMinute(city);
   for (const meeting of city.meetings ?? [])
     if (meeting.status === "scheduled" && meeting.actor_ids.includes(player.citizen_id) && meeting.actor_ids.includes(otherId)
-      && meeting.location_id === player.current_location_id && Math.abs(now - meetingMinute(meeting)) <= 60) meeting.kept = true;
+      && Math.abs(now - meetingMinute(meeting)) <= 60) meeting.kept = true;
 }
 
 /** Tags the newest exchange between the two as the player's own chat. */
@@ -430,7 +430,7 @@ export async function sessionAssignTask(
 
   citizen.personality = {
     ...citizen.personality,
-    player_task: {
+    player_task: withoutPlayerCompanion(city, {
       task,
       location_id: locationId,
       target_citizen_id: taskPlan.target_citizen_id,
@@ -443,7 +443,7 @@ export async function sessionAssignTask(
       assigned_day: city.clock.day,
       assigned_minute: city.clock.minute_of_day,
       status: "active",
-    } satisfies PlayerTaskData,
+    }),
   };
   citizen.current_activity = `Task: ${task}`;
   citizen.current_thought = `The player asked me to: ${task}. I should focus on that next.`;
@@ -614,6 +614,7 @@ export async function sessionTick(generateCognition: GenerateCognition, decideEl
     }
   }
 
+  settleMeetings(city);
   const cognitionCandidate = updateCitizens.find((citizen) => {
     if (citizen.citizen_id === city.policy.player_citizen_id) return false;
     const task = playerTask(citizen);
@@ -1687,13 +1688,13 @@ function desiredLocation(
   return [stop.location_id, stop.activity];
 }
 
-/** In live mode, `beat` lets conversations happen between the 15-minute ticks of real time. */
-async function advanceSocial(city: CityState, cognition: GenerateCognition, decide?: DecideSocial, beat = false) {
+/** An hour after the agreed time a plan is settled, in Auto or Manual: kept if they talked, otherwise missed. */
+function settleMeetings(city: CityState) {
   const now = cityMinute(city);
   for (const meeting of city.meetings ?? []) {
     if (meeting.status !== "scheduled") continue;
     if (now > meetingMinute(meeting) + 60 && meeting.kept) {
-      // The player's own meetings: they talked there in person, so the plan was kept.
+      // The player's own meetings: they talked around the agreed time, so the plan was kept.
       meeting.status = "completed";
       addEvent(city, { event_type: "meeting_kept", actors: meeting.actor_ids, location_id: meeting.location_id,
         description: `${meeting.actor_ids.map((id) => findCitizen(city, id).name).join(" and ")} kept their plan to meet at ${locationName(city, meeting.location_id)}.`, priority: 1 });
@@ -1702,7 +1703,17 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
       const description = `The meeting about ${meeting.topic} at ${locationName(city, meeting.location_id)} did not happen. Nobody was forced to attend.`;
       addEvent(city, { event_type: "meeting_missed", actors: meeting.actor_ids, location_id: meeting.location_id, description, priority: 2 });
       meeting.actor_ids.forEach((id) => addMemory({ citizen_id: id, related_citizen_id: meeting.actor_ids.find((other) => other !== id) ?? null, kind: "episodic", content: `My planned meeting about ${meeting.topic} did not happen. I do not know why the other person did not attend.`, importance: 0.6, salience: 0.6, extra: { source: "meeting_missed" } }));
-    } else if (!city.encounter && now >= meetingMinute(meeting)) {
+    }
+  }
+}
+
+/** In live mode, `beat` lets conversations happen between the 15-minute ticks of real time. */
+async function advanceSocial(city: CityState, cognition: GenerateCognition, decide?: DecideSocial, beat = false) {
+  const now = cityMinute(city);
+  settleMeetings(city);
+  for (const meeting of city.meetings ?? []) {
+    if (meeting.status !== "scheduled") continue;
+    if (!city.encounter && now >= meetingMinute(meeting)) {
       const people = meeting.actor_ids.map((id) => city.citizens.find((c) => c.citizen_id === id));
       if (people.every((c) => c && sociallyAvailable(c, city.policy.player_citizen_id) && c.current_location_id === meeting.location_id)) {
         city.encounter = { actor_id: meeting.actor_ids[0], target_id: meeting.actor_ids[1], location_id: meeting.location_id, topic: meeting.topic,
@@ -1885,6 +1896,12 @@ async function runTaskCognition(
       ...citizen.personality,
       player_task: { ...task, last_cognition_tick: city.clock.tick },
     };
+    return;
+  }
+  if (target.citizen_id === city.policy.player_citizen_id && withoutPlayerCompanion(city, task) !== task) {
+    const direct = withoutPlayerCompanion(city, task);
+    citizen.personality = { ...citizen.personality, player_task: { ...direct, last_cognition_tick: city.clock.tick } };
+    citizen.current_activity = `Going to ${locationName(city, direct.location_id!)}`;
     return;
   }
   if (target.citizen_id === city.policy.player_citizen_id) {
@@ -2547,6 +2564,20 @@ function completeTask(
   });
 }
 
+/**
+ * Going somewhere "with" the resident you play: the AI never agrees for you, so they head there on their own
+ * and you choose whether to join. Anyone else in the task still goes along.
+ */
+function withoutPlayerCompanion(city: CityState, task: PlayerTaskData): PlayerTaskData {
+  const player = city.policy.player_citizen_id;
+  const ids = task.target_citizen_ids?.length ? task.target_citizen_ids : task.target_citizen_id ? [task.target_citizen_id] : [];
+  if (task.task_kind !== "go_with_citizen" || typeof player !== "string" || !ids.includes(player) || !task.location_id) return task;
+  const others = ids.filter((id) => id !== player);
+  if (others.length) return { ...task, target_citizen_ids: others, target_citizen_id: others[0] };
+  return { ...task, task_kind: "go_to_location", target_citizen_id: null, target_citizen_ids: [],
+    plan_summary: `${task.plan_summary ?? ""} ${findCitizen(city, player).name} can meet them there.`.trim() };
+}
+
 function blockManualTask(
   city: CityState,
   citizen: CitizenAgent,
@@ -2565,9 +2596,12 @@ function blockManualTask(
     blocked_minute: city.clock.minute_of_day,
   };
   citizen.personality = { ...citizen.personality, player_task: blocked };
-  citizen.current_activity = "AI planning unavailable";
-  citizen.current_thought =
-    "I need my AI cognition before I can handle that task like a real person.";
+  // Only a real AI failure says so; waiting for someone's answer is just waiting.
+  const aiDown = eventType === "agent_planning_blocked" || eventType === "agent_cognition_blocked";
+  citizen.current_activity = aiDown ? "AI planning unavailable" : eventType === "invitation_unresolved" ? "Waiting for an answer" : "Waiting to talk it over";
+  citizen.current_thought = aiDown
+    ? "I need my AI cognition before I can handle that task like a real person."
+    : `I'm waiting before I go ahead with: ${task.task}`;
   citizen.short_term_goals = withoutPlayerTask(citizen.short_term_goals);
   addEvent(city, {
     event_type: eventType,
