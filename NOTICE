@@ -6,3 +6,5 @@ Third-party components:
   frontend/public/art/trees/leaves.
 - Poly Haven textures (CC0): frontend/public/art/surfaces and frontend/public/art/trees/bark.
 - MakeHuman Community assets (CC0): frontend/public/characters (see CREDITS.md there).
+- Earth imagery (frontend/public/art/earth/earth.jpg): NASA Visible Earth, Blue Marble Next Generation
+  with Topography and Bathymetry (September 2004), public domain. Courtesy NASA Earth Observatory.

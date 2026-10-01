@@ -56,6 +56,8 @@ export class CityRenderer {
   private readonly people = new Map<string, CitizenModel>();
   private street!: StreetView;
   private lastLook: { x: number; y: number } | null = null;
+  /** While the opening descent plays, the camera glides down slowly instead of snapping. */
+  private descentUntil = 0;
   // Street view: a marker that leads you to the scene being played, and a speech bubble you can overhear.
   private readonly sceneMarker = document.createElement("button");
   private readonly bubble = document.createElement("div");
@@ -558,6 +560,18 @@ export class CityRenderer {
     this.mode = mode;
     if (mode === "follow") this.focusCitizen(true);
   }
+  /** The end of the opening flight from space: the camera drops out of the sky onto the town. */
+  introDescent() {
+    if (this.street.active) return;
+    const target = this.controls.target.clone();
+    const end = this.camera.position.clone();
+    this.controls.maxDistance = 700;
+    this.camera.position.set(target.x + 12, 300, target.z + 70);
+    this.controls.update();
+    this.descentUntil = this.seconds + 6;
+    this.focusTarget = target;
+    this.shotPosition = end;
+  }
   /** Street view from in front of a place, e.g. "jump to the station". */
   streetViewAt(locationId: string) {
     const spot = arrivals[locationId];
@@ -802,7 +816,9 @@ export class CityRenderer {
     if (followed) this.focusTarget = followed.root.position.clone();
     if (this.street.active) this.street.update(dt, this.reducedMotion.matches);
     else if (this.shotPosition && this.focusTarget) {
-      const smoothing = this.reducedMotion.matches ? 1 : Math.min(1, dt * 2.8);
+      const descending = this.seconds < this.descentUntil;
+      const smoothing = this.reducedMotion.matches ? 1 : Math.min(1, dt * (descending ? 1.15 : 2.8));
+      if (!descending && this.controls.maxDistance > 190) this.controls.maxDistance = 190;
       this.camera.position.lerp(this.shotPosition, smoothing);
       this.controls.target.lerp(this.focusTarget, smoothing);
       if (this.camera.position.distanceTo(this.shotPosition) < 0.005) {

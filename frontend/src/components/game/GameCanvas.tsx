@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -22,8 +22,16 @@ import { HEARING, type CameraMode, type CityRenderer } from "@/game/three/render
 import type { ConversationFrame } from "@/lib/conversation-playback";
 import { useGameStore } from "@/lib/store";
 import { LiveConversation } from "./LiveConversation";
+import { EarthIntro } from "./EarthIntro";
 import { calendarDay, formatDate } from "@/lib/calendar";
 import { weekday } from "@/lib/routine";
+
+const REDUCED = "(prefers-reduced-motion: reduce)";
+function subscribeReducedMotion(onChange: () => void) {
+  const query = window.matchMedia(REDUCED);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
 
 export function GameCanvas({
   city,
@@ -98,6 +106,23 @@ export function GameCanvas({
     setMode(next);
     renderer.current?.setMode(next);
   }
+  // The opening flight from space onto Nakameguro (skipped for reduced motion).
+  // The prerender assumes reduced motion (no intro); the browser then knows the real preference.
+  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, () => window.matchMedia(REDUCED).matches, () => true);
+  const [introDone, setIntroDone] = useState(false);
+  const intro = !reducedMotion && !introDone;
+  const pendingDescent = useRef(false);
+  const descend = useCallback(() => {
+    if (renderer.current) renderer.current.introDescent();
+    else pendingDescent.current = true;
+  }, []);
+  useEffect(() => {
+    if (ready && pendingDescent.current) {
+      pendingDescent.current = false;
+      renderer.current?.introDescent();
+    }
+  }, [ready]);
+  const endIntro = useCallback(() => setIntroDone(true), []);
   // Street view: how far the scene being played is, so you have to walk over to hear it.
   const [sceneDistance, setSceneDistance] = useState<number | null>(null);
   useEffect(() => {
@@ -116,6 +141,7 @@ export function GameCanvas({
   return (
     <>
       <div ref={host} className="three-world" />
+      {intro && <EarthIntro townReady={ready} onDescend={descend} onDone={endIntro} />}
       {ready && conversation && city && (
         <LiveConversation key={conversation.conversation_id} conversation={conversation}
           citizens={city.citizens} onFrame={stageConversation} onFinish={finishPlayback}

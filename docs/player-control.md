@@ -85,6 +85,13 @@ storyline's proposal is a real question: a yes starts dating, a no is a no. The 
 into a scene. Every four game hours a town incident (the shrine festival, a power cut, a lost cat...) gives
 everyone something to talk about. A full game day has about 18 storyline scenes and 36 conversations in all.
 
+## Opening flight
+
+Opening the game starts in space: the Earth (NASA Blue Marble imagery) turns to Japan, dives towards Tokyo and
+through the clouds, and the town camera finishes the descent onto Nakameguro (about 7 seconds;
+`EarthIntro.tsx`, `CityRenderer.introDescent`). **Skip** jumps straight in, and it is skipped for players who
+prefer reduced motion.
+
 ## Street view
 
 **Street** (next to Explore and Follow on the map) puts you in the street at eye level, like Google Street View:
