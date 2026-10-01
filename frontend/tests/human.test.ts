@@ -26,7 +26,7 @@ function fixture() {
   scene.add(lashes);
   return { gltf: { scene } as unknown as GLTF, skin, hidden, lashes };
 }
-const pose: HumanPose = { legs:[0.4,-0.4], arms:[[0,0],[0,0]], head:{yaw:0.2,pitch:0,tilt:0}, lean:{x:0,z:0}, blink:1, voice:0.5, emotion:"happy" };
+const pose: HumanPose = { legs:[0.4,-0.4], arms:[[0,0],[0,0]], head:{yaw:0.2,pitch:0,tilt:0}, lean:{x:0,z:0}, blink:1, voice:0.5, emotion:"happy", gait:{moving:false, phase:0}, time:0 };
 
 test("MetaHuman is centered, grounded and normalized without hidden export geometry", () => {
   const f = fixture(), orientation = f.gltf.scene.quaternion.clone();

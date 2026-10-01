@@ -1,7 +1,82 @@
 {
   "residents": {
-    "cit_009": { "file": "cit_009.glb" },
-    "cit_010": { "file": "cit_010.glb" },
-    "cit_026": { "file": "cit_026.glb" }
+    "cit_009": {
+      "file": "cit_009.glb"
+    },
+    "cit_010": {
+      "file": "cit_010.glb"
+    },
+    "cit_021": {
+      "file": "cit_021.glb"
+    },
+    "cit_022": {
+      "file": "cit_022.glb"
+    },
+    "cit_026": {
+      "file": "cit_026.glb"
+    },
+    "cit_027": {
+      "file": "cit_027.glb"
+    },
+    "cit_028": {
+      "file": "cit_028.glb"
+    },
+    "cit_029": {
+      "file": "cit_029.glb"
+    },
+    "cit_030": {
+      "file": "cit_030.glb"
+    },
+    "cit_031": {
+      "file": "cit_031.glb"
+    },
+    "cit_032": {
+      "file": "cit_032.glb"
+    },
+    "cit_033": {
+      "file": "cit_033.glb"
+    },
+    "cit_034": {
+      "file": "cit_034.glb"
+    },
+    "cit_035": {
+      "file": "cit_035.glb"
+    },
+    "cit_036": {
+      "file": "cit_036.glb"
+    },
+    "cit_037": {
+      "file": "cit_037.glb"
+    },
+    "cit_038": {
+      "file": "cit_038.glb"
+    },
+    "cit_039": {
+      "file": "cit_039.glb"
+    },
+    "cit_040": {
+      "file": "cit_040.glb"
+    },
+    "cit_041": {
+      "file": "cit_041.glb"
+    },
+    "cit_042": {
+      "file": "cit_042.glb"
+    },
+    "cit_043": {
+      "file": "cit_043.glb"
+    },
+    "cit_044": {
+      "file": "cit_044.glb"
+    },
+    "cit_045": {
+      "file": "cit_045.glb"
+    },
+    "cit_046": {
+      "file": "cit_046.glb"
+    },
+    "cit_047": {
+      "file": "cit_047.glb"
+    }
   }
 }
