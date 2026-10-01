@@ -6,7 +6,8 @@ import { useEffect, useRef } from "react";
 // Nakameguro, where the town camera finishes the descent. Earth imagery: NASA Blue Marble (public domain).
 
 const NAKAMEGURO = { lat: 35.644, lon: 139.699 };
-const CAPTIONS: Array<[number, string]> = [[0, "Earth"], [2.6, "Japan"], [4, "Tokyo"], [5.1, "Nakameguro, Meguro City"]];
+// The planet needs no label; captions start once there is somewhere to name.
+const CAPTIONS: Array<[number, string]> = [[0, ""], [2.6, "Japan"], [4, "Tokyo"], [5.1, "Nakameguro, Meguro City"]];
 /** Seconds: the globe turns and zooms until DIVE_END, the clouds close in, the town descends behind them, then fade. */
 const DIVE_END = 5.6, CLOUD_IN = 5.0, DESCEND_AT = 5.4, FADE_START = 6.2, FADE_END = 7.2;
 
@@ -142,7 +143,7 @@ export function EarthIntro({ townReady, onDescend, onDone }: { townReady: boolea
     <div ref={root} className="earth-intro" aria-label="Flying in to Nakameguro">
       <div ref={host} className="earth-intro-canvas" />
       <div ref={cloudEl} className="earth-intro-clouds" style={{ opacity: 0 }} />
-      <p ref={captionEl} className="earth-intro-caption earth-intro-caption-in">Earth</p>
+      <p ref={captionEl} className="earth-intro-caption" />
       <button className="earth-intro-skip" onClick={skip}>Skip</button>
     </div>
   );
