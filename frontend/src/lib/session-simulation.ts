@@ -27,6 +27,7 @@ import { validateCognition } from "./cognition-validation";
 import { isWeekend, routineStop, weekday, type RoutineContext } from "./routine";
 import { agreedPlan } from "./plans";
 import { MAX_PROMPT } from "./character-prompt";
+import { INCIDENTS, INCIDENT_GAP, SCENE_GAP, STORYLINES, nextBeat, sceneHours, storyState, type Seed, type StoryState } from "./storyteller";
 import { actBlocked, actRequest, applyAct, resolveProposal, type ActInterpretation, type ActRequest, type BondChange } from "./acts";
 import { calendarDay, calendarStartFor, realCityTime } from "./calendar";
 import { dayWeather, weatherAt, type WeatherOverride } from "./weather";
@@ -218,6 +219,7 @@ export async function sessionStart() {
   }
   city.clock.running = true;
   delete city.policy.autonomy_error;
+  delete city.policy.paused_while_away;
   city.policy.autonomy_failures = 0;
   addEvent(city, {
     event_type: "simulation_started",
@@ -227,9 +229,12 @@ export async function sessionStart() {
   return saveAndReturn(city);
 }
 
-export async function sessionPause() {
+/** `hidden`: paused only because the tab was hidden, so it resumes by itself when the player comes back. */
+export async function sessionPause(reason?: "hidden") {
   const city = requireSessionCity();
   city.clock.running = false;
+  if (reason === "hidden") city.policy.paused_while_away = true;
+  else delete city.policy.paused_while_away;
   addEvent(city, {
     event_type: "simulation_paused",
     description: "The city simulation paused.",
@@ -396,6 +401,24 @@ export async function sessionSetMode(mode: SimulationMode) {
       priority: 2,
     });
   }
+  return saveAndReturn(city);
+}
+
+/**
+ * Every world plays as a show: Auto, story pace (fast time), clock running, storylines planted. Once per world,
+ * so whatever the player chooses afterwards (Manual, Live time, a pause) sticks across reloads.
+ */
+export async function sessionStartStory() {
+  const city = requireSessionCity();
+  // Coming back to a town that only paused because you looked away: it carries on.
+  if (city.policy.story_started && city.policy.paused_while_away) return sessionStart();
+  if (city.policy.story_started) return city;
+  city.policy = { ...city.policy, story_started: true, time_mode: "fast", simulation_mode: "autonomous" };
+  city.simulation_mode = "autonomous";
+  city.clock.running = true;
+  delete city.policy.autonomy_error;
+  plantStory(city);
+  addEvent(city, { event_type: "story_started", description: "🎬 Nakameguro is on. Secrets are kept, hearts are racing, and the storyteller is watching.", priority: 2 });
   return saveAndReturn(city);
 }
 
@@ -1730,6 +1753,7 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
       }
     }
   }
+  if (!city.encounter) stageStoryScene(city, now);
   const encounter = city.encounter;
   if (encounter) {
     const actor = findCitizen(city, encounter.actor_id), target = findCitizen(city, encounter.target_id);
@@ -1741,8 +1765,10 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
     }
     if ((!beat && now <= encounter.started_at) || !sociallyAvailable(actor, city.policy.player_citizen_id) || !sociallyAvailable(target, city.policy.player_citizen_id) || !nearCitizen(actor, target)) return;
     const event = addEvent(city, { event_type: "social_opportunity", actors: [actor.citizen_id, target.citizen_id], location_id: encounter.location_id,
-      description: encounter.reason, payload: { topic: encounter.topic, kind: encounter.meeting_id ? "planned" : "chance", meeting_id: encounter.meeting_id }, priority: 2 });
-    await runAutonomousCognition(city, event, cognition);
+      description: encounter.reason, payload: { topic: encounter.topic, kind: encounter.meeting_id ? "planned" : "chance", meeting_id: encounter.meeting_id,
+        stakes: encounter.story?.stakes, proposal: encounter.story?.proposal }, priority: 2 });
+    const response = await runAutonomousCognition(city, event, cognition);
+    if (encounter.story && response) storyMovedOn(city, encounter.story, actor, target, response, now);
     if (encounter.meeting_id) {
       const meeting = city.meetings?.find((m) => m.id === encounter.meeting_id);
       if (meeting) meeting.status = "completed";
@@ -1777,6 +1803,89 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
     reason: decision.reason, topic: decision.topic, started_at: now };
   addEvent(city, { event_type: "encounter_intention", actors: [choice.actor.citizen_id, decision.target_id], location_id: choice.actor.current_location_id,
     description: `${choice.actor.name} wants to approach ${findCitizen(city, decision.target_id).name}: ${decision.reason}`, priority: 2 });
+}
+
+/** Plants the storylines' secrets and feelings, once per world. */
+function plantStory(city: CityState) {
+  if (city.policy.story_planted) return;
+  for (const storyline of STORYLINES) for (const seed of storyline.seeds) plantSeed(city, seed);
+  city.policy.story_planted = true;
+}
+
+function plantSeed(city: CityState, seed: Seed) {
+  if (!city.citizens.some((c) => c.citizen_id === seed.who)) return;
+  addMemory({ citizen_id: seed.who, kind: "episodic", content: seed.memory, importance: 0.9, salience: 0.9,
+    related_citizen_id: seed.feels?.toward ?? null, extra: { source: "story" } });
+  const feels = seed.feels;
+  if (!feels || !city.citizens.some((c) => c.citizen_id === feels.toward)) return;
+  const relationships = ensureRelationships(city);
+  const bond = relationships.find((r) => r.citizen_id === seed.who && r.other_citizen_id === feels.toward);
+  if (!bond) return;
+  const feelings = { affection: 0, jealousy: 0, resentment: 0, admiration: 0, ...bond.feelings };
+  for (const key of ["affection", "jealousy", "resentment", "admiration"] as const) feelings[key] = Math.max(feelings[key], feels[key] ?? 0);
+  bond.feelings = feelings;
+  writeJson(RELATIONSHIPS_KEY, relationships);
+}
+
+/**
+ * The director: in the waking day, every SCENE_GAP game minutes, it stages the next beat of the storyline that
+ * has waited longest, if both people can take part. The actor goes to find the other person; the scene plays
+ * at once (no separate "should I talk?" AI call). Town-wide incidents land every few hours.
+ */
+function stageStoryScene(city: CityState, now: number) {
+  if (city.simulation_mode !== "autonomous" || !sceneHours(city.clock.minute_of_day)) return;
+  plantStory(city);
+  const story = storyState(city.policy);
+  if (now - story.last_incident >= INCIDENT_GAP) townIncident(city, story, now);
+  city.policy.story = story;
+  if (now - story.last_scene < SCENE_GAP) return;
+  const player = city.policy.player_citizen_id;
+  const person = (id: string) => city.citizens.find((c) => c.citizen_id === id);
+  const next = nextBeat(story, (id) => {
+    const c = person(id);
+    return Boolean(c && sociallyAvailable(c, player) && !meetingFor(city, c));
+  });
+  if (!next) return;
+  const { storyline, beat, index } = next;
+  const actor = person(beat.actor)!, target = person(beat.target)!;
+  for (const seed of beat.prelude ?? []) plantSeed(city, seed);
+  if (!nearCitizen(actor, target)) {
+    actor.current_location_id = target.current_location_id;
+    actor.x = actor.target_x = target.x;
+    actor.y = actor.target_y = target.y;
+  }
+  actor.current_activity = `Talking with ${target.name}`;
+  story.last_scene = now;
+  city.policy.story = story;
+  addEvent(city, { event_type: "story_beat", actors: [actor.citizen_id, target.citizen_id], location_id: target.current_location_id,
+    description: beat.headline, payload: { storyline: storyline.id, beat: index, title: storyline.title }, priority: 3 });
+  city.encounter = { actor_id: actor.citizen_id, target_id: target.citizen_id, location_id: target.current_location_id, reason: beat.reason,
+    topic: beat.topic, started_at: now - 15, story: { id: storyline.id, beat: index, stakes: beat.stakes, proposal: beat.proposal } };
+}
+
+/** After a staged scene plays, its storyline moves on; a proposal's answer counts (a no is a no). */
+function storyMovedOn(city: CityState, staged: NonNullable<import("./encounters").Encounter["story"]>, actor: CitizenAgent, target: CitizenAgent,
+  response: SessionCognitionResponse, now: number) {
+  const story = storyState(city.policy);
+  story.progress[staged.id] = Math.max(story.progress[staged.id] ?? 0, staged.beat + 1);
+  story.advanced[staged.id] = now;
+  city.policy.story = story;
+  const answer = response.participant_outcomes?.[target.citizen_id]?.invitation_response;
+  if (staged.proposal && (answer === "accepted" || answer === "declined")) {
+    const tools = { sink: lifeSink(city), adjustBonds: (changes: BondChange[]) => adjustBonds(city, changes), bond: bondLookup(city) };
+    resolveProposal(city, staged.proposal, actor, target, answer === "accepted", tools);
+  }
+}
+
+function townIncident(city: CityState, story: StoryState, now: number) {
+  const incident = INCIDENTS[story.incidents % INCIDENTS.length];
+  story.incidents += 1;
+  story.last_incident = now;
+  const who = incident.who === "everyone" ? city.citizens.filter((c) => c.age >= 13).map((c) => c.citizen_id) : incident.who;
+  for (const id of who)
+    if (city.citizens.some((c) => c.citizen_id === id))
+      addMemory({ citizen_id: id, kind: "episodic", content: incident.memory, importance: 0.8, salience: 0.8, related_citizen_id: null, extra: { source: "town_incident", incident: incident.id } });
+  addEvent(city, { event_type: "town_incident", actors: [], description: incident.headline, payload: { incident: incident.id }, priority: 3 });
 }
 
 /**
@@ -2089,6 +2198,10 @@ async function runAutonomousCognition(
       `${actor.name} is ${actor.mood.toLowerCase()} and ${target.name} is ${target.mood.toLowerCase()}.`,
       "Let them talk like real people of their ages. The conversation should reveal whether they are strangers, acquaintances, friends, family, or at odds.",
       "Respect a wish for privacy or a refusal. A conversation may end without becoming friends. Only make a future plan if both genuinely want it.",
+      ...(event.payload?.stakes ? [
+        `What's at stake: ${String(event.payload.stakes).slice(0, 300)}`,
+        "This moment matters to them. Let real feelings show (nerves, hurt, hope, anger or awkwardness, whatever fits who they are). Don't smooth it over or wrap up with polite pleasantries; it can end unresolved.",
+      ] : []),
     ],
     memories: [],
     private_memories: {

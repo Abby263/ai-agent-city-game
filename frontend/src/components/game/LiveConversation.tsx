@@ -93,6 +93,12 @@ export function LiveConversation({ conversation, citizens, location, dateLabel, 
       phase: !arrived ? "arrival" : introduced ? "dialogue" : "establishing" }, ready);
   }, [conversation, line?.speaker_id, line?.text, lineIndex, arrived, introduced, paused, onFrame, ready]);
   useEffect(() => () => onFrame(null), [onFrame]);
+  // If the walk-over can't finish (a blocked path, a slow device), the scene starts anyway rather than hanging.
+  useEffect(() => {
+    if (arrived) return;
+    const timer = window.setTimeout(() => { if (!document.hidden) ready(); }, 8000);
+    return () => window.clearTimeout(timer);
+  }, [arrived, ready]);
   useEffect(() => useGameStore.subscribe((state, previous) => {
     if (state.city?.clock.running !== previous.city?.clock.running) setPaused(!state.city?.clock.running);
   }), []);

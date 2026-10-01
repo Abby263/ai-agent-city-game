@@ -181,7 +181,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (city.status !== "fulfilled") {
         throw city.reason;
       }
-      get().setCity(city.value);
+      get().setCity(await api.startStory(city.value).catch(() => city.value));
       if (cityConversations.status === "fulfilled") {
         cityConversations.value.forEach((c) => knownConversations.add(c.conversation_id));
       }

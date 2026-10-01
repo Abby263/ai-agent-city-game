@@ -355,29 +355,38 @@ export function AgentCityShell() {
     const timer = window.setInterval(check, 3000);
     return () => { window.clearTimeout(first); window.clearInterval(timer); };
   }, [live, act, tickOnce, onCognitionStart]);
+  // Story pace: a game hour every 16 s at 1x, and the night passes in seconds. Scenes hold the clock while
+  // they play, so time slows down exactly when something is happening.
   useEffect(() => {
     if (live || !city?.clock.running) return;
-    const advance = () => {
-      if (document.hidden || useGameStore.getState().playbackQueue.length || useGameStore.getState().playbackHeld) return;
-      void act(tickOnce);
+    let timer = 0;
+    const pace = () => {
+      const current = useGameStore.getState().city;
+      if (current?.policy.player_destination) return 850;
+      const minute = current?.clock.minute_of_day ?? 720;
+      return minute >= 1350 || minute < 390 ? 250 : 4000 / speed;
     };
-    const firstTick = window.setTimeout(advance, 1000);
-    const timer = window.setInterval(
-      advance,
-      city.policy.player_destination ? 850 : 8000 / speed,
-    );
-    return () => { window.clearTimeout(firstTick); window.clearInterval(timer); };
-  }, [live, city?.clock.running, city?.policy.player_destination, speed, act, tickOnce]);
+    const advance = () => {
+      const store = useGameStore.getState();
+      if (!document.hidden && !store.playbackQueue.length && !store.playbackHeld) void act(tickOnce);
+      timer = window.setTimeout(advance, pace());
+    };
+    timer = window.setTimeout(advance, 1000);
+    return () => window.clearTimeout(timer);
+  }, [live, city?.clock.running, speed, act, tickOnce]);
 
   // A paused or hidden game must not keep scheduling model calls. The timers already skip hidden tabs;
   // this stops a running clock, but never cancels what is in flight, such as the reply to your own line.
   useEffect(() => {
     const hide = () => {
-      if (document.hidden && useGameStore.getState().city?.clock.running && !flight.current) void api.pause().then(setCity);
+      const city = useGameStore.getState().city;
+      if (document.hidden && city?.clock.running && !flight.current) void api.pause("hidden").then(setCity);
+      // Back again: a town that only paused because you looked away carries on.
+      else if (!document.hidden && city?.policy.paused_while_away) void act(api.start);
     };
     document.addEventListener("visibilitychange", hide);
     return () => document.removeEventListener("visibilitychange", hide);
-  }, [setCity]);
+  }, [setCity, act]);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") { setPanel(null); closeWelcome(); }
@@ -597,7 +606,7 @@ export function AgentCityShell() {
           <select
             className="speed-select"
             aria-label="Time"
-            title="Live follows real Tokyo time; fast-forward speeds life up"
+            title="Story pace keeps something happening; Live follows real Tokyo time"
             value={live ? "live" : String(speed)}
             onChange={(event) => {
               const value = event.target.value;
@@ -606,10 +615,10 @@ export function AgentCityShell() {
               if (live) void act(() => api.setTimeMode("fast"));
             }}
           >
-            <option value="live">🔴 Live</option>
-            <option value="1">⏩ 1x</option>
+            <option value="1">▶ Story</option>
             <option value="2">⏩ 2x</option>
             <option value="4">⏩ 4x</option>
+            <option value="live">🔴 Live</option>
           </select>
           <button
             className="icon-button"
