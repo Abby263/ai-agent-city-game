@@ -93,6 +93,12 @@ to zoom, pick **Go to…** to stand in front of any place, and press Esc or **Ex
 Movement stays on walkable ground; residents keep living around you and can be clicked as usual
 (`frontend/src/game/three/street-view.ts`).
 
+Street view is also how you follow the drama. When a scene starts, a **🎬 marker** shows who is talking and how
+far away they are, floating over them or pinned to the screen edge with an arrow; click it to go there. You only
+hear a conversation within about 24 m: from further away the subtitles say you're too far to hear (with **Go
+there**), and up close each line also floats over the speaker's head as a speech bubble. Scenes can always be
+replayed in full from Talk. There is no depth-of-field blur in street view.
+
 The town is built at true scale for this (one unit is about 2 m): people about 0.85 units tall, Japanese houses
 with tiled gable roofs, gutters, balconies and storm-shutter boxes, glass-fronted shops, apartment blocks with
 balcony grids, a curtain-wall office tower and concrete public buildings (`architecture.ts`); real instanced trees

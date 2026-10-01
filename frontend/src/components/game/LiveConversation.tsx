@@ -12,7 +12,7 @@ import { castVoices, deliveryStyle } from "@/lib/voices";
 const subscribeToSupport = () => () => {};
 const supportsVoices = () => typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 
-export function LiveConversation({ conversation, citizens, location, dateLabel, onFrame, onFinish, onFocus }: {
+export function LiveConversation({ conversation, citizens, location, dateLabel, onFrame, onFinish, onFocus, faraway }: {
   conversation: PlaybackConversation;
   citizens: CitizenAgent[];
   location: string;
@@ -20,6 +20,8 @@ export function LiveConversation({ conversation, citizens, location, dateLabel, 
   onFrame: (frame: ConversationFrame | null, onReady?: () => void) => void;
   onFinish: (id: string) => void;
   onFocus: () => void;
+  /** Street view: you're too far away to hear; walk there (or replay it later from Talk). */
+  faraway?: { metres: number; onGo: () => void } | null;
 }) {
   const [lineIndex, setLineIndex] = useState(0);
   const [arrived, setArrived] = useState(false);
@@ -66,10 +68,11 @@ export function LiveConversation({ conversation, citizens, location, dateLabel, 
     });
   }, [arrived, introduced, line, paused, conversation.conversation_id, conversation.transcript, lineIndex, volume, next, cast, citizens]);
 
+  const outOfEarshot = Boolean(faraway);
   useEffect(() => {
-    if (audioEnabled && !paused) speak();
+    if (audioEnabled && !paused && !outOfEarshot) speak();
     else audio.current?.stop();
-  }, [audioEnabled, paused, speak]);
+  }, [audioEnabled, paused, speak, outOfEarshot]);
   useEffect(() => () => audio.current?.stop(), []);
 
   const toggleAudio = () => {
@@ -128,7 +131,11 @@ export function LiveConversation({ conversation, citizens, location, dateLabel, 
         <>
           <div className="live-subtitle" aria-live="polite" aria-atomic="true">
             {speaker && <CitizenPortrait citizen={speaker} size={48} />}
-            <div><strong>{speaker?.name ?? "Resident"}</strong><p key={lineIndex}>{displayText(line.text)}</p></div>
+            {faraway ? (
+              <div className="overhear-far"><strong>{speaker?.name ?? "Resident"}</strong>
+                <p>Too far to hear. {participants.map((c) => c.name.split(" ")[0]).join(" and ")} are talking about {faraway.metres} m away.</p>
+                <button className="outline-action" onClick={faraway.onGo}>Go there</button></div>
+            ) : <div><strong>{speaker?.name ?? "Resident"}</strong><p key={lineIndex}>{displayText(line.text)}</p></div>}
           </div>
           <div className="live-dialogue-controls">
             <span>{lineIndex + 1} / {conversation.transcript.length}</span>

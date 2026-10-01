@@ -2134,3 +2134,13 @@ select {
 .street-view-row .street-view-exit { background: #f3f9fa; color: #14252d; }
 .conversation-on-stage .street-view-controls { bottom: auto; top: 140px; }
 @media (max-width: 600px) { .street-view-controls { bottom: 100px; } .street-view-controls p { font-size: 11px; } }
+
+/* Street view: a marker leading to the scene, and the current line floating over the speaker. */
+.street-scene-marker { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: auto; padding: 6px 12px; border: 1px solid #ffffff55; border-radius: 999px; background: #c2410cee; color: #fff; font: 600 13px/1.2 inherit; white-space: nowrap; cursor: pointer; box-shadow: 0 4px 14px #0005; }
+.street-scene-marker[hidden], .street-speech-bubble[hidden] { display: none; }
+.street-speech-bubble { position: absolute; left: 0; top: 0; z-index: 3; max-width: min(300px, 70vw); padding: 8px 12px; border-radius: 14px; background: #fffef8f2; color: #1d2a2f; font-size: 13px; line-height: 1.4; box-shadow: 0 4px 16px #0004; }
+.street-speech-bubble::after { content: ""; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 7px solid transparent; border-bottom: 0; border-top-color: #fffef8f2; }
+.overhear-far p { font-style: italic; opacity: 0.85; }
+.overhear-far .outline-action { margin-top: 6px; white-space: nowrap; }
+.conversation-on-stage .street-view-controls { top: 70px; bottom: auto; }
+.conversation-on-stage .street-view-controls p { display: none; }
