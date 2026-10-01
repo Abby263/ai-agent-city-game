@@ -25,6 +25,8 @@ import { calendarDay, calendarStartFor } from "@/lib/calendar";
 import type { WeatherNow } from "@/lib/weather";
 
 export type CameraMode = "orbit" | "follow" | "street";
+/** In street view you hear a conversation within about 24 m (12 town units). */
+export const HEARING = 12;
 const nightAmbient = new THREE.Color(0x8fa3d6);
 const overcast = new THREE.Color(0x9aa5ad), snowSky = new THREE.Color(0xdfe6ec), heatSky = new THREE.Color(0xf3dcb6), lightningSky = new THREE.Color(0xeef2ff);
 export class CityRenderer {
@@ -54,6 +56,9 @@ export class CityRenderer {
   private readonly people = new Map<string, CitizenModel>();
   private street!: StreetView;
   private lastLook: { x: number; y: number } | null = null;
+  // Street view: a marker that leads you to the scene being played, and a speech bubble you can overhear.
+  private readonly sceneMarker = document.createElement("button");
+  private readonly bubble = document.createElement("div");
   // Realistic bodies are downloaded only for residents you can see up close.
   private readonly humans = new HumanLibrary();
   private readonly humanRequested = new Set<string>();
@@ -193,6 +198,13 @@ export class CityRenderer {
     };
     this.controls.addEventListener("start", this.cancelFocus);
     this.street = new StreetView(this.camera, this.controls);
+    this.sceneMarker.type = "button";
+    this.sceneMarker.className = "street-scene-marker";
+    this.sceneMarker.hidden = true;
+    this.sceneMarker.addEventListener("click", (event) => { event.stopPropagation(); this.streetGoToScene(); });
+    this.bubble.className = "street-speech-bubble";
+    this.bubble.hidden = true;
+    this.names.append(this.sceneMarker, this.bubble);
     this.renderer.domElement.addEventListener("wheel", this.streetWheel, { passive: false });
     this.camera.position.set(23, 17, 31);
     this.controls.target.set(12, 0.2, 12);
@@ -557,6 +569,72 @@ export class CityRenderer {
     this.street.yaw = 0;
     this.street.pitch = 0.08;
   }
+  /** The middle of the scene being played: where its people stand (or are heading). */
+  private sceneCenter() {
+    const models = this.conversation?.actorIds.map((id) => this.people.get(id)).filter((m) => m !== undefined) ?? [];
+    if (!models.length) return null;
+    return models.reduce((sum, m) => sum.add(m.destination ? new THREE.Vector3(m.destination.x, 0, m.destination.z) : m.root.position.clone().setY(0)),
+      new THREE.Vector3()).multiplyScalar(1 / models.length);
+  }
+  /** Street view only: how far the scene being played is from you, in town units (one is about 2 m). */
+  streetSceneDistance() {
+    const center = this.street.active ? this.sceneCenter() : null;
+    return center ? center.distanceTo(this.street.standing.setY(0)) : null;
+  }
+  /** Walks you to a few metres from the scene and turns you to watch it. */
+  streetGoToScene() {
+    const center = this.sceneCenter();
+    if (!center || !this.street.active) return;
+    const from = this.street.standing.setY(0);
+    const away = from.clone().sub(center).setY(0);
+    if (away.lengthSq() < 0.01) away.set(0, 0, 1);
+    const spot = center.clone().add(away.setLength(1.6));
+    if (!this.street.walkTo({ x: spot.x, z: spot.z })) this.street.enter({ x: spot.x, z: spot.z });
+    this.street.face(center);
+  }
+  private updateStreetScene() {
+    const center = this.street.active ? this.sceneCenter() : null;
+    if (!center || !this.conversation) {
+      this.sceneMarker.hidden = true;
+      this.bubble.hidden = true;
+      return;
+    }
+    const distance = center.distanceTo(this.camera.position.clone().setY(0));
+    // The marker: over the scene when it's in view, pinned to the screen edge with an arrow when it isn't.
+    if (distance > 5) {
+      const names = this.conversation.actorIds.map((id) => this.people.get(id)?.citizen.name.split(" ")[0]).filter(Boolean).join(" & ");
+      const metres = Math.round(distance * 2);
+      this.vector.copy(center).setY(1.3).project(this.camera);
+      const ahead = this.vector.z < 1 && Math.abs(this.vector.x) < 0.9 && Math.abs(this.vector.y) < 0.85;
+      let x = this.vector.x, y = this.vector.y, anchor = "-50%";
+      if (!ahead) {
+        if (this.vector.z >= 1) { x = -x; y = -y; }
+        const side = x >= 0 ? 1 : -1;
+        // Pinned to the edge it points to, reading inwards so it's never cut off.
+        x = side;
+        anchor = side > 0 ? "calc(-100% - 12px)" : "12px";
+        y = THREE.MathUtils.clamp(y, -0.2, 0.5);
+        this.sceneMarker.textContent = side > 0 ? `🎬 ${names} · ${metres} m →` : `← 🎬 ${names} · ${metres} m`;
+      } else this.sceneMarker.textContent = `🎬 ${names} · ${metres} m`;
+      this.sceneMarker.hidden = false;
+      this.sceneMarker.style.transform = `translate(${((x + 1) * this.width) / 2}px,${((1 - y) * this.height) / 2}px) translate(${anchor}, -50%)`;
+    } else this.sceneMarker.hidden = true;
+    // Overhearing: the current line floats over the speaker, if you're close enough to hear it.
+    const speaker = this.conversation.speakerId ? this.people.get(this.conversation.speakerId) : undefined;
+    if (speaker && this.conversation.line && distance < HEARING) {
+      if (this.bubble.textContent !== this.conversation.line) this.bubble.textContent = this.conversation.line;
+      this.vector.copy(speaker.root.position);
+      this.vector.y += speaker.labelLift + 0.06;
+      this.vector.project(this.camera);
+      const visible = this.vector.z < 1 && Math.abs(this.vector.x) < 0.95;
+      this.bubble.hidden = !visible;
+      if (visible) {
+        // Just above the head, but never up under the street-view controls.
+        const x = ((this.vector.x + 1) * this.width) / 2, y = Math.max(((1 - this.vector.y) * this.height) / 2, this.bubble.offsetHeight + 130);
+        this.bubble.style.transform = `translate(${x}px,${y}px) translate(-50%, -100%)`;
+      }
+    } else this.bubble.hidden = true;
+  }
   streetStep(distance: number) {
     this.street.step(distance);
   }
@@ -801,7 +879,9 @@ export class CityRenderer {
     }
     this.camera.position.add(this.shake);
     this.skyDome.dome.position.copy(this.camera.position);
-    this.post.render(dt, this.night, this.conversation && this.conversation.phase !== "arrival" ? cameraDistance : 0);
+    this.updateStreetScene();
+    // No depth-of-field in street view: you choose where to look.
+    this.post.render(dt, this.night, this.conversation && this.conversation.phase !== "arrival" && !this.street.active ? cameraDistance : 0);
     this.camera.position.sub(this.shake);
     this.host.dataset.rendered = "true";
   };
@@ -934,6 +1014,8 @@ export class CityRenderer {
       this.pointerCancel,
     );
     this.street.dispose();
+    this.sceneMarker.remove();
+    this.bubble.remove();
     this.renderer.domElement.removeEventListener("wheel", this.streetWheel);
     this.controls.dispose();
     this.people.forEach((p) => p.dispose());

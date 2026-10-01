@@ -96,6 +96,17 @@ export class StreetView {
     this.yaw += angle;
   }
 
+  /** Turns to face a point, level with the horizon. */
+  face(point: THREE.Vector3) {
+    this.yaw = Math.atan2(-(point.x - this.target.x), -(point.z - this.target.z));
+    this.pitch = 0.02;
+  }
+
+  /** Where you'll be standing once any walk finishes. */
+  get standing() {
+    return this.target.clone();
+  }
+
   update(dt: number, reducedMotion: boolean) {
     if (!this.active) return;
     const forward = (this.keys.has("ArrowUp") || this.keys.has("KeyW") ? 1 : 0) - (this.keys.has("ArrowDown") || this.keys.has("KeyS") ? 1 : 0);

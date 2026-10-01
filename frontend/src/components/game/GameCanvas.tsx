@@ -18,7 +18,7 @@ import {
   RotateCw,
 } from "lucide-react";
 import type { CityState } from "@/lib/types";
-import type { CameraMode, CityRenderer } from "@/game/three/renderer";
+import { HEARING, type CameraMode, type CityRenderer } from "@/game/three/renderer";
 import type { ConversationFrame } from "@/lib/conversation-playback";
 import { useGameStore } from "@/lib/store";
 import { LiveConversation } from "./LiveConversation";
@@ -98,6 +98,13 @@ export function GameCanvas({
     setMode(next);
     renderer.current?.setMode(next);
   }
+  // Street view: how far the scene being played is, so you have to walk over to hear it.
+  const [sceneDistance, setSceneDistance] = useState<number | null>(null);
+  useEffect(() => {
+    if (mode !== "street" || !conversation) return;
+    const timer = window.setInterval(() => setSceneDistance(renderer.current?.streetSceneDistance() ?? null), 500);
+    return () => { window.clearInterval(timer); setSceneDistance(null); };
+  }, [mode, conversation]);
   // Esc leaves street view, like closing a panel.
   useEffect(() => {
     if (mode !== "street") return;
@@ -114,7 +121,9 @@ export function GameCanvas({
           citizens={city.citizens} onFrame={stageConversation} onFinish={finishPlayback}
           location={city.locations.find((p) => p.location_id === conversation.location_id)?.name ?? city.city_name}
           dateLabel={city.calendar_start ? (() => { const d = calendarDay(city.calendar_start, conversation.game_day); return `${weekday(conversation.game_day).slice(0, 3)} ${formatDate(d)}`; })() : undefined}
-          onFocus={() => renderer.current?.focusConversation()} />
+          onFocus={() => (mode === "street" ? renderer.current?.streetGoToScene() : renderer.current?.focusConversation())}
+          faraway={mode === "street" && !conversation.replay && sceneDistance !== null && sceneDistance > HEARING
+            ? { metres: Math.round(sceneDistance * 2), onGo: () => renderer.current?.streetGoToScene() } : null} />
       )}
       {(!ready || error) && (
         <div className="world-graphics-status" role="status">
