@@ -301,16 +301,17 @@ export function AgentCityShell() {
   }, [panel, player, targetId, setInlineTalk]);
   // The town waits while you read the brief, choose your words, or take in how a case ended.
   useEffect(() => { holdClock.current = welcome || composing || Boolean(result) || introPlaying; }, [welcome, composing, result, introPlaying]);
+  const closedKey = story ? Object.keys(story.closed).sort().join(",") : null;
   useEffect(() => {
-    if (!story) return;
-    const closed = Object.keys(story.closed);
+    if (closedKey === null) return;
+    const closed = closedKey ? closedKey.split(",") : [];
     if (!knownClosed.current) { knownClosed.current = new Set(closed); return; }
+    // The verdict waits for the scene that decided it to finish playing.
     const fresh = closed.find((id) => !knownClosed.current!.has(id));
     if (!fresh || scenePlaying) return;
-    knownClosed.current.add(fresh);
-    const timer = window.setTimeout(() => setResult(fresh), 0);
+    const timer = window.setTimeout(() => { knownClosed.current!.add(fresh); setResult(fresh); }, 500);
     return () => window.clearTimeout(timer);
-  }, [story, scenePlaying]);
+  }, [closedKey, scenePlaying]);
   const shareCase = useCallback((id: string) => {
     const current = latestCity.current;
     const storyline = STORYLINES.find((s) => s.id === id);

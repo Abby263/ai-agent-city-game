@@ -24,16 +24,17 @@ test("phone conversation framing keeps both speakers inside the visible canvas",
 });
 
 test("unobstructed conversations prefer a human-level camera", () => {
-  const target = new THREE.Vector3(0, 0.35, 0);
-  const heads = [-0.75, 0.75].map(x => new THREE.Vector3(x, 1.35, 0));
-  const offset = conversationCameraOffset(target, heads, new THREE.Group(), 4.8, true);
-  assert.equal(offset.y, 1.8);
+  // True scale: a unit is about 2 m, so people stand about 0.85 tall, a step apart.
+  const target = new THREE.Vector3(0, 0.25, 0);
+  const heads = [-0.4, 0.4].map(x => new THREE.Vector3(x, 0.7, 0));
+  const offset = conversationCameraOffset(target, heads, new THREE.Group(), 3, true);
+  assert.equal(offset.y, 0.75, "the camera stands in the street at eye level");
   const camera = new THREE.PerspectiveCamera(42, 1.7, 0.1, 1000);
   camera.position.copy(target).add(offset);
   camera.lookAt(target);
   camera.updateMatrixWorld();
-  assert.ok(new THREE.Vector3(0.75, 2, 0).project(camera).y < 0.9, "Tall residents keep headroom");
-  assert.ok(new THREE.Vector3(0.75, 0, 0).project(camera).y > -0.3, "Feet stay above the desktop subtitles");
+  assert.ok(new THREE.Vector3(0.4, 1, 0).project(camera).y < 0.9, "Tall residents keep headroom");
+  assert.ok(new THREE.Vector3(0.4, 0, 0).project(camera).y > -0.5, "Feet stay above the subtitles");
 });
 
 const exchange = (id: string, minute = 360): Conversation => ({

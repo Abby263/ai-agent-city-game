@@ -2239,7 +2239,7 @@ select {
 .live-meeting { padding: 10px 0 6px; }
 .conversation-on-stage::before { display: none; }
 @media (max-width: 760px), (max-width: 1024px) and (max-height: 500px) {
-  .desk { top: 10px; left: 10px; width: calc(100% - 20px); max-height: 46%; }
+  .desk { top: 10px; left: 10px; width: calc(100% - 20px); max-height: 62%; }
   .desk > .next-move, .desk > .story-tracker { bottom: auto; left: auto; }
   .conversation-on-stage .live-dialogue { transform: none; left: auto; border-radius: 0; border-width: 1px 0 0; backdrop-filter: none; background: #0f181a; }
   .live-line { flex-direction: column; align-items: stretch; gap: 4px; }

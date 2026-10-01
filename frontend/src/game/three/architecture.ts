@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { Art } from "./materials";
 import type { Building } from "./layout";
+import { LANTERN_RED, LANTERN_WHITE, aFrame, banner, bicycle, lanterns, pottedPlant, projectingSign, shopInterior, type Interior } from "./props";
 
 // Buildings at true scale (one unit is about 2 m): Japanese two-storey houses, shops with glass fronts, apartment
 // blocks with balcony grids, a glass office tower and concrete public buildings. Everything is built from shared
@@ -9,6 +10,8 @@ import type { Building } from "./layout";
 const C = {
   frame: 0x8c9398, // anodised aluminium window frames
   glass: 0x709ba6, // matches the colour atmosphere.ts lights at night
+  glassDark: 0x6f9aa5, // the same glass with nobody home: stays dark
+  glassCool: 0x719ca7, // a room lit by a screen or a daylight bulb
   sill: 0xd8d4cb,
   foundation: 0x9d9a94,
   door: 0x6e4c38,
@@ -25,7 +28,10 @@ const C = {
 
 export function tagArchitecture(art: Art) {
   art.tag("metal", C.frame, C.darkMetal, C.rail, C.gutter, C.spandrel, C.fan);
-  art.tag("glass", C.glass);
+  art.tag("glass", C.glass, C.glassDark, C.glassCool);
+  art.glow(art.material(C.glassCool), 0xcfe2ff, 0, 1.1);
+  art.glow(art.material(LANTERN_RED), 0xff5a30, 0.1, 1.5);
+  art.glow(art.material(LANTERN_WHITE), 0xffd9a0, 0.1, 1.4);
   art.tag("plaster", C.sill, C.slab, C.ac, C.canopy);
   art.tag("paving", C.foundation);
   art.tag("wood", C.door);
@@ -55,18 +61,20 @@ function faces(group: THREE.Group, b: Building): Record<"front" | "back" | "left
 /** An aluminium sliding window: frame, glass, meeting rail, sill; optional storm-shutter box above (amado). */
 function window(art: Art, f: Face, x: number, y: number, w: number, h: number, shutter = false) {
   art.box(f.group, x, y, 0.012, w, h, 0.03, C.frame);
-  art.box(f.group, x, y, 0.03, w - 0.05, h - 0.05, 0.012, C.glass);
+  // After dark most rooms are lit warm, some are dark, a few glow blue: a street of lives, not one switch.
+  const pick = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + f.width * 37.719 + f.group.position.x * 3.1 + f.group.parent!.position.x * 1.7) * 43758.5453) % 1;
+  art.box(f.group, x, y, 0.03, w - 0.05, h - 0.05, 0.012, pick < 0.56 ? C.glass : pick < 0.86 ? C.glassDark : C.glassCool);
   art.box(f.group, x, y, 0.04, 0.022, h - 0.04, 0.012, C.frame);
   art.box(f.group, x, y - h / 2 - 0.02, 0.045, w + 0.08, 0.03, 0.08, C.sill);
   if (shutter) art.box(f.group, x, y + h / 2 + 0.055, 0.05, w + 0.06, 0.09, 0.09, C.frame);
 }
 
-function door(art: Art, f: Face, x: number, base: number, glass = false) {
+function door(art: Art, f: Face, x: number, base: number, glass = false, canopy = true) {
   art.box(f.group, x, base + 0.53, 0.012, 0.5, 1.08, 0.03, C.darkMetal);
   art.box(f.group, x, base + 0.52, 0.03, 0.44, 1.02, 0.02, glass ? C.glass : C.door);
   art.box(f.group, x + 0.15, base + 0.5, 0.05, 0.02, 0.12, 0.03, C.frame);
   // Canopy over the entrance and a step down to the pavement.
-  art.box(f.group, x, base + 1.2, 0.2, 0.8, 0.035, 0.4, C.canopy);
+  if (canopy) art.box(f.group, x, base + 1.2, 0.2, 0.8, 0.035, 0.4, C.canopy);
   art.box(f.group, x, base * 0.5, 0.18, 0.75, base, 0.36, C.foundation);
 }
 
@@ -142,6 +150,10 @@ function home(art: Art, group: THREE.Group, b: Building) {
   door(art, f.front, doorX, base);
   // Ground floor: a big living-room window; upstairs: two windows with storm shutters, or a balcony.
   window(art, f.front, -doorX, base + step * 0.48, 0.95, step * 0.62);
+  // Lived-in doorsteps: plants in pots, and often a bicycle against the wall.
+  pottedPlant(art, f.front.group, doorX - 0.42, 0, 0.3, seed);
+  if (seed % 4) pottedPlant(art, f.front.group, doorX - 0.62, 0, 0.26, seed + 5);
+  if (seed % 3 !== 1) bicycle(art, f.front.group, -doorX + (seed % 2 ? 0.2 : -0.2), 0.02, 0.32, 0.12, [0xb55f65, 0x4f7fae, 0x5e8f6d, 0xd9a03c][seed % 4]);
   const upper = floors[1] ?? base + step;
   if (seed % 3 === 0) {
     window(art, f.front, 0, upper + step * 0.45, 1.05, step * 0.72);
@@ -167,9 +179,19 @@ function shop(art: Art, group: THREE.Group, b: Building) {
   art.box(f.front.group, 0, base + height / 2, 0.03, front - 0.06, height - 0.06, 0.012, C.glass);
   const panes = Math.max(2, Math.round(front / 0.75));
   for (let i = 1; i < panes; i++) art.box(f.front.group, -front / 2 + (front * i) / panes, base + height / 2, 0.04, 0.03, height - 0.04, 0.02, C.darkMetal);
-  door(art, f.front, 0, base, true);
+  const brand = BRANDS[b.id] ?? BRANDS.shop;
+  shopInterior(art, f.front.group, brand.interior, seed, 0, base + height / 2, 0.0375, front - 0.08, height - 0.08);
+  // No canopy: it would hide the sign band from the street.
+  door(art, f.front, 0, base, true, false);
   // The sign band above the shopfront, and on a cafe a striped awning below it.
-  art.sign(f.front.group, b.name, 0, base + height + 0.22, 0.06, b.w * 0.9, 0.3);
+  art.sign(f.front.group, b.name, 0, base + height + 0.22, 0.06, b.w * 0.9, 0.3, brand.bg, brand.fg);
+  if (brand.letters) projectingSign(art, f.front.group, brand.letters, b.w / 2 - 0.1, base + height + 0.75, 0.3, brand.bg, brand.fg);
+  lanterns(art, f.front.group, -b.w / 2 + 0.2, b.w / 2 - 0.2, base + height - 0.02, 0.42, Math.max(4, Math.round(b.w / 0.45)));
+  for (const side of [-1, 1]) banner(art, f.front.group, side * (b.w / 2 - 0.45) - 0.1, 0, 0.75, side > 0 ? brand.flag : 0xf2b632);
+  aFrame(art, f.front.group, b.w * 0.24, 0, 0.8, brand.flag);
+  pottedPlant(art, f.front.group, -0.5, 0, 0.42, seed);
+  pottedPlant(art, f.front.group, 0.5, 0, 0.42, seed + 3);
+  bicycle(art, f.front.group, -b.w * 0.3, 0.02, 0.62, 0.3, 0x4f7fae);
   if (b.id === "loc_restaurant") {
     for (let i = 0; i < 8; i++) {
       const stripe = art.box(f.front.group, -b.w / 2 + ((i + 0.5) * b.w) / 8, base + height - 0.06, 0.3, b.w / 8, 0.035, 0.58, i % 2 ? 0xf4e7d4 : b.roof);
@@ -206,6 +228,14 @@ function apartment(art: Art, group: THREE.Group, b: Building) {
   flatRoof(art, group, b, top, seed);
 }
 
+type Brand = { interior: Interior; bg: string; fg: string; flag: number; letters?: string[] };
+const BRANDS: Record<string, Brand> = {
+  shop: { interior: "shop", bg: "#f7efda", fg: "#344b51", flag: 0xd8473c },
+  loc_konbini: { interior: "konbini", bg: "#1f9a5d", fg: "#ffffff", flag: 0x1f9a5d, letters: ["2", "4", "h"] },
+  loc_restaurant: { interior: "cafe", bg: "#4a2f20", fg: "#ffe9bf", flag: 0xc8642c, letters: ["カ", "フ", "ェ"] },
+  loc_pharmacy: { interior: "pharmacy", bg: "#d8412f", fg: "#ffffff", flag: 0xd8412f, letters: ["く", "す", "り"] },
+};
+
 /** A glass curtain wall on every side: mullions, and dark spandrel bands at each floor. */
 function office(art: Art, group: THREE.Group, b: Building) {
   const { base, floors, step, top } = shell(art, group, b, 1.6);
@@ -241,6 +271,12 @@ function civic(art: Art, group: THREE.Group, b: Building) {
     for (const side of [f.left, f.right]) rowOfWindows(art, side, y + step * 0.52, Math.max(1, Math.round(b.d / 1.2)), 0.6, step * 0.45, false, 0.35);
   }
   art.sign(f.front.group, b.name, 0, top - 0.25, 0.06, b.w * 0.82, 0.3);
+  for (const side of [-1, 1]) pottedPlant(art, f.front.group, doorX + side * 0.55, 0, 0.45, seed + side);
+  if (b.kind === "mall" || b.kind === "gym") {
+    lanterns(art, f.front.group, -b.w / 2 + 0.3, b.w / 2 - 0.3, base + step - 0.12, 0.3, Math.max(5, Math.round(b.w / 0.5)));
+    for (const x of [-b.w * 0.36, b.w * 0.36]) banner(art, f.front.group, x, 0, 0.7, b.kind === "gym" ? 0xd0685e : 0xd9798a);
+  }
+  if (b.id !== "loc_police") for (let i = 0; i < 2 + (seed % 3); i++) bicycle(art, f.front.group, b.w * 0.2 + i * 0.28, 0.02, 0.55, Math.PI / 2 - 0.25, [0x4f7fae, 0xb55f65, 0x5e8f6d][(seed + i) % 3]);
   if (b.kind === "hospital") {
     art.box(f.front.group, b.w * 0.36, top - 0.25, 0.07, 0.3, 0.09, 0.03, 0xc8423f);
     art.box(f.front.group, b.w * 0.36, top - 0.25, 0.07, 0.09, 0.3, 0.03, 0xc8423f);

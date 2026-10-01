@@ -1776,7 +1776,7 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
     if ((!beat && now <= encounter.started_at) || !sociallyAvailable(actor, city.policy.player_citizen_id) || !sociallyAvailable(target, city.policy.player_citizen_id) || !nearCitizen(actor, target)) return;
     const event = addEvent(city, { event_type: "social_opportunity", actors: [actor.citizen_id, target.citizen_id], location_id: encounter.location_id,
       description: encounter.reason, payload: { topic: encounter.topic, kind: encounter.meeting_id ? "planned" : "chance", meeting_id: encounter.meeting_id,
-        stakes: encounter.story?.stakes, proposal: encounter.story?.proposal, advice: encounter.story?.advice,
+        stakes: encounter.story?.stakes, proposal: encounter.story?.proposal, advice: encounter.story?.advice, finale: encounter.story?.finale,
         story: encounter.story && { id: encounter.story.id, beat: encounter.story.beat } }, priority: 2 });
     const response = await runAutonomousCognition(city, event, cognition);
     if (encounter.story && response) storyMovedOn(city, encounter.story, actor, target, response, now);
@@ -1874,7 +1874,7 @@ function stageStoryScene(city: CityState, now: number) {
   addEvent(city, { event_type: "story_beat", actors: [actor.citizen_id, target.citizen_id], location_id: target.current_location_id,
     description: beat.headline, payload: { storyline: storyline.id, beat: index, title: storyline.title }, priority: 3 });
   city.encounter = { actor_id: actor.citizen_id, target_id: target.citizen_id, location_id: target.current_location_id, reason: beat.reason,
-    topic: beat.topic, started_at: now - 15, story: { id: storyline.id, beat: index, stakes: beat.stakes, proposal: beat.proposal,
+    topic: beat.topic, started_at: now - 15, story: { id: storyline.id, beat: index, stakes: beat.stakes, proposal: beat.proposal, finale: index === storyline.beats.length - 1,
       advice: Object.fromEntries((story.nudges[storyline.id] ?? []).filter((n) => n.beat === index).map((n) => [n.who, n.text])) } };
 }
 
@@ -2283,6 +2283,8 @@ async function runAutonomousCognition(
       ...(event.payload?.stakes ? [
         `What's at stake: ${String(event.payload.stakes).slice(0, 300)}`,
         "This moment matters to them. Let real feelings show (nerves, hurt, hope, anger or awkwardness, whatever fits who they are). Don't smooth it over or wrap up with polite pleasantries; it can end unresolved.",
+        "They have it out here and now. Nobody puts the conversation off until later, after work, or somewhere else.",
+        ...(event.payload.finale ? ["This is where it comes to a head. By the last line it is clear how things now stand between them, for better or worse: they say what they have been holding back, and each reacts to it."] : []),
       ] : []),
     ],
     memories: [],

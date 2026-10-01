@@ -24,6 +24,7 @@ import { useGameStore } from "@/lib/store";
 import { LiveConversation } from "./LiveConversation";
 import { EarthIntro } from "./EarthIntro";
 import { registerSceneCapture } from "@/lib/scene-capture";
+import { renderShareCard } from "@/lib/share";
 import { calendarDay, formatDate } from "@/lib/calendar";
 import { weekday } from "@/lib/routine";
 
@@ -86,7 +87,7 @@ export function GameCanvas({
         renderer.current = instance;
         registerSceneCapture(() => instance?.snapshot() ?? null);
         // A handle for inspecting the town from the browser console while developing.
-        if (process.env.NODE_ENV === "development") (window as unknown as { __town?: CityRenderer }).__town = instance;
+        if (process.env.NODE_ENV === "development") Object.assign(window, { __town: instance, __shareCard: renderShareCard });
         if (latest.current.city)
           instance.sync(latest.current.city, latest.current.selectedCitizenId);
         setReady(true);

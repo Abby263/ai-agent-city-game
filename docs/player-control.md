@@ -85,7 +85,59 @@ storyline's proposal is a real question: a yes starts dating, a no is a no. The 
 into a scene. Every four game hours a town incident (the shrine festival, a power cut, a lost cat...) gives
 everyone something to talk about. A full game day has about 18 storyline scenes and 36 conversations in all.
 
+## The fixer: cases, nudges and outcomes
+
+The player has a role: the neighbourhood's fixer. Every storyline is a **case** with a goal ("Get Ren and Aoi on a
+date"), a brief (what the player knows that the residents don't) and two endings (`storyteller.ts`: `goal`,
+`brief`, `well`, `badly`).
+
+- **Three cases at a time.** Cases open in `CASE_ORDER`, strongest hook first; when one closes the next opens. The
+  director only stages scenes from open cases. A new world opens at breakfast on its first case, and ordinary small
+  talk waits until that scene has played.
+- **Nudges.** The player's lever is a quiet word with one of the two people in a case's *next* scene
+  (`sessionNudge`): a suggested line or their own words. It becomes a memory for that resident and is handed to them
+  privately when the scene is written; the other person never sees it. Three nudges a day (`NUDGES_PER_DAY`);
+  making something happen from "What happens next?" costs one too. The clock holds while the player chooses words.
+- **How scenes are judged.** Each scene is `well`, `badly` or `mixed`, from what the residents themselves report
+  (`relationship_effect`). A case closes on its last scene: a proposal's yes or no decides it, otherwise the last
+  scene, with earlier scenes breaking a tie (`caseOutcome`). Last scenes are told to land somewhere: nobody puts
+  the conversation off until later.
+- **On screen.** `CaseBoard` (the desk, top left) shows goals, a dot per scene, what's coming up and the nudge
+  buttons; `CaseResult` shows how a case ended and the next case; the welcome is one sentence and the first case.
+  When every case is closed the player gets a rank and can start a new season (`resetSession`).
+
+Tests: `frontend/tests/cases.test.ts`.
+
+## Scenes, sound and sharing
+
+- Subtitles are a lower-third strip, so the scene keeps the screen. Speakers are framed over the listener's
+  shoulder (shot and reverse shot); two-shots start at eye level.
+- People talk with their forearms (`armPose` returns elbow bends), keep time with their voice, and listeners react
+  to what they hear (`reactionTo`).
+- Voices are on from the start using the device's own voices (free); natural AI voices remain a choice because each
+  line costs a model call. The town has its own synthesised sound and a quiet score (`ambience.ts`, no audio
+  files), ducked while people talk; one button in the header mutes it.
+- Any scene, and any closed case, can be shared as a picture: the frame from the town, the lines and the link
+  (`share.ts`).
+
+## Telling residents apart
+
+The bodies share a small set of CC0 outfits, so `wardrobe.ts` gives every resident their own outfit colours (top
+above the waist, bottom below, recoloured in the shader), one signature accessory built from simple shapes and hung
+on the skeleton (a guitar case, a police cap, a konbini apron, a cane), and their own bearing (cadence, stride,
+arm swing, stoop).
+
+## A lived-in street
+
+`props.ts` adds what makes a Tokyo street: painted shop interiors behind the glass, lit from inside at night,
+projecting signs, banner flags, paper lanterns, vending machines, bicycles, potted plants and post boxes. Anything
+registered with `Art.glow` brightens after dark; windows are a mix of warm, dark and cool rooms; shopfronts spill
+light onto the pavement.
+
 ## Opening flight
+
+The flight starts at once on a plain blue planet; the Blue Marble photograph lands on it when it has loaded, so the
+first frame is never a black screen.
 
 Opening the game starts in space: the Earth (NASA Blue Marble imagery) turns to Japan, dives towards Tokyo and
 through the clouds, and the town camera finishes the descent onto Nakameguro (about 7 seconds;

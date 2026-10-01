@@ -27,7 +27,8 @@ export function CaseBoard({ city, busy, spotlight, onNudge, onWatch, onComposing
   const cases = openCases(story), closed = closedCases(story);
   const left = nudgesLeft(story, city.clock.day);
   const [picked, setPicked] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  // On a phone the desk starts folded, so the town is what you see first.
+  const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 760px)").matches);
   const [whisper, setWhisper] = useState<{ storyline: string; who: string } | null>(null);
   const [text, setText] = useState("");
   // A scene that just played takes over from whatever you had open, once.
