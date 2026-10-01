@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   Focus,
+  PersonStanding,
+  Undo2,
+  Redo2,
+  X,
   LoaderCircle,
   MapPin,
   Maximize,
@@ -92,6 +98,13 @@ export function GameCanvas({
     setMode(next);
     renderer.current?.setMode(next);
   }
+  // Esc leaves street view, like closing a panel.
+  useEffect(() => {
+    if (mode !== "street") return;
+    const leave = (event: KeyboardEvent) => { if (event.key === "Escape") { setMode("orbit"); renderer.current?.setMode("orbit"); } };
+    window.addEventListener("keydown", leave);
+    return () => window.removeEventListener("keydown", leave);
+  }, [mode]);
 
   return (
     <>
@@ -143,7 +156,32 @@ export function GameCanvas({
           <Focus size={15} />
           Follow
         </button>
+        <button
+          aria-pressed={mode === "street"}
+          title="Street view: stand in the street and look around"
+          disabled={!ready}
+          onClick={() => setCamera(mode === "street" ? "orbit" : "street")}
+        >
+          <PersonStanding size={15} />
+          Street
+        </button>
       </div>
+      {mode === "street" && ready && (
+        <div className="street-view-controls" role="group" aria-label="Street view controls">
+          <p>Drag to look around · click the street to walk · arrow keys or WASD · Esc to leave</p>
+          <div className="street-view-row">
+            <button aria-label="Turn left" title="Turn left" onClick={() => renderer.current?.streetTurn(Math.PI / 6)}><Undo2 size={16} /></button>
+            <button aria-label="Walk forward" title="Walk forward" onClick={() => renderer.current?.streetStep(1.5)}><ArrowUp size={16} /></button>
+            <button aria-label="Walk back" title="Walk back" onClick={() => renderer.current?.streetStep(-1.5)}><ArrowDown size={16} /></button>
+            <button aria-label="Turn right" title="Turn right" onClick={() => renderer.current?.streetTurn(-Math.PI / 6)}><Redo2 size={16} /></button>
+            <select aria-label="Go to a place in street view" value="" onChange={(event) => { if (event.target.value) renderer.current?.streetViewAt(event.target.value); }}>
+              <option value="">Go to…</option>
+              {city?.locations.map((place) => <option key={place.location_id} value={place.location_id}>{place.name}</option>)}
+            </select>
+            <button className="street-view-exit" aria-label="Leave street view" title="Leave street view (Esc)" onClick={() => setCamera("orbit")}><X size={16} /> Exit</button>
+          </div>
+        </div>
+      )}
       <div className="map-zoom" aria-label="3D map controls">
         <button
           disabled={!ready}

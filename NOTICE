@@ -1,1 +1,8 @@
 Required Notice: Copyright 2026 ai-agent-city-game contributors.
+
+Third-party components:
+- EZ-Tree 1.1.0 by Daniel Greenheck, MIT licence: procedural tree generator vendored in
+  frontend/src/game/three/vendor/ez-tree (licence text in that folder), with its leaf textures in
+  frontend/public/art/trees/leaves.
+- Poly Haven textures (CC0): frontend/public/art/surfaces and frontend/public/art/trees/bark.
+- MakeHuman Community assets (CC0): frontend/public/characters (see CREDITS.md there).

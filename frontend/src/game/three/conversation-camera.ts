@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { walkablePoint, type Point } from "./layout";
+import { buildings, walkablePoint, type Point } from "./layout";
 
 /** Preserve horizontal room for both speakers when the visible canvas is narrow. */
 export function conversationDistance(base: number, aspect: number) {
@@ -14,10 +14,10 @@ export function conversationStaging(origin: Point, town: THREE.Object3D) {
   for (const [x, z] of [[0, 0], [-4, 0], [4, 0], [0, 4], [0, -4], [-6, 0], [6, 0], [0, 6]]) {
     const center = walkablePoint({ x: origin.x + x, z: origin.z + z + 1.5 });
     // About a metre and a half apart: close enough to feel like a conversation, far enough to read both faces.
-    const points = [-1, 1].map((side) => walkablePoint({ x: center.x + side * 0.75, z: center.z }));
-    if (Math.hypot(points[0].x - points[1].x, points[0].z - points[1].z) < 1.2) continue;
+    const points = [-1, 1].map((side) => walkablePoint({ x: center.x + side * 0.4, z: center.z }));
+    if (Math.hypot(points[0].x - points[1].x, points[0].z - points[1].z) < 0.6) continue;
     const target = new THREE.Vector3(center.x, -0.25, center.z);
-    const offset = conversationCameraOffset(target, points.map((p) => new THREE.Vector3(p.x, 1.35, p.z)), town, 7.5, true);
+    const offset = conversationCameraOffset(target, points.map((p) => new THREE.Vector3(p.x, 0.7, p.z)), town, 4, true);
     if (offset.y < height) { best = { center, points }; height = offset.y; }
     if (height <= 6) break;
   }
@@ -44,8 +44,8 @@ export function conversationCameraOffset(target: THREE.Vector3, heads: THREE.Vec
         }
       }
       const right = new THREE.Vector3(Math.cos(angle), 0, -Math.sin(angle));
-      const crowded = heads.some((head, i) => heads.slice(i + 1).some((other) => Math.abs(head.clone().sub(other).dot(right)) < 1));
-      const score = blocked * 10 + Number(crowded) * 5;
+      const crowded = heads.some((head, i) => heads.slice(i + 1).some((other) => Math.abs(head.clone().sub(other).dot(right)) < 0.5));
+      const score = blocked * 10 + Number(crowded) * 5 + (insideBuilding(position) ? 100 : 0);
       if (score < bestScore) { bestScore = score; best = offset; }
       if (!score) return offset;
     }
@@ -53,8 +53,17 @@ export function conversationCameraOffset(target: THREE.Vector3, heads: THREE.Vec
   return best;
 }
 
+/**
+ * True when a point is inside (or brushing) a building. Rays cast from inside a building pass out through its
+ * back faces unseen, so sight-line tests alone would happily put the camera in someone's living room.
+ */
+export function insideBuilding(point: THREE.Vector3, margin = 0.25) {
+  return buildings.some((b) => Math.abs(point.x - b.x) < b.w / 2 + margin && Math.abs(point.z - b.z) < b.d / 2 + margin && point.y < b.h + 1.6);
+}
+
 /** True when a camera at `position` can see every head without a roof, wall or tree in the way. */
 export function sightLinesClear(position: THREE.Vector3, heads: THREE.Vector3[], town: THREE.Object3D) {
+  if (insideBuilding(position)) return false;
   town.updateMatrixWorld(true);
   return heads.every((head) => {
     const direction = head.clone().sub(position);

@@ -17,7 +17,8 @@ const LOOK: Record<Surface, Look> = {
   plaster: { roughness: 1, tile: 0.7, grain: 0.5, relief: 0.45 },
   roof: { roughness: 1, tile: 0.45, grain: 0.85, relief: 0.9 },
   wood: { roughness: 1, tile: 0.4, grain: 0.9, relief: 0.6 },
-  glass: { roughness: 0.08, metalness: 0.2 },
+  // Window glass: mostly the sky and street reflected in it, with a dark interior behind.
+  glass: { roughness: 0.04, metalness: 0.75 },
   water: { roughness: 0.06, metalness: 0.1 },
   metal: { roughness: 0.4, metalness: 0.75 },
   // Leaf canopies borrow the leafy ground scan at a small scale, for clumps of leaves instead of smooth plastic.
