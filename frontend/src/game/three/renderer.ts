@@ -369,6 +369,7 @@ export class CityRenderer {
       for (const id of previous?.actorIds ?? []) this.holdInPlace(id);
       this.people.forEach((model) => { model.speaking = false; model.listening = false; model.lookAt = null; model.root.visible = true; });
       this.shotPosition = null;
+      this.controls.minDistance = 6;
       if (this.savedCamera) {
         this.camera.position.copy(this.savedCamera.position);
         this.controls.target.copy(this.savedCamera.target);
@@ -380,9 +381,12 @@ export class CityRenderer {
       return;
     }
     if (previous?.id === frame.id) {
-      if (previous.phase !== frame.phase) this.focusConversation();
+      // Each new speaker gets a close-up over the listener's shoulder, so faces and expressions read clearly.
+      if (frame.phase === "dialogue" && frame.speakerId && frame.speakerId !== previous.speakerId && !this.reducedMotion.matches) this.closeUp(frame.speakerId);
+      else if (previous.phase !== frame.phase) this.focusConversation();
       return;
     }
+    this.controls.minDistance = 1.2;
     const models = frame.actorIds.map((id) => this.people.get(id)).filter((model) => model !== undefined);
     if (!models.length) { onReady?.(); return; }
     this.savedCamera ??= { position: this.camera.position.clone(), target: this.controls.target.clone() };
@@ -500,7 +504,24 @@ export class CityRenderer {
     const offset = conversationCameraOffset(this.focusTarget, heads, this.town.root, distance, cinematic);
     this.shotPosition = this.focusTarget.clone().add(offset);
   }
-  setMode(mode: CameraMode) {
+  /** Over the listener's shoulder onto the speaker's face; keeps the two-shot if anything blocks the view. */
+  private closeUp(speakerId: string) {
+    const speaker = this.people.get(speakerId);
+    const listener = this.conversation?.actorIds.filter((id) => id !== speakerId).map((id) => this.people.get(id)).find((m) => m !== undefined);
+    if (!speaker || !listener) return;
+    // Eye height: the nameplate sits just above the head (labelLift), eyes are a little lower.
+    const face = speaker.root.position.clone().setY(speaker.root.position.y + (speaker.labelLift - 0.1) * 0.74);
+    const toListener = listener.root.position.clone().sub(speaker.root.position).setY(0);
+    if (toListener.lengthSq() < 0.01) return;
+    toListener.normalize();
+    const side = new THREE.Vector3(-toListener.z, 0, toListener.x);
+    const position = face.clone().addScaledVector(toListener, 2.1).addScaledVector(side, 0.75).add(new THREE.Vector3(0, 0.08, 0));
+    if (!sightLinesClear(position, [face], this.town.root)) return;
+    // Aim a little below the eyes: subtitles cover the bottom of the view, so the face sits in its upper part.
+    this.focusTarget = face.clone().add(new THREE.Vector3(0, -0.22, 0));
+    this.shotPosition = position;
+  }
+    setMode(mode: CameraMode) {
     this.mode = mode;
     if (mode === "follow") this.focusCitizen(true);
   }

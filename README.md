@@ -2,9 +2,9 @@
 
 AgentCity is a playable 3D AI city simulation where citizens are autonomous agents with daily routines, needs, money, relationships, memory, and goals. Explore a Japanese neighborhood with animated citizens, blossom trees, shopfronts, a market, a schoolyard, and a riverside. The current cast has 26 active Japanese residents, all aged 18 or older, from young workers to seniors. Other citizen profiles remain inactive in the codebase.
 
-The first three textured residents (Aoi, Ren and Sota) use free CC0 MakeHuman art,
-exported through Blender/MPFB with facial animation and mobile-sized GLB assets.
-The remaining cast uses procedural bodies. See [the open character art guide](docs/open-character-art.md)
+All 26 residents are textured, rigged humans built from free CC0 MakeHuman art,
+exported through Blender/MPFB with individual faces, facial animation and mobile-sized GLB assets.
+See [the open character art guide](docs/open-character-art.md)
 for sources, licences, rebuilding instructions, and remaining visual limitations.
 
 **Follow what you start.** Every situation, action or election you create becomes a

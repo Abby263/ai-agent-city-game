@@ -1,9 +1,9 @@
 # Character art credits
 
-`cit_009.glb` (Aoi), `cit_010.glb` (Ren), and `cit_026.glb` (Sota) are original
-fictional character configurations built from MakeHuman Community CC0 assets.
-They are **MPFB/MakeHuman exports, not MetaHumans**. These art files remain CC0;
-the application's noncommercial code licence does not change their source licence.
+`cit_009.glb` to `cit_047.glb` (all 26 residents) are original fictional character
+configurations built from MakeHuman Community CC0 assets, with textures recoloured and face
+shapes adjusted per resident. They are **MPFB/MakeHuman exports, not MetaHumans**. These art
+files remain CC0; the application's noncommercial code licence does not change their source licence.
 
 Sources:
 
@@ -17,11 +17,13 @@ Sources:
   https://static.makehumancommunity.org/assets/assetpacks.html
 - CC0 legal text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
 
-Included core components: young_asian_female / young_asian_male skin,
-high-poly eyes with brown material, eyebrow001, eyelashes01, bob01 / short02 /
-short01 hair, female_elegantsuit01 / male_casualsuit05 / male_casualsuit01 clothing,
-shoes02 / shoes01 / shoes03. Meshes are clothed, skinned, and contain 23 facial
-controls on the body with relevant controls transferred to brows and lashes.
+Included core components: young / middleage / old asian female and male skins,
+high-poly eyes with brown and brownlight materials, eyebrow001 to eyebrow012, eyelashes01,
+long01 / braid01 / ponytail01 / short01 / short02 / short04 hair, female_casualsuit01 /
+female_elegantsuit01 / female_sportsuit01 / male_casualsuit01 / male_casualsuit03 / male_casualsuit05 /
+male_casualsuit06 / male_elegantsuit01 / male_worksuit01 clothing, shoes01 to shoes06, and MakeHuman
+modelling targets for head shape, nose, mouth, chin, cheeks and eyes. Meshes are clothed, skinned,
+and contain 23 facial controls on the body with relevant controls transferred to brows and lashes.
 
 Build tools (not distributed with the game): Blender 4.5.10 LTS, MPFB source
 `afb9f530a7c2741dedb8df0ebae2e0b183caec21`, glTF Transform CLI 4.4.0.

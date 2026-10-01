@@ -2,18 +2,24 @@
 
 ## What is implemented
 
-Aoi (`cit_009`), Ren (`cit_010`), and Sota (`cit_026`) now have actual textured,
-rigged GLB bodies instead of primitive shapes. They have individual proportions,
-haircuts, brown eyes, everyday outfits, blinking, expressions and speaking mouths.
-The existing simulation drives their walking and gestures. Each optimized model is
-approximately 1 MB, with embedded 1024px-or-smaller WebP textures and Meshopt geometry.
-No asset CDN, paid API, subscription, Unreal installation or runtime Blender is needed.
+All 26 residents now have textured, rigged GLB bodies instead of primitive shapes, built
+from their profiles: sex, age (young, middle-aged and old skins), height, build, the
+profile's hairstyle and outfit, and its hair and shirt colours (hair and the shirt area of
+each outfit are recoloured; denim stays denim). Each face is individual: a stable set of
+head-shape, nose, lip, chin, cheekbone and eye adjustments derived from the resident's id.
+Hairstyles that hang over the eyes (the CC0 bobs and `short03`) are not used, so faces read
+clearly. Eyes use an alpha-masked cornea so irises show. Each optimized model is about
+1 MB, with embedded 1024px-or-smaller WebP textures and Meshopt geometry, and loads only when
+the resident is near the camera, selected or talking. No asset CDN, paid API, subscription,
+Unreal installation or runtime Blender is needed.
 
-The other 23 residents retain the lightweight procedural bodies. This is a first
-art pass, **not** a claim of photorealism or 26 completed production characters.
-Hair cards, procedural animation, illustrated UI portraits and the simple town
-geometry still limit realism. Test physical iOS/Android hardware before expanding
-the high-detail cast; viewport emulation is not a GPU/memory benchmark.
+The game poses the body itself: a human gait (hips leading, knee fold and heel-to-toe step,
+counter-rotating chest, swinging elbows), breathing and weight shifts when standing, relaxed
+curled hands, and a face that blinks, speaks with jaw and lip movement, and shows each mood.
+In conversations the camera cuts to a close-up of whoever is speaking, over the listener's
+shoulder. This is still MakeHuman-level realism, **not** photorealism: hair cards, the
+limited CC0 wardrobe, procedural (not motion-captured) animation and the simple town geometry
+limit it. Test physical iOS/Android hardware for memory before adding heavier assets.
 
 ## Why these tools
 
@@ -65,10 +71,11 @@ against CREDITS.md before running the exporter. This script uses a source checko
 in a headless, factory-startup process; it does not install MPFB in your personal
 Blender environment or save your preferences.
 
-Repeat for `cit_010` and `cit_026`. The explicit `CAST` records in the exporter
-are the current art presets. To author another resident, add an individual preset
-and its CLI choice, export, and add its stable ID to `manifest.json`. Match their
-age and profile appearance; do not give the whole cast one face or outfit.
+Repeat for every resident in `frontend/src/lib/generated/citizens.json` (the exporter reads
+age, sex, height, weight and colours from there; pass `--profiles` to point elsewhere). The
+`ART` table in the exporter holds each resident's hairstyle, outfit, shoes and eyebrows. To add
+a resident, add an `ART` entry, export, optimize, and add their id to `manifest.json`; the
+asset test requires every resident in the cast to have a model.
 
 ## Runtime acceptance checks
 

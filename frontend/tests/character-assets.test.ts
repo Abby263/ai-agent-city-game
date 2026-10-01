@@ -33,7 +33,10 @@ test("asset preflight fails missing files, unsafe paths and incomplete rigs; emp
 test("bundled CC0 residents have mobile-sized embedded textures, real skins and facial animation", () => {
   const result = spawnSync(process.execPath, [resolve("scripts/check-characters.mjs")], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
-  for (const id of ["cit_009", "cit_010", "cit_026"]) {
+  const residents = Object.keys(JSON.parse(readFileSync(resolve("public/characters/manifest.json"), "utf8")).residents);
+  const cast = (JSON.parse(readFileSync(resolve("src/lib/generated/citizens.json"), "utf8")) as Array<{ citizen_id: string }>).map((c) => c.citizen_id);
+  assert.deepEqual([...residents].sort(), [...cast].sort(), "every resident has a real body, so nobody is left as a toy figure");
+  for (const id of residents) {
     const bytes = readFileSync(resolve(`public/characters/${id}.glb`));
     assert.ok(bytes.length < 2 * 1024 * 1024, `${id} must stay below 2 MiB`);
     const gltf = JSON.parse(bytes.subarray(20, 20 + bytes.readUInt32LE(12)).toString("utf8"));

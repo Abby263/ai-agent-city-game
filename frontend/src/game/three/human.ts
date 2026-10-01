@@ -34,6 +34,9 @@ export type HumanPose = {
   blink: number;
   voice: number;
   emotion: Emotion;
+  /** Walking: the stride phase (the legs' swing follows sin(phase)). Idle: seconds, for breathing and weight shifts. */
+  gait: { moving: boolean; phase: number };
+  time: number;
 };
 
 // ARKit shape weights for each emotion (both sides where the shape is sided).
@@ -130,8 +133,8 @@ export class Human {
     this.root.updateMatrixWorld(true);
 
     const rootInverse = this.root.getWorldQuaternion(new THREE.Quaternion()).invert();
-    for (const name of ["pelvis", "spine_01", "spine_03", "spine_05", "neck_01", "head", "thigh_l", "thigh_r", "calf_l", "calf_r",
-      "upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r"]) {
+    for (const name of ["pelvis", "spine_01", "spine_02", "spine_03", "spine_05", "neck_01", "head", "thigh_l", "thigh_r", "calf_l", "calf_r",
+      "foot_l", "foot_r", "clavicle_l", "clavicle_r", "upperarm_l", "upperarm_r", "lowerarm_l", "lowerarm_r", "hand_l", "hand_r"]) {
       const bone = bones.get(name);
       if (!bone) continue;
       this.joints.set(name, { bone, rest: bone.quaternion.clone(), world: rootInverse.clone().multiply(bone.getWorldQuaternion(new THREE.Quaternion())) });
@@ -143,6 +146,36 @@ export class Human {
       const from = lower.getWorldPosition(new THREE.Vector3()).applyMatrix4(toRoot).sub(upper.getWorldPosition(new THREE.Vector3()).applyMatrix4(toRoot)).normalize();
       const out = side === "l" ? 1 : -1;
       this.armsDown.set(side, new THREE.Quaternion().setFromUnitVectors(from, new THREE.Vector3(out * 0.14, -1, 0.04).normalize()));
+    }
+    this.relaxHands(bones);
+  }
+
+  /**
+   * Straight, splayed fingers are the quickest giveaway of a puppet: curl them into a relaxed hand, more at the
+   * middle knuckles, less for the thumb. Set once; nothing else moves the fingers.
+   */
+  private relaxHands(bones: Map<string, THREE.Bone>) {
+    const toRoot = this.root.matrixWorld.clone().invert();
+    const at = (bone?: THREE.Bone) => bone?.getWorldPosition(new THREE.Vector3()).applyMatrix4(toRoot);
+    const rootQ = this.root.getWorldQuaternion(new THREE.Quaternion()).invert();
+    for (const side of ["l", "r"]) {
+      const hand = at(bones.get(`hand_${side}`)), middle = at(bones.get(`middle_01_${side}`));
+      const index = at(bones.get(`index_01_${side}`)), pinky = at(bones.get(`pinky_01_${side}`));
+      if (!hand || !middle || !index || !pinky) continue;
+      // The palm faces where the fingers close: across the knuckles crossed with the finger direction.
+      const along = middle.clone().sub(hand).normalize();
+      const across = index.clone().sub(pinky).normalize();
+      const axis = new THREE.Vector3().crossVectors(across, along).normalize().cross(along).normalize();
+      const curl = new THREE.Vector3().crossVectors(along, axis).normalize();
+      for (const finger of ["index", "middle", "ring", "pinky", "thumb"]) {
+        [0.22, 0.42, 0.3].forEach((angle, i) => {
+          const bone = bones.get(`${finger}_0${i + 1}_${side}`);
+          if (!bone) return;
+          const world = rootQ.clone().multiply(bone.getWorldQuaternion(new THREE.Quaternion()));
+          const local = curl.clone().applyQuaternion(world.clone().invert());
+          bone.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(local, (finger === "thumb" ? 0.45 : 1) * angle * (side === "l" ? 1 : -1)));
+        });
+      }
     }
   }
 
@@ -160,22 +193,43 @@ export class Human {
 
   pose(p: HumanPose, dt: number) {
     const rot = (axis: THREE.Vector3, angle: number) => new THREE.Quaternion().setFromAxisAngle(axis, angle);
-    // Legs: swing from the hip; the knee bends as the leg comes forward.
+    const walking = p.gait.moving, t = p.gait.phase, idle = p.time;
+    // Hips lead the stride: they turn towards the forward leg and drop on the swinging side. Standing, the weight
+    // drifts slowly from one foot to the other.
+    const sway = walking ? Math.sin(t) : 0;
+    this.turn("pelvis", rot(Y, sway * 0.08).multiply(rot(Z, walking ? Math.cos(t) * 0.035 : Math.sin(idle * 0.31) * 0.022)));
     (["r", "l"] as const).forEach((side, i) => {
       const swing = p.legs[i];
-      this.turn(`thigh_${side}`, rot(X, swing));
-      this.turn(`calf_${side}`, rot(X, Math.max(0, -swing) * 1.3 + Math.abs(swing) * 0.2));
+      if (walking) {
+        // The knee folds while the leg swings through, then nearly straightens for the heel strike; the ankle
+        // lifts the toes ahead and pushes off behind.
+        const through = Math.max(0, -Math.cos(t + (i ? Math.PI : 0)));
+        this.turn(`thigh_${side}`, rot(X, swing * 0.85));
+        this.turn(`calf_${side}`, rot(X, 0.06 + through * 0.85));
+        this.turn(`foot_${side}`, rot(X, -swing * 0.45 - through * 0.3));
+      } else {
+        const soft = i === 0 ? 0.04 + Math.max(0, Math.sin(idle * 0.31)) * 0.06 : 0.04 + Math.max(0, -Math.sin(idle * 0.31)) * 0.06;
+        this.turn(`thigh_${side}`, rot(X, swing - soft * 0.5));
+        this.turn(`calf_${side}`, rot(X, Math.max(0, -swing) * 1.3 + Math.abs(swing) * 0.2 + soft));
+        this.turn(`foot_${side}`, rot(X, -soft * 0.5));
+      }
     });
-    // Arms: down from the A-pose, then the figure's swing and lift; elbows soften as the arm comes up.
+    // The chest turns against the hips while walking; breathing lifts it gently.
+    const breath = Math.sin(idle * 1.35);
+    this.turn("spine_02", rot(Y, -sway * 0.11).multiply(rot(X, breath * 0.012)));
+    this.turn("spine_03", rot(X, p.lean.x * 0.6 + breath * 0.01).multiply(rot(Z, p.lean.z * 0.6)));
+    // Arms: down from the A-pose, then the swing and gestures; relaxed shoulders, elbows never locked straight.
     (["r", "l"] as const).forEach((side, i) => {
       const [forward, out] = p.arms[i];
       const down = this.armsDown.get(side) ?? q.identity();
+      const outward = side === "l" ? 1 : -1;
+      this.turn(`clavicle_${side}`, rot(Z, -outward * 0.05).multiply(rot(X, walking ? -forward * 0.08 : breath * 0.01)));
       this.turn(`upperarm_${side}`, rot(Z, out).multiply(rot(X, forward)).multiply(down));
-      this.turn(`lowerarm_${side}`, rot(X, -0.12 + Math.min(0, forward) * 0.6));
+      this.turn(`lowerarm_${side}`, rot(X, -0.2 + Math.min(0, forward) * (walking ? 0.55 : 0.6)));
+      this.turn(`hand_${side}`, rot(Z, outward * 0.12).multiply(rot(X, walking ? -forward * 0.2 : 0)));
     });
-    this.turn("spine_03", rot(X, p.lean.x * 0.6).multiply(rot(Z, p.lean.z * 0.6)));
-    // Head: shared between neck and skull so turns look natural.
-    const head = rot(Y, p.head.yaw * 0.5).multiply(rot(X, p.head.pitch * 0.5)).multiply(rot(Z, p.head.tilt * 0.5));
+    // Head: shared between neck and skull so turns look natural, and kept level against the hips' turn.
+    const head = rot(Y, p.head.yaw * 0.5 - sway * 0.02).multiply(rot(X, p.head.pitch * 0.5)).multiply(rot(Z, p.head.tilt * 0.5));
     this.turn("neck_01", head);
     this.turn("head", head);
 
@@ -188,8 +242,12 @@ export class Human {
     }
     this.weights.set("eyeBlinkLeft", p.blink);
     this.weights.set("eyeBlinkRight", p.blink);
-    this.weights.set("jawOpen", Math.min(1, p.voice) * 0.32);
-    this.weights.set("mouthFunnel", Math.min(1, p.voice) * 0.12);
+    // Syllables: the jaw and lips move at different rhythms, so speech doesn't look like a flapping hinge.
+    const voice = Math.min(1, p.voice);
+    this.weights.set("jawOpen", voice * (0.18 + 0.16 * Math.abs(Math.sin(idle * 9.1))));
+    this.weights.set("mouthFunnel", voice * 0.18 * Math.max(0, Math.sin(idle * 5.3)));
+    this.weights.set("mouthStretchLeft", Math.max(this.weights.get("mouthStretchLeft") ?? 0, voice * 0.12 * Math.max(0, Math.sin(idle * 6.7))));
+    this.weights.set("mouthStretchRight", Math.max(this.weights.get("mouthStretchRight") ?? 0, voice * 0.12 * Math.max(0, Math.sin(idle * 6.7))));
     for (const mesh of this.faces) {
       const dictionary = mesh.morphTargetDictionary!, influences = mesh.morphTargetInfluences!;
       this.weights.forEach((weight, shape) => {

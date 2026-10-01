@@ -26,10 +26,11 @@ export class CitizenModel {
   asleep = false;
   /** Height of the nameplate anchor above the ground, following the person's real height. */
   labelLift = 1.9;
-  private walkSpeed = 3.2;
+  private walkSpeed = 2.4;
   private belly: THREE.Mesh;
   private umbrella = new THREE.Group();
   private phase = 0;
+  private idleTime = Math.random() * 100;
   private selected = false;
   private readonly head = new THREE.Group();
   private readonly lids: THREE.Mesh[] = [];
@@ -211,7 +212,8 @@ export class CitizenModel {
       else this.body.scale.set(scale * build, scale, scale * Math.min(1.2, build));
       this.labelLift = 1.9 * scale + 0.1;
       this.belly.visible = !this.human && Boolean(life.pregnancy);
-      this.walkSpeed = citizen.age >= 75 ? 2.2 : citizen.age >= 65 ? 2.6 : 3.2;
+      // A brisk human walk at this scale (about 1.4 m/s); older residents take it slower.
+      this.walkSpeed = citizen.age >= 75 ? 1.7 : citizen.age >= 65 ? 2 : 2.4;
     }
     this.asleep = /sleep/i.test(citizen.current_activity) && citizen.current_location_id === citizen.home_location_id;
     this.emotion = emotionOf(citizen);
@@ -267,6 +269,7 @@ export class CitizenModel {
       if (step === distance) this.route.shift();
     }
     this.phase += dt * (this.moving ? 11 : 1.6);
+    this.idleTime += dt;
     const t = this.phase;
     const still = reducedMotion;
     const talking = this.speaking && !this.speechPaused;
@@ -344,6 +347,8 @@ export class CitizenModel {
       blink: closed,
       voice,
       emotion,
+      gait: { moving: this.moving && !still, phase: this.phase },
+      time: still ? 0 : this.idleTime,
     }, dt);
   }
   dispose() {

@@ -4,9 +4,9 @@ Residents can be shown as realistic MetaHumans instead of the simple figures. Ea
 file. The game poses the body and face itself, so **no animations need exporting**. A resident without a
 file keeps their simple figure, so you can add them one at a time.
 
-**Current asset status:** Aoi, Ren and Sota now use CC0 MPFB/MakeHuman exports; see
+**Current asset status:** all 26 residents use CC0 MPFB/MakeHuman exports; see
 [the free, open character workflow](open-character-art.md). They are not MetaHumans.
-No MetaHuman resident has been imported. The remaining cast uses lightweight procedural bodies.
+No MetaHuman resident has been imported; a MetaHuman file listed in the manifest replaces that resident's model.
 Run `npm run characters:check` in `frontend` for the actual imported count; this also runs before builds.
 Do not mistake the loader or a passing synthetic-rig test for a verified photoreal character.
 
