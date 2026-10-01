@@ -13,6 +13,8 @@ export type DecideSocial = (request: SocialDecisionRequest) => Promise<SocialDec
 export type Encounter = {
   actor_id: string; target_id: string; location_id: string; reason: string; topic: string;
   started_at: number; meeting_id?: string;
+  /** A scene the storyteller staged: which storyline, which beat, what's at stake. */
+  story?: { id: string; beat: number; stakes: string; proposal?: "date" };
 };
 export type MeetingPlan = {
   actor_ids: string[]; location_id: string; game_day: number; game_minute: number; topic: string;

@@ -20,6 +20,7 @@ import {
   seedSession,
   sessionApplyPolicy,
   sessionAssignTask,
+  sessionStartStory,
   sessionCloseTask,
   sessionConversations,
   sessionMemoryEnabled,
@@ -97,6 +98,8 @@ export const api = {
   walkTo: sessionWalkTo,
   speak: (targetId: string, text: string) =>
     sessionSpeak(targetId, text, generateSessionCognition),
+  /** First load of a world: it starts playing as a show (once per world). */
+  startStory: async (city: CityState) => (sessionMemoryEnabled() && getSessionCity() ? sessionStartStory() : city),
   getState: async () => {
     if (sessionMemoryEnabled()) return seedSession(createInitialCity());
     const city = await request<CityState>("/city/state");
@@ -110,8 +113,8 @@ export const api = {
     if (sessionMemoryEnabled() && getSessionCity()) return sessionStart();
     return request<CityState>("/simulation/start", { method: "POST" });
   },
-  pause: async () => {
-    if (sessionMemoryEnabled() && getSessionCity()) return sessionPause();
+  pause: async (reason?: "hidden") => {
+    if (sessionMemoryEnabled() && getSessionCity()) return sessionPause(reason);
     return request<CityState>("/simulation/pause", { method: "POST" });
   },
   setMode: async (mode: SimulationMode) => {

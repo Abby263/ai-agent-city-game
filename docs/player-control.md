@@ -67,6 +67,24 @@ The game master only refuses sexually explicit content, graphic gore, real-world
 - **Intentions.** Every conversation turn can say what the speaker now wants to do; these become the
   "what happens next" choices.
 
+## The storyteller and story pace
+
+A world opens as a running show: Auto, **Story** pace and the clock running (once per world, so choosing
+Manual, Live time or a pause afterwards sticks). At Story pace a game hour takes about 16 seconds, the night
+(22:30 to 06:30) passes in about 8, and a scene on screen holds the clock, so time slows exactly when something
+happens. 2x and 4x are faster; **Live** follows real Tokyo time as before. Hiding the tab pauses the town; it
+carries on by itself when you come back.
+
+The storyteller (`frontend/src/lib/storyteller.ts`) runs nine interlocking storylines (a secret song, a widower
+and the librarian, a hidden manga, a cafe for sale, a heart condition, a job in Osaka, stolen credit, a broken
+promise, a conservatory audition). Each plants private secrets and feelings once, then plays out in three or four
+scenes. In the waking day (07:30 to 22:00), at most every 40 game minutes, the director picks the storyline that
+has waited longest, sends one person to find the other and plays the scene straight away (one AI call, no
+separate "should I talk?" call), telling the scene's writer what's at stake and not to smooth it over. A
+storyline's proposal is a real question: a yes starts dating, a no is a no. The resident you play is never pushed
+into a scene. Every four game hours a town incident (the shrine festival, a power cut, a lost cat...) gives
+everyone something to talk about. A full game day has about 18 storyline scenes and 36 conversations in all.
+
 ## Reliability and speed
 
 - Dialogue uses minimal model thinking (`GEMINI_THINKING_LEVEL`, default `minimal`), and a reply
