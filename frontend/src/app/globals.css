@@ -2124,3 +2124,13 @@ select {
 @media (max-width: 760px), (max-width: 1024px) and (max-height: 500px) {
   .person-bar { transform: none; }
 }
+
+/* Street view: controls float over the bottom of the street, above the resident strip. */
+.street-view-controls { position: absolute; left: 50%; transform: translateX(-50%); bottom: 112px; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(560px, calc(100% - 32px)); pointer-events: none; }
+.street-view-controls p { margin: 0; padding: 5px 12px; border-radius: 999px; background: #14252dcc; color: #eef6f5; font-size: 12px; text-align: center; }
+.street-view-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; pointer-events: auto; }
+.street-view-row button, .street-view-row select { min-height: 38px; min-width: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 0 10px; border: 1px solid #ffffff33; border-radius: 8px; background: #14252de6; color: #f3f9fa; font: inherit; font-size: 13px; cursor: pointer; }
+.street-view-row select { max-width: 190px; }
+.street-view-row .street-view-exit { background: #f3f9fa; color: #14252d; }
+.conversation-on-stage .street-view-controls { bottom: auto; top: 140px; }
+@media (max-width: 600px) { .street-view-controls { bottom: 100px; } .street-view-controls p { font-size: 11px; } }

@@ -85,6 +85,20 @@ storyline's proposal is a real question: a yes starts dating, a no is a no. The 
 into a scene. Every four game hours a town incident (the shrine festival, a power cut, a lost cat...) gives
 everyone something to talk about. A full game day has about 18 storyline scenes and 36 conversations in all.
 
+## Street view
+
+**Street** (next to Explore and Follow on the map) puts you in the street at eye level, like Google Street View:
+drag to look around, click the street to walk there, use the arrow keys or WASD (or the on-screen arrows), scroll
+to zoom, pick **Go to…** to stand in front of any place, and press Esc or **Exit** to return to the overview.
+Movement stays on walkable ground; residents keep living around you and can be clicked as usual
+(`frontend/src/game/three/street-view.ts`).
+
+The town is built at true scale for this (one unit is about 2 m): people about 0.85 units tall, Japanese houses
+with tiled gable roofs, gutters, balconies and storm-shutter boxes, glass-fronted shops, apartment blocks with
+balcony grids, a curtain-wall office tower and concrete public buildings (`architecture.ts`); real instanced trees
+grown with EZ-Tree (zelkova, cherry in blossom, oak and pine, `trees.ts`); and concrete utility poles with
+sagging overhead wires along the roads (`streetscape.ts`).
+
 ## Reliability and speed
 
 - Dialogue uses minimal model thinking (`GEMINI_THINKING_LEVEL`, default `minimal`), and a reply

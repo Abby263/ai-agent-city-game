@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Art } from "./materials";
 import { makeTown } from "./town";
 import { HumanLibrary } from "./human";
+import { StreetView } from "./street-view";
 import { CitizenModel } from "./citizen";
 import { PostPipeline } from "./post";
 import { FrameMonitor, initialQuality, lowerQuality, type QualityPreset } from "./quality";
@@ -11,7 +12,7 @@ import { arrivals, citizenPoint, walkablePoint, walkingRoute } from "./layout";
 import type { CityState } from "@/lib/types";
 import type { ConversationFrame, InlineTalk } from "@/lib/conversation-playback";
 import { speechLevel } from "@/lib/speech-level";
-import { conversationCameraOffset, conversationDistance, conversationStaging, sightLinesClear } from "./conversation-camera";
+import { conversationCameraOffset, conversationDistance, conversationStaging, insideBuilding, sightLinesClear } from "./conversation-camera";
 import { makeSkyDome, skyAt } from "./sky";
 import { makeAtmosphere } from "./atmosphere";
 import { makeTraffic } from "./traffic";
@@ -23,7 +24,7 @@ import { applyFoliage, foliageFor } from "./seasons";
 import { calendarDay, calendarStartFor } from "@/lib/calendar";
 import type { WeatherNow } from "@/lib/weather";
 
-export type CameraMode = "orbit" | "follow";
+export type CameraMode = "orbit" | "follow" | "street";
 const nightAmbient = new THREE.Color(0x8fa3d6);
 const overcast = new THREE.Color(0x9aa5ad), snowSky = new THREE.Color(0xdfe6ec), heatSky = new THREE.Color(0xf3dcb6), lightningSky = new THREE.Color(0xeef2ff);
 export class CityRenderer {
@@ -51,6 +52,8 @@ export class CityRenderer {
   /** How dark it is right now (0 day .. 1 night), for bloom and the immediate redraw after a resize. */
   private night = 0;
   private readonly people = new Map<string, CitizenModel>();
+  private street!: StreetView;
+  private lastLook: { x: number; y: number } | null = null;
   // Realistic bodies are downloaded only for residents you can see up close.
   private readonly humans = new HumanLibrary();
   private readonly humanRequested = new Set<string>();
@@ -189,6 +192,8 @@ export class CityRenderer {
       TWO: THREE.TOUCH.DOLLY_PAN,
     };
     this.controls.addEventListener("start", this.cancelFocus);
+    this.street = new StreetView(this.camera, this.controls);
+    this.renderer.domElement.addEventListener("wheel", this.streetWheel, { passive: false });
     this.camera.position.set(23, 17, 31);
     this.controls.target.set(12, 0.2, 12);
     this.controls.update();
@@ -386,7 +391,7 @@ export class CityRenderer {
       else if (previous.phase !== frame.phase) this.focusConversation();
       return;
     }
-    this.controls.minDistance = 1.2;
+    this.controls.minDistance = 0.6;
     const models = frame.actorIds.map((id) => this.people.get(id)).filter((model) => model !== undefined);
     if (!models.length) { onReady?.(); return; }
     this.savedCamera ??= { position: this.camera.position.clone(), target: this.controls.target.clone() };
@@ -399,6 +404,8 @@ export class CityRenderer {
       const target = points[index % points.length];
       model.route = walkingRoute(model.root.position, target);
       model.destination = target;
+      // Someone far away joins for the last few metres of their walk, so a scene starts in seconds, not a minute.
+      shortenWalk(model, 2.5);
     });
     this.conversationReady = onReady;
     this.focusConversation();
@@ -418,9 +425,9 @@ export class CityRenderer {
     if (!mover || !anchor || mover.route.length) return;
     const dx = mover.root.position.x - anchor.root.position.x, dz = mover.root.position.z - anchor.root.position.z;
     const distance = Math.hypot(dx, dz);
-    if (distance > 0.7 && distance < 1.7) return this.holdInPlace(mover.citizen.citizen_id);
+    if (distance > 0.35 && distance < 0.9) return this.holdInPlace(mover.citizen.citizen_id);
     const direction = distance > 0.01 ? { x: dx / distance, z: dz / distance } : { x: 1, z: 0 };
-    const spot = walkablePoint({ x: anchor.root.position.x + direction.x * 1.15, z: anchor.root.position.z + direction.z * 1.15 });
+    const spot = walkablePoint({ x: anchor.root.position.x + direction.x * 0.6, z: anchor.root.position.z + direction.z * 0.6 });
     mover.route = walkingRoute(mover.root.position, spot);
     mover.destination = spot;
     mover.hold = { locationId: mover.citizen.current_location_id, point: spot };
@@ -452,6 +459,7 @@ export class CityRenderer {
   }
   /** Flies to a place, e.g. a building on fire. */
   focusPlace(locationId: string) {
+    if (this.street?.active) return;
     const spot = arrivals[locationId];
     if (!spot) return;
     this.mode = "orbit";
@@ -462,6 +470,7 @@ export class CityRenderer {
   }
   /** Frames the pair inside the actual visible canvas, not behind a phone sheet. */
   focusPair(ids: string[], onlyIfHidden = false) {
+    if (this.street?.active) return;
     let models = ids.map((id) => this.people.get(id)).filter((m) => m !== undefined);
     if (!models.length) return;
     // People in different parts of town: frame the first one rather than the empty ground between them.
@@ -479,7 +488,7 @@ export class CityRenderer {
     offset.setLength(distance);
     // Keep the current angle when the pair is in view from it; otherwise swing to one no building blocks,
     // so the camera never ends up behind a wall or inside a block of flats.
-    const heads = models.map((m) => m.root.position.clone().setY(1.35));
+    const heads = models.map((m) => m.root.position.clone().setY(0.7));
     const clear = sightLinesClear(this.focusTarget.clone().add(offset), heads, this.town.root);
     this.shotPosition = this.focusTarget.clone().add(clear ? offset : conversationCameraOffset(this.focusTarget, heads, this.town.root, distance, false));
   }
@@ -490,41 +499,75 @@ export class CityRenderer {
     model.hold = { locationId: model.citizen.current_location_id, point };
   }
   focusConversation() {
+    if (this.street?.active) return;
     if (!this.conversationCenter) return;
     this.focusTarget = this.conversationCenter.clone();
     // Compact layouts reserve a separate subtitle area; centre people in the remaining canvas.
     const cinematic = this.conversation?.phase !== "arrival";
     const compact = window.matchMedia("(max-width: 760px), (max-width: 1024px) and (max-height: 500px)").matches;
-    this.focusTarget.y = compact ? 0.9 : cinematic ? 0.35 : -1.2;
+    this.focusTarget.y = compact ? 0.5 : cinematic ? 0.25 : -0.6;
     const heads = this.conversation?.actorIds.flatMap((id) => {
       const model = this.people.get(id);
-      return model?.destination ? [new THREE.Vector3(model.destination.x, 1.35, model.destination.z)] : [];
+      return model?.destination ? [new THREE.Vector3(model.destination.x, 0.7, model.destination.z)] : [];
     }) ?? [];
-    const distance = conversationDistance(cinematic ? 4.8 : 11, this.camera.aspect);
+    const distance = conversationDistance(cinematic ? 3 : 7, this.camera.aspect);
     const offset = conversationCameraOffset(this.focusTarget, heads, this.town.root, distance, cinematic);
     this.shotPosition = this.focusTarget.clone().add(offset);
   }
   /** Over the listener's shoulder onto the speaker's face; keeps the two-shot if anything blocks the view. */
   private closeUp(speakerId: string) {
+    if (this.street?.active) return;
     const speaker = this.people.get(speakerId);
     const listener = this.conversation?.actorIds.filter((id) => id !== speakerId).map((id) => this.people.get(id)).find((m) => m !== undefined);
     if (!speaker || !listener) return;
-    // Eye height: the nameplate sits just above the head (labelLift), eyes are a little lower.
-    const face = speaker.root.position.clone().setY(speaker.root.position.y + (speaker.labelLift - 0.1) * 0.74);
-    const toListener = listener.root.position.clone().sub(speaker.root.position).setY(0);
+    // Where they stand for the scene (they may still be walking there), and eye height just below the nameplate.
+    const standing = (m: CitizenModel) => (m.destination ? new THREE.Vector3(m.destination.x, m.root.position.y, m.destination.z) : m.root.position.clone());
+    const at = standing(speaker);
+    const face = at.clone().setY(at.y + (speaker.labelLift - 0.1) * 0.74);
+    const toListener = standing(listener).sub(at).setY(0);
     if (toListener.lengthSq() < 0.01) return;
     toListener.normalize();
     const side = new THREE.Vector3(-toListener.z, 0, toListener.x);
-    const position = face.clone().addScaledVector(toListener, 2.1).addScaledVector(side, 0.75).add(new THREE.Vector3(0, 0.08, 0));
+    const position = face.clone().addScaledVector(toListener, 1.15).addScaledVector(side, 0.42).add(new THREE.Vector3(0, 0.04, 0));
     if (!sightLinesClear(position, [face], this.town.root)) return;
     // Aim a little below the eyes: subtitles cover the bottom of the view, so the face sits in its upper part.
-    this.focusTarget = face.clone().add(new THREE.Vector3(0, -0.22, 0));
+    this.focusTarget = face.clone().add(new THREE.Vector3(0, -0.12, 0));
     this.shotPosition = position;
   }
     setMode(mode: CameraMode) {
+    if (mode === "street") {
+      // Step down where the overhead camera was looking (or next to whoever is selected).
+      const selected = this.selected ? this.people.get(this.selected) : undefined;
+      const at = selected?.root.visible ? selected.root.position : this.controls.target;
+      this.shotPosition = null;
+      this.focusTarget = null;
+      this.street.enter({ x: at.x + (selected ? 0.8 : 0), z: at.z + (selected ? 0.8 : 0) });
+    } else if (this.street.active) this.street.exit();
     this.mode = mode;
     if (mode === "follow") this.focusCitizen(true);
   }
+  /** Street view from in front of a place, e.g. "jump to the station". */
+  streetViewAt(locationId: string) {
+    const spot = arrivals[locationId];
+    if (!spot) return;
+    if (this.mode !== "street") this.setMode("street");
+    // Fronts face +z: stand out in the street, a few metres back, looking at the entrance, never inside another building.
+    const back = [3, 2.2, 3.8, 1.5].find((d) => !insideBuilding(new THREE.Vector3(spot.x, 0.8, spot.z + d))) ?? 1.5;
+    this.street.enter({ x: spot.x, z: spot.z + back });
+    this.street.yaw = 0;
+    this.street.pitch = 0.08;
+  }
+  streetStep(distance: number) {
+    this.street.step(distance);
+  }
+  streetTurn(angle: number) {
+    this.street.turn(angle);
+  }
+  private streetWheel = (event: WheelEvent) => {
+    if (!this.street.active) return;
+    event.preventDefault();
+    this.street.zoom(Math.sign(event.deltaY) * 4);
+  };
   setLabels(visible: boolean) {
     this.labelsVisible = visible;
   }
@@ -631,7 +674,7 @@ export class CityRenderer {
     for (const model of this.people.values()) {
       const participant = this.conversation?.actorIds.includes(model.citizen.citizen_id) ?? false;
       const indoors = model.asleep && !model.route.length && !participant;
-      model.root.visible = !indoors && (!this.conversation || this.conversation.phase === "arrival" || participant);
+      model.root.visible = !indoors && (!this.conversation || this.conversation.phase === "arrival" || participant || this.street.active);
       model.update(dt, this.reducedMotion.matches);
       if (model.root.visible) pedestrians.push(model.root.position);
     }
@@ -679,7 +722,8 @@ export class CityRenderer {
     const followed =
       !this.conversation && this.mode === "follow" && this.selected && this.people.get(this.selected);
     if (followed) this.focusTarget = followed.root.position.clone();
-    if (this.shotPosition && this.focusTarget) {
+    if (this.street.active) this.street.update(dt, this.reducedMotion.matches);
+    else if (this.shotPosition && this.focusTarget) {
       const smoothing = this.reducedMotion.matches ? 1 : Math.min(1, dt * 2.8);
       this.camera.position.lerp(this.shotPosition, smoothing);
       this.controls.target.lerp(this.focusTarget, smoothing);
@@ -696,7 +740,7 @@ export class CityRenderer {
       this.camera.position.add(delta);
       if (!followed && delta.length() < 0.003) this.focusTarget = null;
     }
-    this.controls.update();
+    if (!this.street.active) this.controls.update();
     if (!this.reducedMotion.matches) this.town.animate(this.seconds);
     this.incidents.update(this.seconds);
     const cameraDistance = this.camera.position.distanceTo(
@@ -805,8 +849,14 @@ export class CityRenderer {
       id: event.pointerId,
       moved: false,
     };
+    this.lastLook = { x: event.clientX, y: event.clientY };
   };
   private pointerMove = (event: PointerEvent) => {
+    // Street view: drag to look around.
+    if (this.street.active && this.pointer && this.lastLook && event.pointerId === this.pointer.id) {
+      this.street.look(event.clientX - this.lastLook.x, event.clientY - this.lastLook.y);
+      this.lastLook = { x: event.clientX, y: event.clientY };
+    }
     if (
       this.pointer &&
       Math.hypot(
@@ -845,7 +895,12 @@ export class CityRenderer {
     if (hit) {
       let parent: THREE.Object3D | null = hit.object;
       while (parent && !parent.userData.citizenId) parent = parent.parent;
-      if (parent) this.onSelect(String(parent.userData.citizenId));
+      if (parent) return this.onSelect(String(parent.userData.citizenId));
+    }
+    // Street view: a click on the ground walks you there.
+    if (this.street.active) {
+      const ground = new THREE.Vector3();
+      if (ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), ground)) this.street.walkTo({ x: ground.x, z: ground.z });
     }
   };
   private contextLost = (event: Event) => {
@@ -878,6 +933,8 @@ export class CityRenderer {
       "pointercancel",
       this.pointerCancel,
     );
+    this.street.dispose();
+    this.renderer.domElement.removeEventListener("wheel", this.streetWheel);
     this.controls.dispose();
     this.people.forEach((p) => p.dispose());
     this.scene.traverse((object) => {
@@ -898,5 +955,26 @@ export class CityRenderer {
     this.renderer.domElement.remove();
     this.names.remove();
     this.scene.clear();
+  }
+}
+
+/** Trims a route to its last `metres`-ish units, moving the walker to that point (a scene starts sooner). */
+function shortenWalk(model: CitizenModel, length: number) {
+  const route = model.route;
+  if (route.length < 1) return;
+  let remaining = length;
+  let from = route[route.length - 1];
+  for (let i = route.length - 2; i >= -1; i--) {
+    const to = i >= 0 ? route[i] : { x: model.root.position.x, z: model.root.position.z };
+    const step = Math.hypot(to.x - from.x, to.z - from.z);
+    if (step >= remaining) {
+      const t = remaining / Math.max(step, 1e-6);
+      model.root.position.x = from.x + (to.x - from.x) * t;
+      model.root.position.z = from.z + (to.z - from.z) * t;
+      model.route = route.slice(i + 1);
+      return;
+    }
+    remaining -= step;
+    from = to;
   }
 }

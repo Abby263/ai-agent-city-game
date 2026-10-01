@@ -4,9 +4,13 @@ import { buildings, type Building } from "./layout";
 import { makeDistrict } from "./district";
 import { makeLanterns } from "./seasons";
 import { GROUND_KINDS, paintedGround } from "./surfaces";
+import { makeArchitecture, tagArchitecture } from "./architecture";
+import { makeForest, type TreeSpot } from "./trees";
+import { makeStreetscape } from "./streetscape";
 
 /** Labels the palette with real materials before anything is built. */
 function tagSurfaces(art: Art) {
+  tagArchitecture(art);
   art.tag("grass", P.grass, 0x80a776, 0x638b74, 0x91b69b);
   art.tag("paving", P.path, P.curb);
   art.tag("asphalt", P.road);
@@ -118,7 +122,7 @@ export function makeTown(art: Art) {
   ground.receiveShadow = true;
   root.add(ground);
 
-  for (const building of buildings) makeBuilding(root, art, building);
+  for (const building of buildings) if (!makeArchitecture(root, art, building)) makeBuilding(root, art, building);
   art.box(root, 6, 0.026, 10.6, 10, 0.035, 2.1, P.path);
   art.box(root, 6, 0.028, 6.4, 1.5, 0.035, 8, P.path);
   for (let i = 0; i < 10; i++) {
@@ -137,6 +141,14 @@ export function makeTown(art: Art) {
   ])
     flowerBed(root, art, x, z);
 
+  /** A group that scales whatever is built in it (in town coordinates) about one point: props sized for true scale. */
+  const scaled = (factor: number, x: number, z: number) => {
+    const g = new THREE.Group();
+    g.position.set(x * (1 - factor), 0, z * (1 - factor));
+    g.scale.setScalar(factor);
+    root.add(g);
+    return g;
+  };
   // School forecourt, basketball court, and swings.
   art.box(root, 19.6, 0.025, 9.1, 7.5, 0.04, 3, P.path);
   art.box(root, 21.1, 0.052, 10, 3.8, 0.025, 2, 0x87a6a2);
@@ -145,13 +157,14 @@ export function makeTown(art: Art) {
   art.box(root, 21.1, 0.07, 10, 0.04, 0.01, 1.8, 0xf8f4df);
   art.box(root, 23, 0.9, 10, 0.07, 1.8, 0.07, P.ink);
   art.box(root, 22.8, 1.65, 10, 0.08, 0.6, 0.8, 0xf5efdf);
+  const swings = scaled(0.6, 17.35, 10.4);
   for (const x of [16.5, 18.2])
-    art.box(root, x, 0.8, 10.4, 0.09, 1.6, 0.1, 0xa78063);
-  art.box(root, 17.35, 1.6, 10.4, 1.9, 0.12, 0.12, 0xb67962);
+    art.box(swings, x, 0.8, 10.4, 0.09, 1.6, 0.1, 0xa78063);
+  art.box(swings, 17.35, 1.6, 10.4, 1.9, 0.12, 0.12, 0xb67962);
   for (const x of [17.05, 17.65]) {
-    art.box(root, x, 0.98, 10.4, 0.025, 1.15, 0.025, P.ink);
+    art.box(swings, x, 0.98, 10.4, 0.025, 1.15, 0.025, P.ink);
   }
-  art.box(root, 17.35, 0.4, 10.4, 0.85, 0.08, 0.35, 0xd3af70);
+  art.box(swings, 17.35, 0.4, 10.4, 0.85, 0.08, 0.35, 0xd3af70);
 
   // A market that reads as a place, not another box-shaped building.
   art.box(root, 20.5, 0.03, 18.6, 8.5, 0.04, 4.3, P.path);
@@ -212,10 +225,11 @@ export function makeTown(art: Art) {
     [16.4, 30.5],
   ])
     bench(root, art, x, z);
+  const pergola = scaled(0.65, 19.6, 29.8);
   for (const x of [18.8, 20.4])
-    for (const z of [29, 30.6]) art.box(root, x, 1, z, 0.12, 2, 0.12, 0xf1e9d8);
+    for (const z of [29, 30.6]) art.box(pergola, x, 1, z, 0.12, 2, 0.12, 0xf1e9d8);
   for (let i = 0; i < 6; i++)
-    art.box(root, 19.6, 2, 28.9 + i * 0.36, 2, 0.14, 0.11, 0xe7dfc8);
+    art.box(pergola, 19.6, 2, 28.9 + i * 0.36, 2, 0.14, 0.11, 0xe7dfc8);
 
   // Farm plots, greenhouse and stacks of produce.
   for (let i = 0; i < 5; i++) {
@@ -246,12 +260,13 @@ export function makeTown(art: Art) {
     );
 
   // A quiet bus shelter; no fast decorative traffic.
-  art.box(root, 15.6, 1.6, 11.4, 1.5, 0.16, 1.4, 0x648e8b);
-  for (const x of [15, 16.2]) art.box(root, x, 0.8, 11, 0.07, 1.6, 0.07, P.ink);
-  art.box(root, 15.6, 0.9, 10.98, 1.3, 1.1, 0.06, 0xb1d2c9);
+  const shelter = scaled(0.7, 15.6, 11.5);
+  art.box(shelter, 15.6, 1.6, 11.4, 1.5, 0.16, 1.4, 0x648e8b);
+  for (const x of [15, 16.2]) art.box(shelter, x, 0.8, 11, 0.07, 1.6, 0.07, P.ink);
+  art.box(shelter, 15.6, 0.9, 10.98, 1.3, 1.1, 0.06, 0xb1d2c9);
   bench(root, art, 15.6, 11.3);
-  art.box(root, 15, 0.9, 12.2, 0.06, 1.8, 0.06, P.ink);
-  art.sign(root, "BUS", 15, 1.65, 12.24, 0.55, 0.28, "#567c88", "#fff9e6");
+  art.box(shelter, 15, 0.9, 12.2, 0.06, 1.8, 0.06, P.ink);
+  art.sign(shelter, "BUS", 15, 1.65, 12.24, 0.55, 0.28, "#567c88", "#fff9e6");
 
   // Street furniture adds scale at citizen height.
   for (const x of [11.2, 24.2, 28.8])
@@ -268,9 +283,10 @@ export function makeTown(art: Art) {
     [28.8, 21.3],
     [16, 23.7],
   ]) {
-    art.box(root, x, 0.58, z, 0.45, 1.15, 0.4, 0xa2545c);
-    art.box(root, x, 0.78, z + 0.21, 0.33, 0.53, 0.03, 0xa2cacc);
-    art.box(root, x, 0.29, z + 0.21, 0.3, 0.14, 0.03, P.ink);
+    const vending = scaled(0.8, x, z);
+    art.box(vending, x, 0.58, z, 0.45, 1.15, 0.4, 0xa2545c);
+    art.box(vending, x, 0.78, z + 0.21, 0.33, 0.53, 0.03, 0xa2cacc);
+    art.box(vending, x, 0.29, z + 0.21, 0.3, 0.14, 0.03, P.ink);
   }
   for (const [x, z] of [
     [5.9, 5.5],
@@ -279,12 +295,14 @@ export function makeTown(art: Art) {
   ])
     bicycle(root, art, x, z);
   for (const x of [2.7, 6]) {
-    art.cylinder(root, x, 0.5, 23.4, 0.045, 1, P.ink);
-    art.cylinder(root, x, 0.77, 23.4, 0.55, 0.08, 0xe1ba8a);
-    art.cylinder(root, x, 1.85, 23.4, 0.9, 0.35, 0xe0b977, 0, 8);
+    // Cafe terrace: a table under a parasol, a chair either side.
+    const terrace = scaled(0.55, x, 23.4);
+    art.cylinder(terrace, x, 0.5, 23.4, 0.045, 1, P.ink);
+    art.cylinder(terrace, x, 0.77, 23.4, 0.55, 0.08, 0xe1ba8a);
+    art.cylinder(terrace, x, 1.85, 23.4, 0.9, 0.35, 0xe0b977, 0, 8);
     for (const zz of [22.75, 24.05]) {
-      art.box(root, x, 0.37, zz, 0.42, 0.08, 0.42, 0xa8876e);
-      art.box(root, x, 0.18, zz, 0.08, 0.36, 0.08, P.ink);
+      art.box(terrace, x, 0.37, zz, 0.42, 0.08, 0.42, 0xa8876e);
+      art.box(terrace, x, 0.18, zz, 0.08, 0.36, 0.08, P.ink);
     }
   }
 
@@ -398,6 +416,12 @@ export function makeTown(art: Art) {
   });
   lampHeads.push(...district.lampHeads);
   batchStatic(root);
+  // Real trees, added after batching: they are already instanced per species.
+  const forest = makeForest(spots);
+  root.add(forest.root);
+  const streetscape = makeStreetscape([...spots, ...lampHeads]);
+  root.add(streetscape.root);
+  spots.length = 0;
   return {
     root,
     dynamic,
@@ -405,7 +429,7 @@ export function makeTown(art: Art) {
     petals,
     lanterns: lanterns.root,
     animate,
-    dispose: () => (petals.material as THREE.Material).dispose(),
+    dispose: () => { (petals.material as THREE.Material).dispose(); forest.dispose(); streetscape.dispose(); },
   };
 }
 
@@ -586,47 +610,38 @@ function makeBuilding(parent: THREE.Group, art: Art, b: Building) {
   }
 }
 
+/** Every tree planted while the town is built; grown as real, instanced trees at the end (see trees.ts). */
+const spots: TreeSpot[] = [];
+const nearShrine = (x: number, z: number) => x > 53 && x < 61 && z > 30 && z < 39;
+
 function tree(
-  parent: THREE.Group,
-  art: Art,
+  _parent: THREE.Group,
+  _art: Art,
   x: number,
   z: number,
   blossom: boolean,
   scale: number,
 ) {
-  const g = new THREE.Group();
-  g.position.set(x, 0, z);
-  g.scale.setScalar(scale);
-  parent.add(g);
-  art.cylinder(g, 0, 1, 0, 0.14, 2, 0x8b7766, 0.1);
-  const colors = blossom
-    ? [0xefb0c2, 0xf6c2cf, 0xe999b4, 0xffd6de]
-    : [0x6d9e78, 0x80ac7d, 0x5d916c, 0x9cbd8b];
-  for (let i = 0; i < 7; i++) {
-    const a = (i / 7) * Math.PI * 2;
-    art.ball(
-      g,
-      Math.cos(a) * 0.63,
-      2.3 + random(i + x) * 0.65,
-      Math.sin(a) * 0.63,
-      0.86,
-      0.8,
-      0.85,
-      colors[i % colors.length],
-    );
-  }
-  art.ball(g, 0, 3.1, 0, 0.96, 0.8, 0.95, colors[1]);
+  const pick = random(x * 3.1 + z * 7.7);
+  const kind = blossom ? "sakura" : nearShrine(x, z) ? "pine" : pick < 0.3 ? "oak" : "keyaki";
+  // The old figure sizes (0.6 to 1.5) become a gentler spread around each species' natural height.
+  spots.push({ x, z, kind, scale: 0.8 + (scale - 0.75) * 0.45 + pick * 0.15 });
 }
 
 function flowerBed(parent: THREE.Group, art: Art, x: number, z: number) {
-  art.box(parent, x, 0.16, z, 1.15, 0.28, 0.5, 0xc0b199);
+  // Built at its old size around the origin, then scaled to true scale (one unit is about 2 m).
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  g.scale.setScalar(0.75);
+  parent.add(g);
+  art.box(g, 0, 0.16, 0, 1.15, 0.28, 0.5, 0xc0b199);
   for (let i = 0; i < 5; i++) {
-    art.ball(parent, x - 0.42 + i * 0.21, 0.35, z, 0.15, 0.2, 0.18, 0x658e67);
+    art.ball(g, 0 - 0.42 + i * 0.21, 0.35, 0, 0.15, 0.2, 0.18, 0x658e67);
     art.ball(
-      parent,
-      x - 0.42 + i * 0.21,
+      g,
+      0 - 0.42 + i * 0.21,
       0.53,
-      z,
+      0,
       0.09,
       0.08,
       0.09,
@@ -635,11 +650,16 @@ function flowerBed(parent: THREE.Group, art: Art, x: number, z: number) {
   }
 }
 function bench(parent: THREE.Group, art: Art, x: number, z: number) {
-  for (const xx of [x - 0.5, x + 0.5])
-    art.box(parent, xx, 0.25, z, 0.08, 0.5, 0.45, P.ink);
+  // Built at its old size around the origin, then scaled to true scale (one unit is about 2 m).
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  g.scale.setScalar(0.5);
+  parent.add(g);
+  for (const xx of [0 - 0.5, 0 + 0.5])
+    art.box(g, xx, 0.25, 0, 0.08, 0.5, 0.45, P.ink);
   for (let i = 0; i < 3; i++)
-    art.box(parent, x, 0.48, z - 0.18 + i * 0.16, 1.35, 0.07, 0.13, 0xb39573);
-  art.box(parent, x, 0.76, z - 0.22, 1.35, 0.3, 0.06, 0xb39573);
+    art.box(g, 0, 0.48, 0 - 0.18 + i * 0.16, 1.35, 0.07, 0.13, 0xb39573);
+  art.box(g, 0, 0.76, 0 - 0.22, 1.35, 0.3, 0.06, 0xb39573);
 }
 function marketStall(
   parent: THREE.Group,
@@ -648,35 +668,40 @@ function marketStall(
   z: number,
   color: number,
 ) {
-  for (const xx of [x - 0.9, x + 0.9])
-    art.box(parent, xx, 0.8, z, 0.08, 1.6, 0.08, P.wood);
-  art.box(parent, x, 0.6, z, 1.85, 0.2, 0.9, 0xc2a078);
+  // Built at its old size around the origin, then scaled to true scale (one unit is about 2 m).
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  g.scale.setScalar(0.65);
+  parent.add(g);
+  for (const xx of [0 - 0.9, 0 + 0.9])
+    art.box(g, xx, 0.8, 0, 0.08, 1.6, 0.08, P.wood);
+  art.box(g, 0, 0.6, 0, 1.85, 0.2, 0.9, 0xc2a078);
   for (let i = 0; i < 6; i++) {
     art.box(
-      parent,
-      x - 0.85 + i * 0.34,
+      g,
+      0 - 0.85 + i * 0.34,
       1.65,
-      z,
+      0,
       0.34,
       0.1,
       1.4,
       i % 2 ? 0xf5e9d0 : color,
     );
     art.box(
-      parent,
-      x - 0.85 + i * 0.34,
+      g,
+      0 - 0.85 + i * 0.34,
       1.51,
-      z + 0.68,
+      0 + 0.68,
       0.34,
       0.22,
       0.05,
       i % 2 ? 0xf5e9d0 : color,
     );
     art.ball(
-      parent,
-      x - 0.7 + i * 0.28,
+      g,
+      0 - 0.7 + i * 0.28,
       0.83,
-      z,
+      0,
       0.16,
       0.15,
       0.16,
@@ -687,6 +712,7 @@ function marketStall(
 function bicycle(parent: THREE.Group, art: Art, x: number, z: number) {
   const g = new THREE.Group();
   g.position.set(x, 0.03, z);
+  g.scale.setScalar(0.6);
   parent.add(g);
   for (const xx of [-0.4, 0.4]) {
     const wheel = new THREE.Mesh(

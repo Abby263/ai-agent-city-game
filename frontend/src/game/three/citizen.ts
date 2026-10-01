@@ -8,6 +8,11 @@ import { armPose, emotionOf, gestureFor, lineEmotion, listenPoseFor, type Emotio
 import type { Human } from "./human";
 
 const NECK = 1.16;
+/**
+ * People at the town's true scale: one unit is about 2 m (a storey is 1.25 units), so a 1.7 m adult stands about
+ * 0.85 units tall. Everything the figure builds below is in its own 155 cm units and scaled by this.
+ */
+export const PERSON_SCALE = 0.5;
 
 export class CitizenModel {
   readonly root = new THREE.Group();
@@ -25,8 +30,8 @@ export class CitizenModel {
   /** Asleep at home: the model goes indoors and only the nameplate stays on the map. */
   asleep = false;
   /** Height of the nameplate anchor above the ground, following the person's real height. */
-  labelLift = 1.9;
-  private walkSpeed = 2.4;
+  labelLift = 1.9 * PERSON_SCALE;
+  private walkSpeed = 1.2;
   private belly: THREE.Mesh;
   private umbrella = new THREE.Group();
   private phase = 0;
@@ -53,7 +58,7 @@ export class CitizenModel {
   /** A realistic body (MetaHuman) standing in for the simple figure, when one has been loaded. */
   private human: Human | null = null;
   private readonly figure: THREE.Object3D[] = [];
-  private heightScale = 1;
+  private heightScale = PERSON_SCALE;
 
   constructor(
     public citizen: CitizenAgent,
@@ -61,6 +66,7 @@ export class CitizenModel {
     onSelect: (id: string) => void,
   ) {
     this.root.name = citizen.citizen_id;
+    this.body.scale.setScalar(PERSON_SCALE);
     const colors = appearanceFor(citizen);
     const style = styleFor(citizen);
     const ball = (...args: Parameters<Art["ball"]>) => {
@@ -182,14 +188,14 @@ export class CitizenModel {
       opacity: 0.95,
     });
     this.ring = new THREE.Mesh(
-      art.geometry(new THREE.RingGeometry(0.44, 0.49, 40)),
+      art.geometry(new THREE.RingGeometry(0.44 * PERSON_SCALE, 0.49 * PERSON_SCALE, 40)),
       ringMat,
     );
     this.ring.rotation.x = -Math.PI / 2;
     this.ring.position.y = 0.09;
     this.root.add(this.ring);
     // A soft contact shadow keeps them standing on the street rather than floating over it.
-    art.contactShadow(this.root, 0.95, 0.95, 0.4);
+    art.contactShadow(this.root, 0.95 * PERSON_SCALE, 0.95 * PERSON_SCALE, 0.4);
     this.label = document.createElement("button");
     this.label.type = "button";
     this.label.className = "citizen-nameplate";
@@ -205,15 +211,15 @@ export class CitizenModel {
     const life = citizen.life;
     if (life) {
       // Both bodies are normalized around 155 cm, then scaled to the resident's real height.
-      const scale = (this.heightScale = Math.max(0.36, life.height_cm / 155));
+      const scale = (this.heightScale = Math.max(0.36, life.height_cm / 155) * PERSON_SCALE);
       const build = Math.min(1.35, Math.max(0.85, life.weight_kg / (life.height_cm / 100) ** 2 / 20));
       // A real body already has its own build; stretching it would distort the face.
       if (this.human) this.body.scale.setScalar(scale);
       else this.body.scale.set(scale * build, scale, scale * Math.min(1.2, build));
-      this.labelLift = 1.9 * scale + 0.1;
+      this.labelLift = 1.9 * scale + 0.05;
       this.belly.visible = !this.human && Boolean(life.pregnancy);
-      // A brisk human walk at this scale (about 1.4 m/s); older residents take it slower.
-      this.walkSpeed = citizen.age >= 75 ? 1.7 : citizen.age >= 65 ? 2 : 2.4;
+      // A brisk walk (about 2.4 m/s, a little quick so people keep up with compressed game time); older residents slower.
+      this.walkSpeed = citizen.age >= 75 ? 0.85 : citizen.age >= 65 ? 1 : 1.2;
     }
     this.asleep = /sleep/i.test(citizen.current_activity) && citizen.current_location_id === citizen.home_location_id;
     this.emotion = emotionOf(citizen);
