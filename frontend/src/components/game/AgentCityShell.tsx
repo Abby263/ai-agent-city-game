@@ -45,6 +45,12 @@ import { WelcomeGuide, WELCOME_KEY } from "./WelcomeGuide";
 import { WorldClock } from "./WorldClock";
 import { GodPanel } from "./GodPanel";
 import { StoryTracker } from "./StoryTracker";
+import { CaseBoard } from "./CaseBoard";
+import { CaseResult } from "./CaseResult";
+import { STORYLINES, closedCases, nudgesLeft, openCases, storyState } from "@/lib/storyteller";
+import { captureScene } from "@/lib/scene-capture";
+import { quotable, shareCard } from "@/lib/share";
+import { ambienceEnabled, setAmbienceEnabled, setAmbienceScene, startAmbience } from "@/lib/ambience";
 import { liveElection, playerTurn } from "@/lib/elections";
 import { ActionPanel } from "./ActionPanel";
 import { PersonBar } from "./PersonBar";
@@ -60,7 +66,7 @@ import { displayText, subtitleDuration } from "@/lib/conversation-playback";
 import { castVoices, deliveryStyle } from "@/lib/voices";
 import { parsePlan } from "@/lib/plans";
 import { api } from "@/lib/api";
-import { exportSession, sessionMemoryEnabled, sessionRelationships } from "@/lib/session-simulation";
+import { exportSession, resetSession, sessionMemoryEnabled, sessionRelationships } from "@/lib/session-simulation";
 import { readUnlocked, unlockNew, type Achievement, type Unlocked } from "@/lib/achievements";
 import { isWeekend, weekday } from "@/lib/routine";
 import { checkPlayerText } from "@/lib/safety";
@@ -152,6 +158,28 @@ export function AgentCityShell() {
   const [unlocked, setUnlocked] = useState<Unlocked>({});
   const [celebration, setCelebration] = useState<Achievement[]>([]);
   const [welcome, setWelcome] = useState(false);
+  const introPlaying = useGameStore((state) => state.introPlaying);
+  // Cases: the one that just closed (shown once), and whether you're choosing your words for a nudge.
+  const [composing, setComposing] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [everyone, setEveryone] = useState(false);
+  const knownClosed = useRef<Set<string> | null>(null);
+  const holdClock = useRef(false);
+  const [soundOn, setSoundOn] = useState(true);
+  // Sound needs a first tap; after that the town follows the hour and the weather.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSoundOn(ambienceEnabled()), 0);
+    const begin = () => startAmbience();
+    window.addEventListener("pointerdown", begin, { once: true });
+    window.addEventListener("keydown", begin, { once: true });
+    return () => { window.clearTimeout(timer); window.removeEventListener("pointerdown", begin); window.removeEventListener("keydown", begin); };
+  }, []);
+  const minuteOfDay = city?.clock.minute_of_day, raining = city?.weather?.precipitation ?? 0;
+  useEffect(() => {
+    if (minuteOfDay === undefined) return;
+    const night = minuteOfDay < 300 || minuteOfDay >= 1170 ? 1 : minuteOfDay < 360 ? (360 - minuteOfDay) / 60 : minuteOfDay >= 1080 ? (minuteOfDay - 1080) / 90 : 0;
+    setAmbienceScene({ night, rain: Math.min(1, raining) });
+  }, [minuteOfDay, raining]);
   const [alertSeen, setAlertSeen] = useState("");
   const [voiceOn, setVoiceOn] = useState(conversationAudioPreference.enabled);
   const setInlineTalk = useGameStore((state) => state.setInlineTalk);
@@ -225,7 +253,13 @@ export function AgentCityShell() {
   const personCitizen = personId ? city?.citizens.find((c) => c.citizen_id === personId) : undefined;
   // After a scene that isn't already part of a story (stories offer their own choices), ask what happens next.
   const sceneInStory = !!lastScene && !!city && activeStories(city).some((s) => s.beats.some((b) => b.conversation_id === lastScene.conversationId));
-  const showScene = Boolean(lastScene && city && !sceneInStory);
+  // A case scene sends you back to your desk instead: how it went, what's coming, and whether to nudge.
+  const sceneCase = lastScene ? cityConversations.find((c) => c.conversation_id === lastScene.conversationId)?.encounter?.story ?? null : null;
+  const showScene = Boolean(lastScene && city && !sceneInStory && !sceneCase);
+  const story = city ? storyState(city.policy) : null;
+  const resultCase = result ? STORYLINES.find((s) => s.id === result) : undefined;
+  const closedList = story ? closedCases(story) : [];
+  const caseCast = new Set(story ? openCases(story).flatMap((c) => c.beats.flatMap((b) => [b.actor, b.target])) : []);
   const sceneChoices = showScene ? nextMoves(city!, cityConversations.find((c) => c.conversation_id === lastScene!.conversationId)) : [];
   const scenePeople = (lastScene?.actorIds ?? []).map((id) => city?.citizens.find((c) => c.citizen_id === id)).filter((c) => c !== undefined);
   const sceneNames = (lastScene?.actorIds ?? []).map((id) => shortName(city?.citizens.find((c) => c.citizen_id === id))).join(" and ");
@@ -265,7 +299,35 @@ export function AgentCityShell() {
     const chatting = panel === "journal" && player && talk.actorIds.includes(player.citizen_id) && talk.actorIds.includes(targetId);
     if (!chatting) { inlineRun.current++; inlineAudio.current?.stop(); setInlineTalk(null); }
   }, [panel, player, targetId, setInlineTalk]);
+  // The town waits while you read the brief, choose your words, or take in how a case ended.
+  useEffect(() => { holdClock.current = welcome || composing || Boolean(result) || introPlaying; }, [welcome, composing, result, introPlaying]);
+  const closedKey = story ? Object.keys(story.closed).sort().join(",") : null;
+  useEffect(() => {
+    if (closedKey === null) return;
+    const closed = closedKey ? closedKey.split(",") : [];
+    if (!knownClosed.current) { knownClosed.current = new Set(closed); return; }
+    // The verdict waits for the scene that decided it to finish playing.
+    const fresh = closed.find((id) => !knownClosed.current!.has(id));
+    if (!fresh || scenePlaying) return;
+    const timer = window.setTimeout(() => { knownClosed.current!.add(fresh); setResult(fresh); }, 500);
+    return () => window.clearTimeout(timer);
+  }, [closedKey, scenePlaying]);
+  const shareCase = useCallback((id: string) => {
+    const current = latestCity.current;
+    const storyline = STORYLINES.find((s) => s.id === id);
+    if (!current || !storyline) return;
+    const state = storyState(current.policy);
+    const scene = useGameStore.getState().cityConversations.filter((c) => c.encounter?.story?.id === id).sort((a, b) => (b.encounter!.story!.beat) - (a.encounter!.story!.beat))[0];
+    const good = state.closed[id]?.outcome !== "badly";
+    void shareCard({ kicker: "Case closed in Nakameguro", title: storyline.title, backdrop: captureScene(),
+      verdict: { text: good ? storyline.well : storyline.badly, good },
+      lines: scene ? quotable(scene.transcript).map((l) => ({ name: shortName(current.citizens.find((c) => c.citizen_id === l.speaker_id)), text: displayText(l.text) })) : [],
+    }).then((how) => setMessage(how === "saved" ? "Picture saved. Post it anywhere." : how === "failed" ? "The picture could not be made." : ""));
+  }, []);
   const closeWelcome = useCallback(() => {
+    // The first tap is also what lets the browser play sound.
+    unlockAudio();
+    startAmbience();
     setWelcome(false);
     try { localStorage.setItem(WELCOME_KEY, "1"); } catch { /* the guide can show again next visit */ }
   }, []);
@@ -340,7 +402,7 @@ export function AgentCityShell() {
     const check = () => {
       const current = useGameStore.getState().city;
       // While you chat as a resident the town waits for you, so your words are never stuck behind its AI calls.
-      if (!current || document.hidden || useGameStore.getState().playbackQueue.length || useGameStore.getState().playbackHeld || flight.current) return;
+      if (!current || document.hidden || holdClock.current || useGameStore.getState().playbackQueue.length || useGameStore.getState().playbackHeld || flight.current) return;
       const behind = minutesBehindRealTime(current);
       if (behind >= 60) void act(api.syncToRealTime);
       else if (behind >= 15 || current.policy.player_destination) void act(tickOnce);
@@ -368,7 +430,7 @@ export function AgentCityShell() {
     };
     const advance = () => {
       const store = useGameStore.getState();
-      if (!document.hidden && !store.playbackQueue.length && !store.playbackHeld) void act(tickOnce);
+      if (!document.hidden && !holdClock.current && !store.playbackQueue.length && !store.playbackHeld) void act(tickOnce);
       timer = window.setTimeout(advance, pace());
     };
     timer = window.setTimeout(advance, 1000);
@@ -434,11 +496,17 @@ export function AgentCityShell() {
   const runAct = useCallback((actorId: string | null, targetId: string | null, text: string, storyId?: string) => {
     useGameStore.getState().clearLastScene();
     setPersonId(null);
-    const yours = actorId !== null && actorId === latestCity.current?.policy.player_citizen_id;
+    const current = latestCity.current;
+    const yours = actorId !== null && actorId === current?.policy.player_citizen_id;
+    // Steering other people's lives is the fixer's lever, and it is rationed.
+    if (!yours && current && nudgesLeft(storyState(current.policy), current.clock.day) <= 0) {
+      setMessage("No nudges left today. You get three more tomorrow morning.");
+      return;
+    }
     void act(async () => {
       const { city: next, headline, talked, error } = await api.act(actorId, targetId, text, storyId ? { storyId } : {});
       setMessage(error ? `${headline} (${error})` : talked && !yours ? `${headline} Watch what happens.` : headline);
-      return next;
+      return yours || error ? next : api.spendNudge();
     }).then((ok) => { if (ok && yours && targetId) openChat(targetId); });
   }, [act, openChat]);
   /** What you write in "what happens next": aimed at whoever it names, else the other person in the scene. */
@@ -622,6 +690,15 @@ export function AgentCityShell() {
           </select>
           <button
             className="icon-button"
+            aria-label={soundOn ? "Mute town sound" : "Turn on town sound"}
+            aria-pressed={soundOn}
+            title={soundOn ? "Mute town sound and music" : "Turn on town sound and music"}
+            onClick={() => { setAmbienceEnabled(!soundOn); setSoundOn(!soundOn); }}
+          >
+            <span>{soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}</span>
+          </button>
+          <button
+            className="icon-button"
             aria-label="How to play"
             title="How to play"
             onClick={() => setWelcome(true)}
@@ -652,15 +729,6 @@ export function AgentCityShell() {
               <p>{city.encounter.reason}</p>
             </div></div>
           )}
-          <div className="world-caption">
-            <span className="map-pin">
-              <MapPin size={16} />
-            </span>
-            <div>
-              <strong>{city?.city_name ?? "Nakameguro"}</strong>
-              <span>{city ? `Meguro City, Tokyo · ${city.citizens.length} residents` : "Waking up..."}</span>
-            </div>
-          </div>
           {live && city && (city.clock.minute_of_day >= 1380 || city.clock.minute_of_day < 330) && alertSeen !== "night" && !scenePlaying && !player && (
             <div className="weather-alert night-card" role="status">
               <span aria-hidden="true">😴</span>
@@ -722,6 +790,12 @@ export function AgentCityShell() {
               onWatch={(id) => useGameStore.getState().focusOn([id])}
               onGoTo={(locationId) => { setPersonId(null); void goTo(locationId); }} />
           )}
+          <div className="desk">
+          {city && !scenePlaying && !player && (
+            <CaseBoard city={city} busy={busy} spotlight={sceneCase} onComposing={setComposing} onMessage={setMessage}
+              onWatch={(ids) => useGameStore.getState().focusOn(ids)}
+              onNudge={(storylineId, citizenId, text) => void act(() => api.nudge(storylineId, citizenId, text))} />
+          )}
           {city && !personCitizen && !scenePlaying && showScene && (
             <NextMoveCard names={sceneNames} moves={sceneChoices} people={scenePeople} busy={busy} onPick={(m) => pickChoice(m)}
               onWrite={(actorId, text) => writeAct(actorId, text, lastScene?.actorIds ?? [])}
@@ -733,11 +807,12 @@ export function AgentCityShell() {
             onAsk={(id) => void act(() => api.callCandidate(id)).then((ok) => { if (ok) openChat(id); })}
             onChoose={pickChoice}
             onWrite={(actorId, text, storyId) => writeAct(actorId, text, city.stories?.find((s) => s.id === storyId)?.focus_ids ?? [], storyId)} />}
+          </div>
           {!city && (
             <div className="world-loading">{error || "Opening Nakameguro..."}</div>
           )}
           <div className="citizen-strip" aria-label="Citizens">
-            {city?.citizens.map((citizen) => (
+            {city?.citizens.filter((citizen) => everyone || !caseCast.size || caseCast.has(citizen.citizen_id) || citizen.citizen_id === player?.citizen_id).map((citizen) => (
               <button
                 key={citizen.citizen_id}
                 aria-label={`Meet ${citizen.name}`}
@@ -761,6 +836,11 @@ export function AgentCityShell() {
                 )}
               </button>
             ))}
+            {caseCast.size > 0 && city && (
+              <button className="strip-more" aria-pressed={everyone} title={everyone ? "Only the people in your cases" : "Show all residents"} onClick={() => setEveryone(!everyone)}>
+                <span><strong>{everyone ? "Cases" : `+${city.citizens.length - city.citizens.filter((c) => caseCast.has(c.citizen_id)).length}`}</strong><small>{everyone ? "only" : "everyone"}</small></span>
+              </button>
+            )}
           </div>
         </section>
 
@@ -1277,7 +1357,7 @@ export function AgentCityShell() {
                         title={voiceOn ? "Mute voices" : "Hear voices"}
                         onClick={() => {
                           const on = !conversationAudioPreference.enabled;
-                          conversationAudioPreference.enabled = on;
+                          conversationAudioPreference.remember(on);
                           if (on) unlockAudio(); else inlineAudio.current?.stop();
                           setVoiceOn(on);
                         }}
@@ -1440,7 +1520,12 @@ export function AgentCityShell() {
           </div>
         </button>
       )}
-      {welcome && <WelcomeGuide onClose={closeWelcome} />}
+      {welcome && !introPlaying && <WelcomeGuide firstCase={story ? openCases(story)[0] : undefined} onClose={closeWelcome} />}
+      {resultCase && story && !welcome && (
+        <CaseResult storyline={resultCase} outcome={story.closed[resultCase.id]?.outcome ?? "well"} next={openCases(story).at(-1)}
+          record={{ wins: closedList.filter((c) => story.closed[c.id]?.outcome === "well").length, closed: closedList.length, total: STORYLINES.length }}
+          onShare={() => shareCase(resultCase.id)} onNewSeason={() => { resetSession(); window.location.reload(); }} onClose={() => setResult(null)} />
+      )}
       {(message || error) && (
         <div className="game-toast" role="status">
           <span>{message || error}</span>

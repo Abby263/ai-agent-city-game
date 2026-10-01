@@ -66,6 +66,15 @@ export class Art {
     parent.add(mesh);
     return mesh;
   }
+  /** Things that light up after dark (signs, shop interiors, lanterns): how brightly by day and at night. */
+  readonly lit: Array<{ material: THREE.MeshStandardMaterial; day: number; night: number }> = [];
+  glow(material: THREE.MeshStandardMaterial, color: THREE.ColorRepresentation, day: number, night: number) {
+    if (this.lit.some((entry) => entry.material === material)) return;
+    material.emissive.set(color);
+    if (material.map) material.emissiveMap = material.map;
+    material.emissiveIntensity = day;
+    this.lit.push({ material, day, night });
+  }
   geometry<T extends THREE.BufferGeometry>(geometry: T): T {
     this.geometries.push(geometry);
     return geometry;
@@ -194,6 +203,8 @@ export class Art {
     this.textures.push(texture);
     const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.6 });
     this.materials.set(`sign-${this.materials.size}`, material);
+    // Signboards are lit at night, so the street stays readable after dark.
+    this.glow(material, 0xffffff, 0.06, 0.85);
     const mesh = new THREE.Mesh(
       this.geometry(new THREE.PlaneGeometry(w, h)),
       material,

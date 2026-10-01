@@ -56,22 +56,35 @@ export function listenPoseFor(emotion: Emotion): ListenPose {
   return emotion === "angry" ? "crossed" : emotion === "sad" || emotion === "worried" ? "clasped" : emotion === "curious" ? "attentive" : "relaxed";
 }
 
-/** Target arm angles for a gesture: [x, outward z] for left and right arms, with motion amplitude. */
-export function armPose(gesture: Gesture | ListenPose, t: number): { left: [number, number]; right: [number, number] } {
+export type ArmPose = { left: [number, number]; right: [number, number]; /** Elbow bend, left and right (0 is straight). */ bend: [number, number] };
+
+/**
+ * Target arm angles for a gesture: [forward swing, outward lift] for the left and right upper arms, plus how far
+ * each elbow bends. People talk with their forearms: the upper arms stay near the body and the hands move.
+ */
+export function armPose(gesture: Gesture | ListenPose, t: number): ArmPose {
   const s = Math.sin(t * 3.1), c = Math.sin(t * 2.3 + 1.2);
   switch (gesture) {
-    case "explain": return { left: [-0.75 + s * 0.22, 0.22], right: [-0.7 - s * 0.22, 0.25 + c * 0.08] };
-    case "open": return { left: [-0.55, 0.55 + s * 0.08], right: [-0.55, 0.55 - s * 0.08] };
-    case "point": return { left: [0, 0.05], right: [-1.45 + s * 0.05, 0.08] };
-    case "shrug": return { left: [-0.35, 0.75 + s * 0.05], right: [-0.35, 0.75 - s * 0.05] };
-    case "hips": return { left: [0.3, 0.55], right: [0.3, 0.55] };
-    case "heart": return { left: [-0.2, 0.05], right: [-1.25, -0.4] };
-    case "wave": return { left: [0, 0.05], right: [-0.35, 2.55 + Math.sin(t * 9) * 0.28] };
-    case "fists": return { left: [-0.25 + Math.sin(t * 11) * 0.06, 0.18], right: [-0.25 - Math.sin(t * 11) * 0.06, 0.18] };
-    case "fidget": return { left: [-0.85 + s * 0.05, -0.42], right: [-0.85 - s * 0.05, -0.42] };
-    case "crossed": return { left: [-1.2, -0.62], right: [-1.15, -0.55] };
-    case "clasped": return { left: [-0.45, -0.3], right: [-0.45, -0.3] };
-    case "attentive": return { left: [-0.1, 0.06], right: [-0.1, 0.06] };
-    default: return { left: [0, 0.05], right: [0, 0.05] };
+    case "explain": return { left: [-0.32 + s * 0.08, 0.1], right: [-0.36 - s * 0.08, 0.12 + c * 0.05], bend: [1.25 + s * 0.28, 1.35 - s * 0.28] };
+    case "open": return { left: [-0.22, 0.3 + s * 0.05], right: [-0.22, 0.3 - s * 0.05], bend: [1.05 + c * 0.12, 1.05 - c * 0.12] };
+    case "point": return { left: [0.02, 0.05], right: [-1.05 + s * 0.04, 0.06], bend: [0.25, 0.35 + c * 0.08] };
+    case "shrug": return { left: [-0.12, 0.34 + s * 0.04], right: [-0.12, 0.34 - s * 0.04], bend: [1.45, 1.45] };
+    case "hips": return { left: [0.22, 0.52], right: [0.22, 0.52], bend: [1.35, 1.35] };
+    case "heart": return { left: [0, 0.05], right: [-0.5, -0.22], bend: [0.25, 1.95] };
+    case "wave": return { left: [0, 0.05], right: [-0.35, 2.55 + Math.sin(t * 9) * 0.28], bend: [0.2, 0.5] };
+    case "fists": return { left: [-0.08 + Math.sin(t * 11) * 0.04, 0.16], right: [-0.08 - Math.sin(t * 11) * 0.04, 0.16], bend: [0.6, 0.6] };
+    case "fidget": return { left: [-0.28 + s * 0.03, -0.16], right: [-0.28 - s * 0.03, -0.16], bend: [1.2 + c * 0.06, 1.2 - c * 0.06] };
+    case "crossed": return { left: [-0.42, -0.3], right: [-0.4, -0.26], bend: [1.75, 1.7] };
+    case "clasped": return { left: [-0.14, -0.16], right: [-0.14, -0.16], bend: [0.85, 0.85] };
+    case "attentive": return { left: [-0.04, 0.06], right: [-0.04, 0.06], bend: [0.3, 0.3] };
+    default: return { left: [0, 0.05], right: [0, 0.05], bend: [0.2, 0.2] };
   }
+}
+
+/** How a listener takes what they just heard. */
+export function reactionTo(heard: Emotion, own: Emotion): Emotion {
+  if (heard === "angry") return own === "angry" ? "angry" : "worried";
+  if (heard === "sad" || heard === "worried") return "worried";
+  if (heard === "excited" || heard === "happy") return own === "sad" || own === "angry" ? own : "happy";
+  return own;
 }

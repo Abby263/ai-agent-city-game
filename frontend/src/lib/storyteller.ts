@@ -26,7 +26,11 @@ export type Beat = {
   proposal?: "date";
 };
 
-export type Storyline = { id: string; title: string; seeds: Seed[]; beats: Beat[] };
+/**
+ * Each storyline is also a case for the player, the neighbourhood's fixer: a goal, what they know going in, and
+ * how it reads when it ends well or badly.
+ */
+export type Storyline = { id: string; title: string; icon: string; goal: string; brief: string; well: string; badly: string; seeds: Seed[]; beats: Beat[] };
 
 const AOI = "cit_009", REN = "cit_010", RIKU = "cit_021", MIO = "cit_022", SOTA = "cit_026", HANA = "cit_027", RIN = "cit_028",
   KAITO = "cit_029", TAKASHI = "cit_030", MASAO = "cit_032", KAORI = "cit_033", DAISUKE = "cit_034", KEIKO = "cit_035",
@@ -35,7 +39,11 @@ const AOI = "cit_009", REN = "cit_010", RIKU = "cit_021", MIO = "cit_022", SOTA 
 
 export const STORYLINES: Storyline[] = [
   {
-    id: "ren_song", title: "The song about someone",
+    id: "ren_song", title: "The song about someone", icon: "🎸",
+    goal: "Get Ren and Aoi on a date.",
+    brief: "Ren wrote a song about Aoi and has never told her. Shy Hana has a crush on Ren.",
+    well: "Ren told Aoi the truth, and she said yes.",
+    badly: "Ren laid his heart on the line, and Aoi turned him down.",
     seeds: [
       { who: REN, memory: "I wrote a song called 'Ninety-Nine Degrees' about Aoi Takahashi. I've never told her, or anyone. I'm playing it at my gig at Sunny Side Cafe on Saturday.", feels: { toward: AOI, affection: 45 } },
       { who: HANA, memory: "I have a crush on Ren Ishikawa from Sunny Side Cafe. I've filled half a sketchbook with drawings of him playing guitar. Nobody knows.", feels: { toward: REN, affection: 40 } },
@@ -54,7 +62,11 @@ export const STORYLINES: Storyline[] = [
     ],
   },
   {
-    id: "library_books", title: "Books he's already read",
+    id: "library_books", title: "Books he's already read", icon: "📚",
+    goal: "Get Officer Abe and Yuka to the festival together.",
+    brief: "Takeshi, a widower, keeps borrowing books he's already read just to see Yuka the librarian. His daughter Rin has noticed.",
+    well: "Yuka and Takeshi are going to the festival together.",
+    badly: "Yuka and Takeshi couldn't find the courage. The festival will come and go.",
     seeds: [
       { who: TAKESHI, memory: "I've borrowed 'The Wind-Up Bird Chronicle' three times this month just to talk to Yuka at the library. Part of me feels I'm betraying Amira.", feels: { toward: YUKA, affection: 40 } },
       { who: YUKA, memory: "Takeshi Abe keeps borrowing books he has already read. I think it might be because of me, and I don't know what to do with that.", feels: { toward: TAKESHI, affection: 35 } },
@@ -74,7 +86,11 @@ export const STORYLINES: Storyline[] = [
     ],
   },
   {
-    id: "haruto_manga", title: "Last Train",
+    id: "haruto_manga", title: "Last Train", icon: "🎌",
+    goal: "Get Haruto to tell his father about the manga, without breaking them apart.",
+    brief: "Haruto has secretly entered a manga contest. His father Kenji, the station master, thinks he is studying to take over the station.",
+    well: "Kenji knows about the manga, and father and son are still talking.",
+    badly: "The truth came out, and it drove Haruto and his father apart.",
     seeds: [
       { who: HARUTO, memory: "I entered my manga 'Last Train' in the Shonen Spark newcomer contest; the deadline is Sunday. Dad thinks I'm studying for the station supervisor exam. If he finds out, he'll explode." },
       { who: KENJI, memory: "Haruto's station supervisor exam is in two weeks. He'll run the station one day; I've worked twenty years for that." },
@@ -94,7 +110,11 @@ export const STORYLINES: Storyline[] = [
     ],
   },
   {
-    id: "cafe_sale", title: "For sale?",
+    id: "cafe_sale", title: "For sale?", icon: "☕",
+    goal: "Get Daisuke to come clean about selling the cafe, and keep his friends.",
+    brief: "Daisuke is quietly thinking of selling Sunny Side Cafe, where his son Ren plays his music. He has told nobody.",
+    well: "Daisuke told the truth about the cafe, and nobody walked away.",
+    badly: "The cafe secret came out badly, and it cost Daisuke a friend.",
     seeds: [
       { who: DAISUKE, memory: "An estate agent valued Sunny Side Cafe yesterday. If I sell, I can buy the food truck outright. I haven't told Ren; the cafe is where he plays his music." },
       { who: AIKO, memory: "I saw an estate agent with a tape measure at Sunny Side Cafe this morning. Daisuke wouldn't sell... would he?" },
@@ -109,7 +129,11 @@ export const STORYLINES: Storyline[] = [
     ],
   },
   {
-    id: "masao_heart", title: "Grandpa's appointment card",
+    id: "masao_heart", title: "Grandpa's appointment card", icon: "🫀",
+    goal: "Get Masao to let his family help.",
+    brief: "Grandpa Masao is hiding heart tests from his family. His grandson Sota has found the appointment card.",
+    well: "Masao let his family in. He will not face the tests alone.",
+    badly: "Masao shut his family out. He is facing the tests alone.",
     seeds: [
       { who: MASAO, memory: "Dr. Takahashi wants me back for heart tests next Tuesday. I've told nobody. I won't be the old man everyone tiptoes around." },
       { who: SOTA, memory: "I found Grandpa's hospital appointment card in his coat pocket. Cardiology, next Tuesday. He hasn't said a word to any of us." },
@@ -127,7 +151,11 @@ export const STORYLINES: Storyline[] = [
     ],
   },
   {
-    id: "natsumi_osaka", title: "The Osaka offer",
+    id: "natsumi_osaka", title: "The Osaka offer", icon: "🏋️",
+    goal: "Help Natsumi decide about Osaka without leaving anyone behind.",
+    brief: "Natsumi has been offered her dream job in Osaka. She has not told her sister Hana, or Riku, who is counting on her.",
+    well: "Natsumi made her choice, and the people who count on her are still on her side.",
+    badly: "Natsumi made her choice, and someone who counted on her feels abandoned.",
     seeds: [
       { who: NATSUMI, memory: "A studio in Osaka has offered me head coach, starting next month. It's my dream job. I haven't told Hana, or Riku, who's counting on me for his tryout." },
       { who: RIKU, memory: "Natsumi is training me for the Meguro football club tryout in three weeks. She's the only coach who's ever believed in me.", feels: { toward: NATSUMI, admiration: 45 } },
@@ -146,7 +174,11 @@ export const STORYLINES: Storyline[] = [
     ],
   },
   {
-    id: "stolen_credit", title: "Whose idea was it?",
+    id: "stolen_credit", title: "Whose idea was it?", icon: "💼",
+    goal: "Get Yui to make it right with Rin.",
+    brief: "Yui presented Rin's work as her own, days before a promotion decision. Daichi, meanwhile, is trying to ask Yui to lunch.",
+    well: "Yui owned up, and Rin can work with her again.",
+    badly: "Yui and Rin are finished as colleagues who trust each other.",
     seeds: [
       { who: RIN, memory: "In Monday's meeting Yui Sato presented my user-retention model as 'our team's idea'. My name wasn't on a single slide.", feels: { toward: YUI, resentment: 40 } },
       { who: YUI, memory: "I used Rin Abe's model in my pitch without crediting her. I panicked; the promotion decision is Friday. I feel sick about it." },
@@ -162,7 +194,11 @@ export const STORYLINES: Storyline[] = [
     ],
   },
   {
-    id: "kaito_promise", title: "The third broken promise",
+    id: "kaito_promise", title: "The third broken promise", icon: "🍳",
+    goal: "Mend things between Kaito and his dad.",
+    brief: "Dr. Ito has broken three promises to his son Kaito this year. Kaito has stopped pretending it is fine.",
+    well: "Kaito is giving his dad one more chance, and this time Dr. Ito means it.",
+    badly: "Kaito has heard it all before. He does not believe his dad any more.",
     seeds: [
       { who: KAITO, memory: "Dad promised to come to my first community-kitchen tasting on Saturday. He didn't show. Third broken promise this year.", feels: { toward: NAOKI, resentment: 35 } },
       { who: NAOKI, memory: "I missed Kaito's tasting; the experiment overran. I keep telling myself he understands." },
@@ -177,7 +213,11 @@ export const STORYLINES: Storyline[] = [
     ],
   },
   {
-    id: "sakura_audition", title: "The audition",
+    id: "sakura_audition", title: "The audition", icon: "🎹",
+    goal: "Get Sakura onto a stage before her audition.",
+    brief: "Sakura has an audition at the Tokyo conservatory and has told no one, not even her mum.",
+    well: "Sakura has people behind her, and a stage to play on before the audition.",
+    badly: "Sakura is facing the audition feeling more alone than before.",
     seeds: [
       { who: SAKURA, memory: "I've got an audition at the Tokyo conservatory on the 20th. I'd have to drop my HappyMart evening shifts to practise. I haven't told Mum or Aiko." },
     ],
@@ -212,6 +252,17 @@ export const INCIDENTS: Incident[] = [
     memory: "Aiko swears someone in Nakameguro is about to get engaged. She won't say who, which means she doesn't know." },
 ];
 
+/** How a scene went for the two people in it. */
+export type SceneResult = "well" | "badly" | "mixed";
+export type CaseOutcome = "well" | "badly";
+/** A word in someone's ear before their next scene. */
+export type CaseNudge = { beat: number; who: string; text: string };
+
+/** Cases open in this order, strongest hook first, and a few at a time so the player can follow them. */
+export const CASE_ORDER = ["haruto_manga", "ren_song", "masao_heart", "library_books", "stolen_credit", "kaito_promise", "cafe_sale", "natsumi_osaka", "sakura_audition"];
+export const OPEN_CASES = 3;
+export const NUDGES_PER_DAY = 3;
+
 /** What has played so far; kept on the city so it survives reloads. */
 export type StoryState = {
   progress: Record<string, number>;
@@ -220,12 +271,41 @@ export type StoryState = {
   last_scene: number;
   last_incident: number;
   incidents: number;
+  /** How each played scene of a case went, in order. */
+  results: Record<string, SceneResult[]>;
+  closed: Record<string, { outcome: CaseOutcome; day: number; minute: number }>;
+  nudges: Record<string, CaseNudge[]>;
+  nudge_day: number;
+  nudges_used: number;
 };
 
 export function storyState(policy: Record<string, unknown>): StoryState {
   const raw = (policy.story ?? {}) as Partial<StoryState>;
   return { progress: { ...(raw.progress ?? {}) }, advanced: { ...(raw.advanced ?? {}) }, last_scene: raw.last_scene ?? -1e9,
-    last_incident: raw.last_incident ?? -1e9, incidents: raw.incidents ?? 0 };
+    last_incident: raw.last_incident ?? -1e9, incidents: raw.incidents ?? 0, results: { ...(raw.results ?? {}) }, closed: { ...(raw.closed ?? {}) },
+    nudges: { ...(raw.nudges ?? {}) }, nudge_day: raw.nudge_day ?? 0, nudges_used: raw.nudges_used ?? 0 };
+}
+
+const ordered = () => CASE_ORDER.map((id) => STORYLINES.find((s) => s.id === id)).filter((s) => s !== undefined);
+export const caseFinished = (state: StoryState, storyline: Storyline) => (state.progress[storyline.id] ?? 0) >= storyline.beats.length;
+/** The cases on the player's desk right now. */
+export const openCases = (state: StoryState) => ordered().filter((s) => !caseFinished(state, s)).slice(0, OPEN_CASES);
+export const closedCases = (state: StoryState) => ordered().filter((s) => caseFinished(state, s));
+export const nudgesLeft = (state: StoryState, day: number) => NUDGES_PER_DAY - (state.nudge_day === day ? state.nudges_used : 0);
+
+type Effect = "neutral" | "positive" | "negative" | undefined;
+/** A scene went well if it brought them closer, badly if it pushed either away. */
+export function sceneResult(effects: Effect[]): SceneResult {
+  const hurt = effects.includes("negative"), warmed = effects.includes("positive");
+  return hurt && warmed ? "mixed" : hurt ? "badly" : warmed ? "well" : "mixed";
+}
+
+/** How a case ends: a proposal's answer decides it; otherwise the last scene, with earlier scenes breaking a tie. */
+export function caseOutcome(results: SceneResult[], answer?: "accepted" | "declined"): CaseOutcome {
+  if (answer) return answer === "accepted" ? "well" : "badly";
+  const last = results.at(-1);
+  if (last === "well" || last === "badly") return last;
+  return results.filter((r) => r === "well").length >= results.filter((r) => r === "badly").length ? "well" : "badly";
 }
 
 /** Minimum game minutes between directed scenes, and between town incidents. */
@@ -236,12 +316,12 @@ export const INCIDENT_GAP = 240;
 export const sceneHours = (minuteOfDay: number) => minuteOfDay >= 450 && minuteOfDay < 1320;
 
 /**
- * The next scene the director can stage: storylines least recently advanced first, the next unplayed beat
+ * The next scene the director can stage: open cases least recently advanced first, the next unplayed beat
  * of each, and only if both people can take part right now.
  */
 export function nextBeat(state: StoryState, canPlay: (id: string) => boolean) {
-  const ordered = [...STORYLINES].sort((a, b) => (state.advanced[a.id] ?? -1e9) - (state.advanced[b.id] ?? -1e9));
-  for (const storyline of ordered) {
+  const waiting = openCases(state).sort((a, b) => (state.advanced[a.id] ?? -1e9) - (state.advanced[b.id] ?? -1e9));
+  for (const storyline of waiting) {
     const index = state.progress[storyline.id] ?? 0;
     const beat = storyline.beats[index];
     if (beat && canPlay(beat.actor) && canPlay(beat.target)) return { storyline, beat, index };

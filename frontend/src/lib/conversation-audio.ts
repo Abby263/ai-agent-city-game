@@ -187,17 +187,29 @@ export class ConversationAudio {
   }
 }
 
-const ENGINE_KEY = "agentcity.voiceEngine";
-function savedEngine(): "natural" | "device" {
-  try { return typeof window !== "undefined" && window.localStorage.getItem(ENGINE_KEY) === "device" ? "device" : "natural"; } catch { return "natural"; }
-}
-// A reload requires a fresh opt-in gesture; subsequent scenes keep the choice.
+const ENGINE_KEY = "agentcity.voiceEngine", VOICES_KEY = "agentcity.voices";
+const saved = (key: string) => {
+  try { return typeof window !== "undefined" ? window.localStorage.getItem(key) : null; } catch { return null; }
+};
+// Voices are on from the start, spoken by the device (free and instant). Natural AI voices are a choice, because
+// every line costs a model call.
 export const conversationAudioPreference = {
-  enabled: false,
+  enabled: saved(VOICES_KEY) !== "off",
   volume: 0.8,
-  engine: savedEngine(),
+  engine: (saved(ENGINE_KEY) === "natural" ? "natural" : "device") as "natural" | "device",
   setEngine(engine: "natural" | "device") {
     this.engine = engine;
     try { window.localStorage.setItem(ENGINE_KEY, engine); } catch { /* remembered for this visit */ }
   },
+  /** The player's own choice to hear voices or not, kept for next time. */
+  remember(enabled: boolean) {
+    this.enabled = enabled;
+    try { window.localStorage.setItem(VOICES_KEY, enabled ? "on" : "off"); } catch { /* remembered for this visit */ }
+  },
 };
+
+/** Browsers only allow sound after the player has tapped or pressed something. */
+export function soundAllowed() {
+  const activation = typeof navigator !== "undefined" ? (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation : undefined;
+  return activation ? activation.hasBeenActive : true;
+}

@@ -30,7 +30,8 @@ export function conversationCameraOffset(target: THREE.Vector3, heads: THREE.Vec
   let bestScore = Infinity;
   // Test sight lines to both residents. Prefer eye-level scenery; raise the camera
   // only if every lower angle is obstructed by a roof, stall, or tree.
-  for (const height of cinematic ? [1.8, 3.8, 6, 10, 16, 23] : [10, 16, 23]) {
+  // Cinematic shots start at standing eye level, like a camera operator on the street.
+  for (const height of cinematic ? [0.75, 1.8, 3.8, 6, 10, 16, 23] : [10, 16, 23]) {
     for (const angle of [0, Math.PI / 2, -Math.PI / 2, Math.PI, Math.PI / 4, -Math.PI / 4, Math.PI * 0.75, -Math.PI * 0.75]) {
       const offset = new THREE.Vector3(Math.sin(angle) * distance, height, Math.cos(angle) * distance);
       const position = target.clone().add(offset);

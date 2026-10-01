@@ -23,6 +23,8 @@ import type { ConversationFrame } from "@/lib/conversation-playback";
 import { useGameStore } from "@/lib/store";
 import { LiveConversation } from "./LiveConversation";
 import { EarthIntro } from "./EarthIntro";
+import { registerSceneCapture } from "@/lib/scene-capture";
+import { renderShareCard } from "@/lib/share";
 import { calendarDay, formatDate } from "@/lib/calendar";
 import { weekday } from "@/lib/routine";
 
@@ -83,6 +85,9 @@ export function GameCanvas({
           setError,
         );
         renderer.current = instance;
+        registerSceneCapture(() => instance?.snapshot() ?? null);
+        // A handle for inspecting the town from the browser console while developing.
+        if (process.env.NODE_ENV === "development") Object.assign(window, { __town: instance, __shareCard: renderShareCard });
         if (latest.current.city)
           instance.sync(latest.current.city, latest.current.selectedCitizenId);
         setReady(true);
@@ -97,6 +102,7 @@ export function GameCanvas({
     void boot();
     return () => {
       cancelled = true;
+      registerSceneCapture(null);
       instance?.dispose();
       renderer.current = null;
     };
@@ -123,6 +129,7 @@ export function GameCanvas({
     }
   }, [ready]);
   const endIntro = useCallback(() => setIntroDone(true), []);
+  useEffect(() => { useGameStore.getState().setIntroPlaying(intro); }, [intro]);
   // Street view: how far the scene being played is, so you have to walk over to hear it.
   const [sceneDistance, setSceneDistance] = useState<number | null>(null);
   useEffect(() => {

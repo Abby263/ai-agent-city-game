@@ -7,6 +7,7 @@ import { GROUND_KINDS, paintedGround } from "./surfaces";
 import { makeArchitecture, tagArchitecture } from "./architecture";
 import { makeForest, type TreeSpot } from "./trees";
 import { makeStreetscape } from "./streetscape";
+import { postBox, vendingMachine } from "./props";
 
 /** Labels the palette with real materials before anything is built. */
 function tagSurfaces(art: Art) {
@@ -283,11 +284,15 @@ export function makeTown(art: Art) {
     [28.8, 21.3],
     [16, 23.7],
   ]) {
-    const vending = scaled(0.8, x, z);
-    art.box(vending, x, 0.58, z, 0.45, 1.15, 0.4, 0xa2545c);
-    art.box(vending, x, 0.78, z + 0.21, 0.33, 0.53, 0.03, 0xa2cacc);
-    art.box(vending, x, 0.29, z + 0.21, 0.3, 0.14, 0.03, P.ink);
+    vendingMachine(art, root, x, 0.03, z, [0xd63f36, 0x2f62b5, 0xf4f4ef][Math.round(x) % 3], Math.round(x * 7 + z));
+    vendingMachine(art, root, x + 0.56, 0.03, z, [0x2f62b5, 0xf4f4ef, 0xd63f36][Math.round(x) % 3], Math.round(x * 3 + z * 5));
   }
+  // More corners: by the station and the konbini, and a red post box outside the bank and the station.
+  for (const [x, z] of [[74.4, 23], [66.2, 32.8], [52, 8.2], [13, 30.2], [34.8, 12.4]]) {
+    vendingMachine(art, root, x, 0.03, z, [0xd63f36, 0x2f62b5, 0xf4f4ef][Math.round(x + z) % 3], Math.round(x * 11 + z));
+    vendingMachine(art, root, x + 0.56, 0.03, z, [0xf4f4ef, 0xd63f36, 0x2f62b5][Math.round(x + z) % 3], Math.round(x * 5 + z * 3));
+  }
+  for (const [x, z] of [[11.6, 20.6], [75.2, 23], [29.4, 28]]) postBox(art, root, x, 0.03, z);
   for (const [x, z] of [
     [5.9, 5.5],
     [16.7, 7.9],
@@ -422,10 +427,13 @@ export function makeTown(art: Art) {
   const streetscape = makeStreetscape([...spots, ...lampHeads]);
   root.add(streetscape.root);
   spots.length = 0;
+  // Light spilling out of shopfronts onto the pavement after dark, alongside the street lamps' pools.
+  const spill = buildings.filter((b) => b.kind === "shop" || b.kind === "mall" || b.kind === "station")
+    .flatMap((b) => [-0.25, 0.25].map((side) => new THREE.Vector3(b.x + side * b.w, 0, b.z + b.d / 2 + 0.8)));
   return {
     root,
     dynamic,
-    lampHeads,
+    lampHeads: [...lampHeads, ...spill],
     petals,
     lanterns: lanterns.root,
     animate,

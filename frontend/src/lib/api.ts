@@ -21,6 +21,8 @@ import {
   sessionApplyPolicy,
   sessionAssignTask,
   sessionStartStory,
+  sessionNudge,
+  sessionSpendNudge,
   sessionCloseTask,
   sessionConversations,
   sessionMemoryEnabled,
@@ -94,6 +96,9 @@ export const api = {
     onCognitionStart?.(request);
     return generateSessionCognition(request);
   }, generateSocialDecision),
+  /** A quiet word with someone in a case, before their next scene. */
+  nudge: async (storylineId: string, citizenId: string, text: string) => sessionNudge(storylineId, citizenId, text),
+  spendNudge: async () => sessionSpendNudge(),
   takeControl: sessionTakeControl,
   walkTo: sessionWalkTo,
   speak: (targetId: string, text: string) =>

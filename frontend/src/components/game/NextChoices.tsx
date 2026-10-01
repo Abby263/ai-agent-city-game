@@ -62,7 +62,7 @@ export function NextMoveCard({ names, moves, people, busy, onPick, onWrite, onDi
         <span className="story-live"><i />What happens next?</span>
         <button className="icon-button" aria-label="Let it be" title="Let it be" onClick={onDismiss}><X size={15} /></button>
       </header>
-      <p>{moves.length ? `What ${names} want to do now. Let it happen, or write your own.` : `You decide what ${names} do now.`}</p>
+      <p>{moves.length ? `What ${names} want to do now. Make one happen, or write your own.` : `You decide what ${names} do now.`} <em>Costs one nudge.</em></p>
       <MoveButtons moves={moves} busy={busy} onPick={onPick} />
       <WriteWhatHappens people={people} busy={busy} onWrite={onWrite} />
     </section>

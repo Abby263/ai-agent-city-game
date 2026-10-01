@@ -54,6 +54,9 @@ type GameStore = {
   playbackHeld: boolean;
   setPlaybackHeld: (held: boolean) => void;
   clearLastScene: () => void;
+  /** The opening flight from space is on screen; the town and its welcome wait for it. */
+  introPlaying: boolean;
+  setIntroPlaying: (playing: boolean) => void;
   replayConversation: (id: string) => void;
   connectionStatus: "idle" | "connecting" | "connected" | "offline";
   error: string | null;
@@ -132,6 +135,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return { playbackQueue: remaining, lastScene };
   }),
   lastScene: null,
+  introPlaying: false,
+  setIntroPlaying: (introPlaying) => set({ introPlaying }),
   playbackHeld: false,
   setPlaybackHeld: (playbackHeld) => set({ playbackHeld }),
   clearLastScene: () => set({ lastScene: null }),

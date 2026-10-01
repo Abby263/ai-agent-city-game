@@ -91,6 +91,7 @@ export function makeAtmosphere(art: Art, lampHeads: THREE.Vector3[]) {
     // Above 1 at night, so bloom makes lit windows and lamps glow.
     for (const material of glass) material.emissiveIntensity = night * 2.1;
     lamps.emissiveIntensity = 0.15 + night * 2.8;
+    for (const entry of art.lit) entry.material.emissiveIntensity = entry.day + (entry.night - entry.day) * night;
     clouds.forEach((cloud, i) => {
       if (animate) cloud.position.x += cloud.userData.speed * dt * (1 + wind * 6);
       if (cloud.position.x > 125) cloud.position.x = -35;

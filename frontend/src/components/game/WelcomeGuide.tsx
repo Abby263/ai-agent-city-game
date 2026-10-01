@@ -1,37 +1,30 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-
-const steps = [
-  { icon: "🗾", title: "A real Tokyo neighbourhood", text: "Nakameguro runs on real Tokyo time, date and weather. Night here is night in Tokyo." },
-  { icon: "🏘️", title: "Meet the neighbours", text: "Tap a face at the bottom to see how someone lives: family, job, feelings, health and memories." },
-  { icon: "✋", title: "Make anyone do anything", text: "Tap anyone and write what happens, in your own words. They react in theirs, and remember it." },
-  { icon: "🪄", title: "Play god", text: "Use Create to make anything happen: change the weather, hold an election, or write any situation you like." },
-  { icon: "📜", title: "Rewrite anyone", text: "Every resident follows a prompt. Open Prompt on anyone to read it and change who they are." },
-  { icon: "🏆", title: "Collect badges", text: "Try new things to earn badges. Can you collect them all?" },
-];
+import type { Storyline } from "@/lib/storyteller";
 
 export const WELCOME_KEY = "agentcity.welcomed";
 
-export function WelcomeGuide({ onClose }: { onClose: () => void }) {
+/** One sentence about who you are, and the first case. Everything else is learned by playing. */
+export function WelcomeGuide({ firstCase, onClose }: { firstCase?: Storyline; onClose: () => void }) {
   const start = useRef<HTMLButtonElement>(null);
   useEffect(() => start.current?.focus(), []);
   return (
     <div className="welcome-backdrop" role="presentation" onClick={onClose}>
       <section className="welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title" onClick={(e) => e.stopPropagation()}>
-        <small>WELCOME TO</small>
-        <h2 id="welcome-title">Nakameguro</h2>
-        <p className="welcome-lead">A living Tokyo neighbourhood where every resident has their own life, feelings and memories, all imagined by AI.</p>
-        <ol className="welcome-steps">
-          {steps.map((step) => (
-            <li key={step.title}>
-              <span aria-hidden="true">{step.icon}</span>
-              <div><strong>{step.title}</strong><p>{step.text}</p></div>
-            </li>
-          ))}
-        </ol>
-        <p className="welcome-safety"><span aria-hidden="true">🛡️</span>Everyone in Nakameguro is an AI character. Never share your real name, address, school, passwords or phone number.</p>
-        <button ref={start} className="primary-action welcome-start" onClick={onClose}>Let&apos;s explore!</button>
+        <small>NAKAMEGURO, TOKYO</small>
+        <h2 id="welcome-title">You&apos;re the neighbourhood fixer.</h2>
+        <p className="welcome-lead">Everyone here is hiding something, and you know all of it. Watch their scenes play out, then have a quiet word with someone before the next one. You get three nudges a day, and every case ends well or badly.</p>
+        {firstCase && (
+          <div className="welcome-case">
+            <small>Your first case</small>
+            <strong><span aria-hidden="true">{firstCase.icon}</span> {firstCase.title}</strong>
+            <p>{firstCase.brief}</p>
+            <p className="welcome-goal">{firstCase.goal}</p>
+          </div>
+        )}
+        <button ref={start} className="primary-action welcome-start" onClick={onClose}>Take the case</button>
+        <p className="welcome-safety">Everyone in Nakameguro is an AI character. Never share your real name, address, school, passwords or phone number.</p>
       </section>
     </div>
   );
