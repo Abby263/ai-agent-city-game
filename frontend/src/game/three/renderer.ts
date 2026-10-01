@@ -540,12 +540,18 @@ export class CityRenderer {
     const face = at.clone().setY(at.y + (speaker.labelLift - 0.1) * 0.74);
     const toListener = standing(listener).sub(at).setY(0);
     if (toListener.lengthSq() < 0.01) return;
+    const apart = toListener.length();
     toListener.normalize();
     const side = new THREE.Vector3(-toListener.z, 0, toListener.x);
-    const position = face.clone().addScaledVector(toListener, 1.15).addScaledVector(side, 0.42).add(new THREE.Vector3(0, 0.04, 0));
+    // Over the listener's shoulder: their shoulder and the back of their head frame one edge, the speaker's face
+    // fills the rest. Shoulders alternate with the speaker, like shot and reverse shot.
+    const shoulder = speakerId === this.conversation?.actorIds[0] ? 1 : -1;
+    const behind = face.clone().addScaledVector(toListener, apart + 0.62).addScaledVector(side, shoulder * 0.3).add(new THREE.Vector3(0, 0.05, 0));
+    const tight = face.clone().addScaledVector(toListener, 1.15).addScaledVector(side, shoulder * 0.42).add(new THREE.Vector3(0, 0.04, 0));
+    const position = sightLinesClear(behind, [face], this.town.root) ? behind : tight;
     if (!sightLinesClear(position, [face], this.town.root)) return;
     // Aim a little below the eyes: subtitles cover the bottom of the view, so the face sits in its upper part.
-    this.focusTarget = face.clone().add(new THREE.Vector3(0, -0.12, 0));
+    this.focusTarget = face.clone().add(new THREE.Vector3(0, -0.1, 0)).addScaledVector(side, shoulder * -0.08);
     this.shotPosition = position;
   }
     setMode(mode: CameraMode) {
@@ -802,8 +808,13 @@ export class CityRenderer {
         aim.y = this.controls.target.y;
         this.controls.target.lerp(aim, Math.min(1, dt * 0.8));
       }
-      if (arrived && this.conversation.line && this.conversation.speakerId)
-        this.people.get(this.conversation.speakerId)?.setLine(this.conversation.lineKey ?? this.conversation.line, this.conversation.line);
+      if (arrived && this.conversation.line && this.conversation.speakerId) {
+        const key = this.conversation.lineKey ?? this.conversation.line;
+        for (const model of participants) {
+          if (model.citizen.citizen_id === this.conversation.speakerId) model.setLine(key, this.conversation.line);
+          else model.hear(key, this.conversation.line);
+        }
+      }
       if (arrived && this.conversationReady) {
         const ready = this.conversationReady;
         this.conversationReady = undefined;
@@ -901,6 +912,12 @@ export class CityRenderer {
     this.camera.position.sub(this.shake);
     this.host.dataset.rendered = "true";
   };
+  /** The frame on screen as a picture, for sharing a scene. */
+  snapshot() {
+    if (!this.alive) return null;
+    this.post.render(0, this.night, 0);
+    return this.renderer.domElement.toDataURL("image/jpeg", 0.86);
+  }
   /** The town can't keep up: drop one quality level (remembered for next time) and rebuild the frame pipeline. */
   private degrade() {
     const next = lowerQuality(this.quality.level);

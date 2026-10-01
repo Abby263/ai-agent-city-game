@@ -4,7 +4,8 @@ import type { CitizenAgent } from "@/lib/types";
 import { appearanceFor, styleFor } from "@/lib/appearance";
 import { activityIcon } from "@/lib/activity-icon";
 import type { Point } from "./layout";
-import { armPose, emotionOf, gestureFor, lineEmotion, listenPoseFor, type Emotion, type Gesture } from "./expression";
+import { armPose, emotionOf, gestureFor, lineEmotion, listenPoseFor, reactionTo, type Emotion, type Gesture } from "./expression";
+import { bearingFor, type Bearing } from "./wardrobe";
 import type { Human } from "./human";
 
 const NECK = 1.16;
@@ -47,6 +48,11 @@ export class CitizenModel {
   private gesture: Gesture = "none";
   private lineKey = "";
   private lineCount = 0;
+  private heardKey = "";
+  /** How they're taking what the other person just said. */
+  private reaction: Emotion | null = null;
+  private readonly elbows: [number, number] = [0.2, 0.2];
+  private bearing: Bearing = { cadence: 1, stride: 1, swing: 1, stoop: 0, bounce: 1, sway: 1 };
   private blink = 2 + Math.random() * 3;
   private nod = 0;
   /** 0-1 loudness of this resident's voice right now, set by the renderer from the audio. */
@@ -219,7 +225,8 @@ export class CitizenModel {
       this.labelLift = 1.9 * scale + 0.05;
       this.belly.visible = !this.human && Boolean(life.pregnancy);
       // A brisk walk (about 2.4 m/s, a little quick so people keep up with compressed game time); older residents slower.
-      this.walkSpeed = citizen.age >= 75 ? 0.85 : citizen.age >= 65 ? 1 : 1.2;
+      this.bearing = bearingFor(citizen.citizen_id, citizen.age);
+      this.walkSpeed = (citizen.age >= 75 ? 0.85 : citizen.age >= 65 ? 1 : 1.2) * THREE.MathUtils.clamp(this.bearing.cadence * this.bearing.stride, 0.8, 1.12);
     }
     this.asleep = /sleep/i.test(citizen.current_activity) && citizen.current_location_id === citizen.home_location_id;
     this.emotion = emotionOf(citizen);
@@ -251,6 +258,13 @@ export class CitizenModel {
     this.lineEmotion = lineEmotion(text, this.emotion);
     this.gesture = gestureFor(text, this.lineEmotion, this.lineCount++, this.citizen.citizen_id);
   }
+  /** The other person's line lands: a look, a nod, a change of expression. */
+  hear(key: string, text: string) {
+    if (key === this.heardKey) return;
+    this.heardKey = key;
+    this.reaction = reactionTo(lineEmotion(text, "neutral"), this.emotion);
+    this.nod = 0.6;
+  }
   update(dt: number, reducedMotion: boolean) {
     this.ring.visible = this.selected || this.speaking || this.listening;
     (this.ring.material as THREE.MeshBasicMaterial).color.set(this.speaking ? 0x89ffe0 : this.listening ? 0xaacfee : 0xffdb8a);
@@ -274,13 +288,15 @@ export class CitizenModel {
       travel -= step;
       if (step === distance) this.route.shift();
     }
-    this.phase += dt * (this.moving ? 11 : 1.6);
+    const bearing = this.bearing;
+    this.phase += dt * (this.moving ? 11 * bearing.cadence : 1.6);
     this.idleTime += dt;
     const t = this.phase;
     const still = reducedMotion;
     const talking = this.speaking && !this.speechPaused;
-    const emotion = talking ? this.lineEmotion : this.emotion;
-    this.body.position.y = still ? 0 : this.moving ? Math.abs(Math.sin(t)) * 0.045 : emotion === "excited" && talking ? Math.abs(Math.sin(t * 4)) * 0.02 : 0;
+    if (!this.listening) this.reaction = null;
+    const emotion = talking ? this.lineEmotion : this.listening && this.reaction ? this.reaction : this.emotion;
+    this.body.position.y = still ? 0 : this.moving ? Math.abs(Math.sin(t)) * 0.045 * bearing.bounce : emotion === "excited" && talking ? Math.abs(Math.sin(t * 4)) * 0.02 : 0;
     // Breathing and a slow weight shift keep idle people alive.
     this.torso.scale.y = 1 + (still ? 0 : Math.sin(t * 1.3) * 0.012);
     this.body.rotation.z = this.moving || still ? 0 : Math.sin(t * 0.37) * 0.025;
@@ -289,11 +305,14 @@ export class CitizenModel {
     const ease = Math.min(1, dt * 7);
     if (this.moving) {
       this.limbs.forEach((limb, i) => {
-        limb.rotation.x = still ? 0 : Math.sin(t + (i % 2 ? Math.PI : 0)) * (i < 2 ? 0.5 : -0.35);
+        limb.rotation.x = still ? 0 : Math.sin(t + (i % 2 ? Math.PI : 0)) * (i < 2 ? 0.5 * bearing.stride : -0.35 * bearing.swing);
         limb.rotation.z = THREE.MathUtils.lerp(limb.rotation.z, (i % 2 ? 1 : -1) * 0.05, ease);
       });
     } else {
       const pose = armPose(talking ? this.gesture : this.speaking || this.listening ? listenPoseFor(this.emotion) : "none", still ? 0 : t);
+      // Hands keep time with the voice: louder syllables push the gesture a little further.
+      const beat = talking && !still ? this.talkLevel * 0.22 * Math.sin(t * 6.3) : 0;
+      pose.bend.forEach((bend, i) => { this.elbows[i] = THREE.MathUtils.lerp(this.elbows[i], bend + (i ? -beat : beat), ease); });
       [pose.left, pose.right].forEach(([x, out], i) => {
         const limb = this.limbs[i + 2], side = i ? 1 : -1;
         limb.rotation.x = THREE.MathUtils.lerp(limb.rotation.x, x, ease);
@@ -341,7 +360,7 @@ export class CitizenModel {
     );
     this.joints.forEach((joint, i) => {
       const swing = this.limbs[i].rotation.x;
-      const bend = i < 2 ? (this.moving ? Math.max(0, -swing) * 1.3 : 0.02) : -0.12 + Math.min(0, swing) * 0.65;
+      const bend = i < 2 ? (this.moving ? Math.max(0, -swing) * 1.3 : 0.02) : this.moving ? -0.12 + Math.min(0, swing) * 0.65 : -this.elbows[i - 2];
       joint.rotation.x = THREE.MathUtils.lerp(joint.rotation.x, bend, ease);
     });
     // The realistic body mirrors the simple rig: same stride, gestures, head turns, blinks and voice.
@@ -349,7 +368,9 @@ export class CitizenModel {
       legs: [this.limbs[0].rotation.x, this.limbs[1].rotation.x],
       arms: [[this.limbs[2].rotation.x, this.limbs[2].rotation.z], [this.limbs[3].rotation.x, this.limbs[3].rotation.z]],
       head: { yaw: this.head.rotation.y, pitch: this.head.rotation.x, tilt: this.head.rotation.z },
-      lean: { x: 0, z: 0 },
+      elbows: this.moving ? undefined : this.elbows,
+      // Posture: age stoops, a speaker leans in, bad news makes a listener pull back.
+      lean: { x: bearing.stoop + (talking ? 0.05 : this.listening && this.reaction === "worried" ? -0.04 : 0), z: this.moving && !still ? Math.sin(t) * 0.025 * bearing.sway : 0 },
       blink: closed,
       voice,
       emotion,

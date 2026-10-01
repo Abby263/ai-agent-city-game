@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import type { Emotion } from "./expression";
+import { addAccessory, wardrobeFor, type BodyFrame, type Wardrobe } from "./wardrobe";
 
 // Textured residents exported as GLB: MPFB game-engine rigs or compatible MetaHuman rigs.
 // No animation files are needed: the body is posed from the same motion the simple figures use (walk swing,
@@ -28,6 +29,8 @@ export type HumanPose = {
   /** Arm pivots [forward swing, outward lift], right arm first: the figure's limbs[2] and limbs[3]. */
   arms: [[number, number], [number, number]];
   head: { yaw: number; pitch: number; tilt: number };
+  /** Elbow bends while standing (same order as `arms`); walking arms bend on their own. */
+  elbows?: [number, number];
   /** Whole-body lean forward/back and side to side. */
   lean: { x: number; z: number };
   /** 0-1 eyelid closure, 0-1 mouth opening from the voice. */
@@ -63,6 +66,28 @@ type Joint = {
 const q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), qInv = new THREE.Quaternion();
 const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
 
+/** Average brightness (linear) of an outfit's texture, so recolouring keeps its folds and seams as shading. */
+function meanLuminance(texture: THREE.Texture | null) {
+  if (!texture?.image || typeof document === "undefined") return 0.2;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 24;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    ctx.drawImage(texture.image as CanvasImageSource, 0, 0, 24, 24);
+    const data = ctx.getImageData(0, 0, 24, 24).data;
+    let sum = 0, n = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 80) continue;
+      const lin = (v: number) => Math.pow(v / 255, 2.2);
+      sum += 0.2126 * lin(data[i]) + 0.7152 * lin(data[i + 1]) + 0.0722 * lin(data[i + 2]);
+      n++;
+    }
+    return Math.max(0.03, n ? sum / n : 0.2);
+  } catch {
+    return 0.2;
+  }
+}
+
 export class Human {
   readonly root = new THREE.Group();
   private readonly joints = new Map<string, Joint>();
@@ -71,7 +96,7 @@ export class Human {
   private readonly armsDown = new Map<string, THREE.Quaternion>();
   private readonly weights = new Map<string, number>();
 
-  constructor(gltf: GLTF, asset?: HumanAsset) {
+  constructor(gltf: GLTF, asset?: HumanAsset, wardrobe?: Wardrobe) {
     const model = gltf.scene;
     model.updateMatrixWorld(true);
     const bones = new Map<string, THREE.Bone>();
@@ -148,6 +173,70 @@ export class Human {
       this.armsDown.set(side, new THREE.Quaternion().setFromUnitVectors(from, new THREE.Vector3(out * 0.14, -1, 0.04).normalize()));
     }
     this.relaxHands(bones);
+    if (wardrobe) this.dress(wardrobe, bones);
+  }
+
+  /** The resident's own colours on the shared outfit (top above the waist, bottom below), and their accessories. */
+  private dress(wardrobe: Wardrobe, bones: Map<string, THREE.Bone>) {
+    const toRoot = this.root.matrixWorld.clone().invert();
+    const at = (name: string) => bones.get(name)?.getWorldPosition(new THREE.Vector3()).applyMatrix4(toRoot);
+    const pelvis = at("pelvis"), chest = at("spine_03"), head = at("head"), shoulder = at("upperarm_l");
+    if (!pelvis || !chest || !head) return;
+    this.root.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      for (const material of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[]) {
+        if (!/^clothes/i.test(material.name)) continue;
+        // The waistline as a plane in the geometry's own (bind pose) space, which for a skinned mesh is reached
+        // through a joint and its inverse bind matrix, not through the mesh's node.
+        const skinned = mesh as THREE.SkinnedMesh, hips = bones.get("pelvis")!;
+        const joint = skinned.isSkinnedMesh ? skinned.skeleton.bones.indexOf(hips) : -1;
+        const toWorld = joint >= 0 ? hips.matrixWorld.clone().multiply(skinned.skeleton.boneInverses[joint]) : mesh.matrixWorld.clone();
+        const toMesh = toWorld.clone().invert();
+        const waist = pelvis.clone().add(new THREE.Vector3(0, 0.075, 0)).applyMatrix4(this.root.matrixWorld).applyMatrix4(toMesh);
+        const up = new THREE.Vector3(0, 1, 0).transformDirection(this.root.matrixWorld).applyMatrix4(new THREE.Matrix4().extractRotation(toMesh));
+        const perUnit = new THREE.Vector3().setFromMatrixScale(toMesh).x * new THREE.Vector3().setFromMatrixScale(this.root.matrixWorld).x;
+        up.normalize();
+        const uniforms = {
+          uWaist: { value: new THREE.Vector4(up.x, up.y, up.z, waist.dot(up)) }, uWaistBand: { value: 0.012 * perUnit },
+          uTop: { value: new THREE.Color(wardrobe.top) }, uBottom: { value: new THREE.Color(wardrobe.bottom) }, uClothMean: { value: meanLuminance(material.map) },
+        };
+        material.customProgramCacheKey = () => "agentcity-wardrobe";
+        material.onBeforeCompile = (shader) => {
+          Object.assign(shader.uniforms, uniforms);
+          shader.vertexShader = shader.vertexShader
+            .replace("#include <common>", "#include <common>\nuniform vec4 uWaist; varying float vWaist;")
+            .replace("#include <begin_vertex>", "#include <begin_vertex>\nvWaist = dot(position, uWaist.xyz) - uWaist.w;");
+          shader.fragmentShader = shader.fragmentShader
+            .replace("#include <common>", "#include <common>\nuniform vec3 uTop; uniform vec3 uBottom; uniform float uWaistBand; uniform float uClothMean; varying float vWaist;")
+            .replace("#include <map_fragment>", `#include <map_fragment>
+              {
+                float clothLum = dot(diffuseColor.rgb, vec3(.2126, .7152, .0722));
+                float clothShade = clamp(pow(clothLum / uClothMean, .28), .68, 1.22);
+                vec3 clothTone = mix(uBottom, uTop, smoothstep(-uWaistBand, uWaistBand, vWaist));
+                diffuseColor.rgb = mix(diffuseColor.rgb, clothTone * clothShade, .88);
+              }`);
+        };
+        material.needsUpdate = true;
+      }
+    });
+    const frame: BodyFrame = { headY: head.y, crownY: BASE_HEIGHT * 0.985, neckY: at("neck_01")?.y ?? chest.y + 0.12, chestY: chest.y, hipY: pelvis.y, shoulder: Math.abs(shoulder?.x ?? 0.17) };
+    const rootScale = this.root.getWorldScale(new THREE.Vector3()).x;
+    for (const accessory of wardrobe.accessories) {
+      addAccessory(accessory, frame, (name, object, offset) => {
+        const joint = this.joints.get(name) ?? (bones.get(name) && { bone: bones.get(name)!, world: this.root.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(bones.get(name)!.getWorldQuaternion(new THREE.Quaternion())) });
+        if (!joint) return;
+        // Placed in the character's space (upright, facing forward), then handed to the bone so it follows the pose.
+        const scale = joint.bone.getWorldScale(new THREE.Vector3()).x / rootScale;
+        const upright = joint.world.clone().invert();
+        const wrapper = new THREE.Group();
+        wrapper.quaternion.copy(upright);
+        wrapper.position.copy(offset).applyQuaternion(upright).divideScalar(scale);
+        wrapper.scale.setScalar(1 / scale);
+        wrapper.add(object);
+        joint.bone.add(wrapper);
+      });
+    }
   }
 
   /**
@@ -225,7 +314,7 @@ export class Human {
       const outward = side === "l" ? 1 : -1;
       this.turn(`clavicle_${side}`, rot(Z, -outward * 0.05).multiply(rot(X, walking ? -forward * 0.08 : breath * 0.01)));
       this.turn(`upperarm_${side}`, rot(Z, out).multiply(rot(X, forward)).multiply(down));
-      this.turn(`lowerarm_${side}`, rot(X, -0.2 + Math.min(0, forward) * (walking ? 0.55 : 0.6)));
+      this.turn(`lowerarm_${side}`, rot(X, !walking && p.elbows ? -p.elbows[i] : -0.2 + Math.min(0, forward) * (walking ? 0.55 : 0.6)));
       this.turn(`hand_${side}`, rot(Z, outward * 0.12).multiply(rot(X, walking ? -forward * 0.2 : 0)));
     });
     // Head: shared between neck and skull so turns look natural, and kept level against the hips' turn.
@@ -308,7 +397,7 @@ export class HumanLibrary {
         await this.slot();
         try {
           const gltf = await this.loader.loadAsync(`${this.base}${entry.file}`);
-          const human = new Human(gltf, entry);
+          const human = new Human(gltf, entry, wardrobeFor(citizenId));
           return human.animated ? human : (human.dispose(), null);
         } catch {
           console.warn(`Character asset could not load for ${citizenId}; using the lightweight resident.`);

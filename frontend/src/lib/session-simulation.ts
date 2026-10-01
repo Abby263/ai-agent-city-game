@@ -27,7 +27,7 @@ import { validateCognition } from "./cognition-validation";
 import { isWeekend, routineStop, weekday, type RoutineContext } from "./routine";
 import { agreedPlan } from "./plans";
 import { MAX_PROMPT } from "./character-prompt";
-import { INCIDENTS, INCIDENT_GAP, SCENE_GAP, STORYLINES, nextBeat, sceneHours, storyState, type Seed, type StoryState } from "./storyteller";
+import { INCIDENTS, INCIDENT_GAP, SCENE_GAP, STORYLINES, caseFinished, caseOutcome, closedCases, nextBeat, nudgesLeft, openCases, sceneHours, sceneResult, storyState, type Seed, type StoryState } from "./storyteller";
 import { actBlocked, actRequest, applyAct, resolveProposal, type ActInterpretation, type ActRequest, type BondChange } from "./acts";
 import { calendarDay, calendarStartFor, realCityTime } from "./calendar";
 import { dayWeather, weatherAt, type WeatherOverride } from "./weather";
@@ -404,6 +404,14 @@ export async function sessionSetMode(mode: SimulationMode) {
   return saveAndReturn(city);
 }
 
+/** Wipes this browser's world so the next load starts a new season. Badges are kept. */
+export function resetSession() {
+  if (typeof window === "undefined") return;
+  const storage = window.localStorage as Storage;
+  const keys = Array.from({ length: storage.length ?? 0 }, (_, i) => storage.key(i)).filter((key): key is string => Boolean(key?.startsWith(`agentcity.${SESSION_VERSION}.`)));
+  keys.forEach((key) => storage.removeItem(key));
+}
+
 /**
  * Every world plays as a show: Auto, story pace (fast time), clock running, storylines planted. Once per world,
  * so whatever the player chooses afterwards (Manual, Live time, a pause) sticks across reloads.
@@ -416,6 +424,8 @@ export async function sessionStartStory() {
   city.policy = { ...city.policy, story_started: true, time_mode: "fast", simulation_mode: "autonomous" };
   city.simulation_mode = "autonomous";
   city.clock.running = true;
+  // A brand-new world skips the sleepy first hour: it opens as the neighbourhood sits down to breakfast.
+  if (city.clock.day === 1 && city.clock.tick === 0 && city.clock.minute_of_day === 360) city.clock.minute_of_day = 435;
   delete city.policy.autonomy_error;
   plantStory(city);
   addEvent(city, { event_type: "story_started", description: "🎬 Nakameguro is on. Secrets are kept, hearts are racing, and the storyteller is watching.", priority: 2 });
@@ -1766,7 +1776,8 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
     if ((!beat && now <= encounter.started_at) || !sociallyAvailable(actor, city.policy.player_citizen_id) || !sociallyAvailable(target, city.policy.player_citizen_id) || !nearCitizen(actor, target)) return;
     const event = addEvent(city, { event_type: "social_opportunity", actors: [actor.citizen_id, target.citizen_id], location_id: encounter.location_id,
       description: encounter.reason, payload: { topic: encounter.topic, kind: encounter.meeting_id ? "planned" : "chance", meeting_id: encounter.meeting_id,
-        stakes: encounter.story?.stakes, proposal: encounter.story?.proposal }, priority: 2 });
+        stakes: encounter.story?.stakes, proposal: encounter.story?.proposal, advice: encounter.story?.advice,
+        story: encounter.story && { id: encounter.story.id, beat: encounter.story.beat } }, priority: 2 });
     const response = await runAutonomousCognition(city, event, cognition);
     if (encounter.story && response) storyMovedOn(city, encounter.story, actor, target, response, now);
     if (encounter.meeting_id) {
@@ -1777,6 +1788,9 @@ async function advanceSocial(city: CityState, cognition: GenerateCognition, deci
     return;
   }
   if (!beat && now - Number(city.policy.last_social_choice ?? -10000) < 45) return;
+  // A new world opens on its first case, not on small talk over breakfast.
+  if (city.policy.story_started && city.simulation_mode === "autonomous" && city.clock.day === 1 && city.clock.minute_of_day < 480
+    && storyState(city.policy).last_scene < 0 && openCases(storyState(city.policy)).length) return;
   const recent = sessionConversations();
   const available = city.citizens.filter((c) => sociallyAvailable(c, city.policy.player_citizen_id) && !meetingFor(city, c));
   const choices = available.map((actor) => ({ actor, nearby: available.filter((target) => target !== actor && target.current_location_id === actor.current_location_id
@@ -1860,7 +1874,8 @@ function stageStoryScene(city: CityState, now: number) {
   addEvent(city, { event_type: "story_beat", actors: [actor.citizen_id, target.citizen_id], location_id: target.current_location_id,
     description: beat.headline, payload: { storyline: storyline.id, beat: index, title: storyline.title }, priority: 3 });
   city.encounter = { actor_id: actor.citizen_id, target_id: target.citizen_id, location_id: target.current_location_id, reason: beat.reason,
-    topic: beat.topic, started_at: now - 15, story: { id: storyline.id, beat: index, stakes: beat.stakes, proposal: beat.proposal } };
+    topic: beat.topic, started_at: now - 15, story: { id: storyline.id, beat: index, stakes: beat.stakes, proposal: beat.proposal,
+      advice: Object.fromEntries((story.nudges[storyline.id] ?? []).filter((n) => n.beat === index).map((n) => [n.who, n.text])) } };
 }
 
 /** After a staged scene plays, its storyline moves on; a proposal's answer counts (a no is a no). */
@@ -1869,12 +1884,73 @@ function storyMovedOn(city: CityState, staged: NonNullable<import("./encounters"
   const story = storyState(city.policy);
   story.progress[staged.id] = Math.max(story.progress[staged.id] ?? 0, staged.beat + 1);
   story.advanced[staged.id] = now;
-  city.policy.story = story;
   const answer = response.participant_outcomes?.[target.citizen_id]?.invitation_response;
-  if (staged.proposal && (answer === "accepted" || answer === "declined")) {
-    const tools = { sink: lifeSink(city), adjustBonds: (changes: BondChange[]) => adjustBonds(city, changes), bond: bondLookup(city) };
-    resolveProposal(city, staged.proposal, actor, target, answer === "accepted", tools);
+  const decided = staged.proposal && (answer === "accepted" || answer === "declined") ? answer : undefined;
+  const result = decided ? (decided === "accepted" ? "well" : "badly")
+    : sceneResult([actor, target].map((c) => response.participant_outcomes?.[c.citizen_id]?.relationship_effect));
+  const results = [...(story.results[staged.id] ?? [])];
+  results[staged.beat] = result;
+  story.results[staged.id] = results;
+  const before = openCases(storyState(city.policy)).map((s) => s.id);
+  const storyline = STORYLINES.find((s) => s.id === staged.id);
+  if (storyline && caseFinished(story, storyline) && !story.closed[staged.id]) {
+    const outcome = caseOutcome(results.filter(Boolean), decided);
+    story.closed[staged.id] = { outcome, day: city.clock.day, minute: city.clock.minute_of_day };
+    addEvent(city, { event_type: "case_closed", actors: [actor.citizen_id, target.citizen_id], location_id: target.current_location_id,
+      description: `${outcome === "well" ? "🎉" : "💔"} Case closed: ${storyline.title}. ${outcome === "well" ? storyline.well : storyline.badly}`,
+      payload: { storyline: storyline.id, outcome, title: storyline.title }, priority: 3 });
+    for (const opened of openCases(story).filter((s) => !before.includes(s.id)))
+      addEvent(city, { event_type: "case_opened", actors: [], description: `🗂️ New case: ${opened.title}. ${opened.goal}`, payload: { storyline: opened.id }, priority: 3 });
+    if (!openCases(story).length) {
+      const wins = closedCases(story).filter((s) => story.closed[s.id]?.outcome === "well").length;
+      addEvent(city, { event_type: "season_finale", actors: [], description: `🏁 Every case is closed: ${wins} of ${closedCases(story).length} ended well.`, payload: { wins }, priority: 3 });
+    }
   }
+  city.policy.story = story;
+  if (decided) {
+    const tools = { sink: lifeSink(city), adjustBonds: (changes: BondChange[]) => adjustBonds(city, changes), bond: bondLookup(city) };
+    resolveProposal(city, staged.proposal!, actor, target, decided === "accepted", tools);
+  }
+}
+
+/**
+ * The player's one lever on a case: a word in someone's ear before their next scene. It becomes something
+ * they remember and weigh; what they do with it is still theirs. A few a day, so each one is a choice.
+ */
+export function sessionNudge(storylineId: string, citizenId: string, text: string) {
+  const city = requireSessionCity();
+  const story = storyState(city.policy);
+  const storyline = openCases(story).find((s) => s.id === storylineId);
+  const index = story.progress[storylineId] ?? 0;
+  const beat = storyline?.beats[index];
+  if (!storyline || !beat) throw new Error("That case has no scene coming up.");
+  if (citizenId !== beat.actor && citizenId !== beat.target) throw new Error("They aren't in the next scene of this case.");
+  const advice = text.trim().replace(/\s+/g, " ").slice(0, 200);
+  if (advice.length < 3) throw new Error("Say a little more.");
+  spendNudge(city, story);
+  story.nudges[storylineId] = [...(story.nudges[storylineId] ?? []).filter((n) => !(n.beat === index && n.who === citizenId)), { beat: index, who: citizenId, text: advice }];
+  city.policy.story = story;
+  const person = findCitizen(city, citizenId);
+  addMemory({ citizen_id: citizenId, kind: "episodic", content: `A neighbour I trust took me aside and said: "${advice}" I keep turning it over.`,
+    importance: 0.9, salience: 0.95, related_citizen_id: citizenId === beat.actor ? beat.target : beat.actor, extra: { source: "nudge", storyline: storylineId } });
+  addEvent(city, { event_type: "nudge", actors: [citizenId], description: `🤫 You had a quiet word with ${person.name.split(" ")[0]}: "${advice}"`,
+    payload: { storyline: storylineId, beat: index }, priority: 2 });
+  return saveAndReturn(city);
+}
+
+/** Steering the town after a scene ("what happens next") costs a nudge too. */
+export function sessionSpendNudge() {
+  const city = requireSessionCity();
+  const story = storyState(city.policy);
+  spendNudge(city, story);
+  city.policy.story = story;
+  return saveAndReturn(city);
+}
+
+function spendNudge(city: CityState, story: StoryState) {
+  if (nudgesLeft(story, city.clock.day) <= 0) throw new Error("No nudges left today. You get three more tomorrow morning.");
+  if (story.nudge_day !== city.clock.day) { story.nudge_day = city.clock.day; story.nudges_used = 0; }
+  story.nudges_used += 1;
 }
 
 function townIncident(city: CityState, story: StoryState, now: number) {
@@ -2167,6 +2243,12 @@ function locationName(city: CityState, locationId: string) {
   );
 }
 
+/** A nudge from the player, as the resident carries it into the scene. */
+function advised(event: CityEvent, citizenId: string) {
+  const text = (event.payload?.advice as Record<string, string> | undefined)?.[citizenId];
+  return text ? [`Advice from a neighbour I trust, which I have decided to take seriously in this conversation: "${text}"`] : [];
+}
+
 async function runAutonomousCognition(
   city: CityState,
   event: CityEvent,
@@ -2205,8 +2287,8 @@ async function runAutonomousCognition(
     ],
     memories: [],
     private_memories: {
-      [actor.citizen_id]: privateMemoryContext(actor, target.citizen_id),
-      [target.citizen_id]: privateMemoryContext(target, actor.citizen_id),
+      [actor.citizen_id]: [...advised(event, actor.citizen_id), ...privateMemoryContext(actor, target.citizen_id)],
+      [target.citizen_id]: [...advised(event, target.citizen_id), ...privateMemoryContext(target, actor.citizen_id)],
     },
   });
   if (isStale(city)) return;
@@ -2297,6 +2379,7 @@ function applyAutonomousCognition(
       kind: sourceEvent.payload?.kind === "planned" ? "planned" : "chance",
       reason: sourceEvent.description, topic: String(sourceEvent.payload?.topic ?? ""),
       meeting_id: typeof sourceEvent.payload?.meeting_id === "string" ? sourceEvent.payload.meeting_id : undefined,
+      story: sourceEvent.payload?.story as EncounterContext["story"],
     } as EncounterContext : undefined,
   };
   const intentions = Object.fromEntries(Object.entries(response.participant_outcomes ?? {})

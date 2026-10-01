@@ -14,7 +14,7 @@ export type Encounter = {
   actor_id: string; target_id: string; location_id: string; reason: string; topic: string;
   started_at: number; meeting_id?: string;
   /** A scene the storyteller staged: which storyline, which beat, what's at stake. */
-  story?: { id: string; beat: number; stakes: string; proposal?: "date" };
+  story?: { id: string; beat: number; stakes: string; proposal?: "date"; advice?: Record<string, string> };
 };
 export type MeetingPlan = {
   actor_ids: string[]; location_id: string; game_day: number; game_minute: number; topic: string;
@@ -27,7 +27,9 @@ export type SocialMeeting = MeetingPlan & {
   /** The resident you play has already been sent on their way to it (only once). */
   player_set_off?: boolean;
 };
-export type EncounterContext = { kind: "chance" | "planned"; reason: string; topic: string; meeting_id?: string };
+export type EncounterContext = { kind: "chance" | "planned"; reason: string; topic: string; meeting_id?: string;
+  /** The case scene this was, if the storyteller staged it. */
+  story?: { id: string; beat: number } };
 export const cityMinute = (city: CityState) => city.clock.day * 1440 + city.clock.minute_of_day;
 export const meetingMinute = (meeting: MeetingPlan) => meeting.game_day * 1440 + meeting.game_minute;
 

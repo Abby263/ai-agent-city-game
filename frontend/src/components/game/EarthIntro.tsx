@@ -63,15 +63,20 @@ export function EarthIntro({ townReady, onDescend, onDone }: { townReady: boolea
       // Earth, lit by the sun from the upper left so Japan is in daylight, and its blue atmosphere.
       const globe = new THREE.Group();
       scene.add(globe);
-      const texture = await new THREE.TextureLoader().loadAsync("/art/earth/earth.jpg").catch(() => null);
-      if (disposed) return;
-      if (texture) {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-      }
+      // The flight starts at once on a plain blue planet; the photograph lands on it as soon as it has loaded.
       const earthGeometry = new THREE.SphereGeometry(1, 128, 64);
-      const earthMaterial = new THREE.MeshPhongMaterial({ map: texture, color: texture ? 0xffffff : 0x2a5d8f, shininess: 12, specular: 0x333844 });
+      const earthMaterial = new THREE.MeshPhongMaterial({ color: 0x2a5d8f, shininess: 12, specular: 0x333844 });
       globe.add(new THREE.Mesh(earthGeometry, earthMaterial));
+      let texture: import("three").Texture | null = null;
+      new THREE.TextureLoader().load("/art/earth/earth.jpg", (loaded) => {
+        if (disposed) return loaded.dispose();
+        texture = loaded;
+        loaded.colorSpace = THREE.SRGBColorSpace;
+        loaded.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        earthMaterial.map = loaded;
+        earthMaterial.color.set(0xffffff);
+        earthMaterial.needsUpdate = true;
+      });
       const glowGeometry = new THREE.SphereGeometry(1.04, 64, 32);
       const glowMaterial = new THREE.ShaderMaterial({
         transparent: true, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false,
