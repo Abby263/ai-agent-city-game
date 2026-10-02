@@ -17,15 +17,19 @@ type Helpers = {
 export function makeDistrict(root: THREE.Group, art: Art, helpers: Helpers) {
   const width = EAST.x1 - EAST.x0;
   const cx = (EAST.x0 + EAST.x1) / 2;
-  art.box(root, cx, -0.38, 20, width + 1, 0.7, 43, 0x80a776);
-  art.box(root, cx, -0.82, 20, width + 1.2, 0.22, 43.2, 0x638b74);
+  art.box(root, cx, -0.38, 20, width + 1, 0.7, 43, THEME.ground.slab);
+  art.box(root, cx, -0.82, 20, width + 1.2, 0.22, 43.2, THEME.ground.under);
 
   // One painted ground texture keeps roads, crossings and the plaza crisp without z-fighting.
   const { canvas, maskCanvas, ctx } = paintedGround(2048, Math.round((2048 * EAST.depth) / width), GROUND_KINDS);
   const u = canvas.width / width;
   const X = (x: number) => (x - EAST.x0) * u;
-  ctx.fillStyle = "#9cbd8b";
+  ctx.fillStyle = THEME.ground.open;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!THEME.ground.lawns) for (let i = 0; i < 2600; i++) {
+    ctx.fillStyle = THEME.ground.speckle[i % 2];
+    ctx.fillRect(Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1) * canvas.width, Math.abs(Math.sin(i * 78.233) * 43758.5453 % 1) * canvas.height, 6 + (i % 9), 4 + (i % 7));
+  }
   ctx.fillStyle = "#ddd7c8"; // station plaza and shopping street paving
   ctx.fillRect(X(72), 15.8 * u, 12.5 * u, 8.6 * u);
   ctx.fillRect(X(52), 16 * u, 14 * u, 8.2 * u);
@@ -140,11 +144,33 @@ export function makeDistrict(root: THREE.Group, art: Art, helpers: Helpers) {
   for (const x of [52, 60, 66.2, 71.8, 80])
     for (const z of [10.8, 16.2, 23.8, 29.2]) {
       if ((x === 80 && z === 16.2) || (x === 60 && z === 10.8)) continue;
+      if (isLucknow) {
+        // Hazratganj's black cast-iron lamp posts: a fluted column, a crossbar and a cluster of globes.
+        const BLACK = 0x1c1e21;
+        art.cylinder(root, x, 1.15, z, 0.045, 2.3, BLACK, 0.035, 8);
+        art.cylinder(root, x, 0.12, z, 0.1, 0.24, BLACK, 0.07, 8);
+        art.box(root, x, 2.2, z, 0.62, 0.035, 0.035, BLACK);
+        for (const [dx, dy] of [[-0.3, 2.34], [0.3, 2.34], [0, 2.5]]) {
+          art.cylinder(root, x + dx, dy - 0.1, z, 0.012, 0.14, BLACK, 0.012, 6);
+          const globe = art.ball(root, x + dx, dy, z, 0.085, 0.095, 0.085, 0xffe6a1);
+          globe.castShadow = false;
+        }
+        lampHeads.push(new THREE.Vector3(x, 2.4, z));
+        continue;
+      }
       art.cylinder(root, x, 1.4, z, 0.055, 2.8, INK);
       art.box(root, x + 0.23, 2.77, z, 0.55, 0.08, 0.08, INK);
       art.box(root, x + 0.45, 2.68, z, 0.28, 0.17, 0.23, 0xffe6a1);
       art.box(root, x + 0.45, 2.81, z, 0.37, 0.08, 0.32, INK);
       lampHeads.push(new THREE.Vector3(x + 0.45, 2.68, z));
     }
+  if (isLucknow) {
+    // Red-and-white bollards down the middle of the avenue, as on Hazratganj's main road.
+    for (let z = 1; z < 39.5; z += 1.1) {
+      if (EAST.roads.some((road) => Math.abs(road - z) < 3)) continue;
+      art.cylinder(root, EAST.avenue, 0.2, z, 0.035, 0.4, 0xd63f36, 0.035, 8);
+      art.cylinder(root, EAST.avenue, 0.3, z, 0.038, 0.07, 0xf6f6f2, 0.038, 8);
+    }
+  }
   return { lampHeads };
 }

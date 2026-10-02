@@ -22,6 +22,26 @@ function archOutline(w: number, h: number, shape: THREE.Shape | THREE.Path) {
   return shape;
 }
 
+/** A round-headed (semicircular) arch panel, as on Hazratganj's colonial arcades. Feet on y = 0. */
+export function roundArchPanel(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, w: number, h: number, color: number, depth = 0.03) {
+  const key = `round-${w.toFixed(2)}-${h.toFixed(2)}-${depth.toFixed(2)}`;
+  const geometry = cached(art, key, () => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-w / 2, 0);
+    shape.lineTo(-w / 2, h - w / 2);
+    shape.absarc(0, h - w / 2, w / 2, Math.PI, 0, true);
+    shape.lineTo(w / 2, 0);
+    shape.lineTo(-w / 2, 0);
+    return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 10 });
+  });
+  const mesh = new THREE.Mesh(geometry, art.material(color));
+  mesh.position.set(x, base, z);
+  mesh.castShadow = false;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
 /** A flat arch-shaped panel on a wall: a shaded doorway, a niche or a window, facing +z. */
 export function archPanel(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, w: number, h: number, color: number, depth = 0.03) {
   const key = `arch-${w.toFixed(2)}-${h.toFixed(2)}-${depth.toFixed(2)}`;

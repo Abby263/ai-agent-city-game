@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { EAST } from "./district";
+import { THEME } from "./theme";
 
 // Tokyo's overhead wires: concrete utility poles along the pavements, a crossarm with three power lines and a lower
 // telecom cable, a pole-mounted transformer every few poles, and the wires sagging between them.
@@ -80,6 +81,34 @@ export function makeStreetscape(avoid: Array<{ x: number; z: number }>) {
       sag(a, b, HEIGHT - 1.4, new THREE.Vector3());
     }
   });
+  if (THEME.terraces) {
+    // The old city's wiring: every pole feeds a dozen houses, each by its own drooping cable, and nobody has ever
+    // taken an old one down.
+    const drop = (from: THREE.Vector3, to: THREE.Vector3, slack: number) => {
+      const steps = 6;
+      for (let k = 0; k < steps; k++) for (const t of [k / steps, (k + 1) / steps]) {
+        const p = from.clone().lerp(to, t);
+        points.push(p.x, p.y - Math.sin(Math.PI * t) * slack, p.z);
+      }
+    };
+    const noise = (n: number) => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+    poles.forEach((line, r) => {
+      const across = RUNS[r].axis === "x" ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0);
+      const along = RUNS[r].axis === "x" ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+      line.forEach((p, i) => {
+        const top = p.clone().setY(HEIGHT - 0.5);
+        for (let k = 0; k < 9; k++) {
+          const seed = r * 97 + i * 13 + k;
+          // Near side: straight to the house fronts; far side: across the road.
+          const reach = k % 3 === 0 ? -4.6 - noise(seed) * 0.6 : 0.3 + noise(seed) * 0.5;
+          const end = p.clone().addScaledVector(across, reach).addScaledVector(along, (noise(seed + 5) - 0.5) * 6).setY(1.6 + noise(seed + 9) * 2.4);
+          drop(top.clone().setY(HEIGHT - 0.4 - noise(seed + 3) * 1.4), end, 0.25 + noise(seed + 7) * 0.5);
+        }
+        if (i + 1 < line.length && line[i + 1].distanceTo(p) < SPACING * 1.6) for (let k = 0; k < 4; k++)
+          drop(p.clone().setY(HEIGHT - 1.7 - k * 0.22), line[i + 1].clone().setY(HEIGHT - 1.75 - k * 0.2), 0.3 + k * 0.12);
+      });
+    });
+  }
   const wireGeometry = new THREE.BufferGeometry();
   wireGeometry.setAttribute("position", new THREE.Float32BufferAttribute(points, 3));
   const wireMaterial = new THREE.LineBasicMaterial({ color: 0x23272b, transparent: true, opacity: 0.85 });

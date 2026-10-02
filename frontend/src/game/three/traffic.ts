@@ -72,13 +72,18 @@ function makeAuto(art: Art, electric: boolean): Vehicle {
 
 export function makeTraffic(art: Art) {
   const root = new THREE.Group();
+  // Lucknow's roads belong to the three-wheelers: autos and e-rickshaws outnumber everything else.
   const vehicles = isLucknow ? [
     makeVehicle(art, true, 0xd9662b),
     makeAuto(art, false),
+    makeAuto(art, true),
     makeVehicle(art, false, 0xf1f1ec),
     makeAuto(art, true),
     makeAuto(art, false),
+    makeAuto(art, true),
     makeVehicle(art, false, 0xb9bdc0),
+    makeAuto(art, false),
+    makeAuto(art, true),
   ] : [
     makeVehicle(art, true, 0xf2c14e),
     makeVehicle(art, false, 0xd9776b),

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { THEME } from "./theme";
 
 // Photo-scanned surfaces (Poly Haven, CC0) mapped by world position, so every box gets true-scale texture
 // without UVs of its own. "photo" surfaces look like the scan; "tint" surfaces keep their art-directed colour
@@ -139,7 +140,7 @@ export class SurfaceLibrary {
           float groundSum = groundMask.r + groundMask.g + groundMask.b;
           // Lawns keep the layout's green (no scan is a lush lawn); the scan adds blades, clumps and soil.
           float grassGrain = dot(texture2D(uGrass, vGroundWorld / ${LOOK.grass.tile!.toFixed(2)}).rgb, vec3(.2126, .7152, .0722)) / uGrassMean;
-          vec3 lawn = groundLayout * vec3(.74, .9, .68) * mix(1., grassGrain, ${LOOK.grass.grain!.toFixed(2)});
+          vec3 lawn = groundLayout * vec3(${THEME.ground.tint.map((v) => v.toFixed(2)).join(", ")}) * mix(1., grassGrain, ${LOOK.grass.grain!.toFixed(2)});
           vec3 groundScan = (texture2D(uAsphalt, vGroundWorld / ${LOOK.asphalt.tile!.toFixed(2)}).rgb * groundMask.r
             + texture2D(uPaving, vGroundWorld / ${LOOK.paving.tile!.toFixed(2)}).rgb * groundMask.g
             + lawn * groundMask.b) / max(groundSum, 1e-3);
@@ -160,6 +161,9 @@ export class SurfaceLibrary {
 /** What the ground layout's colours are made of; anything else (markings, crossings) stays painted. */
 export const GROUND_KINDS: Record<string, keyof typeof MASK> = {
   "#9cbd8b": "grass", "#a8c493": "grass", "#94b480": "grass",
+  // Lucknow's open ground is bare earth: it keeps its painted colour and takes the scan's grain, like a lawn does.
+  "#c9b48e": "grass", "#d3c09b": "grass", "#bda57d": "grass", "#a9b97f": "grass", "#b5a988": "grass",
+  "#6f777c": "asphalt", "#959a98": "asphalt",
   "#e1ddcf": "paving", "#ddd7c8": "paving", "#b9b4a8": "paving", "#c5c6ba": "paving",
   "#899398": "asphalt", "#7b858d": "asphalt",
 };

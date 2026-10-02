@@ -34,6 +34,29 @@ residents' character prompts and, for scenes, a line on how people there speak.
 
 ## Lucknow, specifically
 
+Built from photographs of Hazratganj, Chowk, Aminabad, Charbagh's forecourt and ordinary residential lanes. What
+those have in common, and what the town therefore does (`theme.ts`, `infill.ts`, `terraces.ts`):
+
+- **No lawns, few road markings.** Open ground is bare dusty earth; roads are worn, patched asphalt from one
+  building line to the other, their edges crumbling into dust. Only the park is green; only Hazratganj has
+  pavements, zebra crossings, railings, bollards and cast-iron lamp posts with globes.
+- **Built wall to wall.** `infill.ts` fills the road frontages and the blocks behind them with attached two- to
+  four-storey buildings around the places the game uses: a shop below (shutter down, or open with goods spilling
+  out, under a painted Hindi or English board), homes above with balconies hung over the road, white railings,
+  washing, air conditioners, bare-brick party walls, a black water tank on every roof and the odd rooftop hoarding.
+  Behind the streets the same houses line narrow lanes, with steel gates instead of shops. Hazratganj's are cream
+  colonial terraces with round-arched arcades, a balustrade and uniform black-and-white boards.
+- **Walled plots.** Anything left open to the road has a compound wall (brick or plaster, with painted notices)
+  or iron railings, with a gap wherever people need to get in.
+- **Homes.** Most families live in a three-storey house in a lane like their neighbours'; two old families keep
+  havelis with arched doors and a jharokha.
+- **Street life.** The roadside is a market: vendors under umbrellas, fruit carts, rows of parked scooters,
+  waiting cycle rickshaws and autos, heaps of sand, cows. Cloth banners hang across the road. Traffic is mostly
+  autos and e-rickshaws. Every pole feeds a dozen houses by its own drooping cable.
+
+The terraces and walls join the building list, so people walk round them and cameras stay out of them;
+`tests/lucknow-streets.test.ts` checks that nothing overlaps and every place and front door can still be reached.
+
 - **Places.** West of the Gomti is the old city: Chowk Mohalla, Aminabad Bazaar, Nawab Kabab House, KGMU Hospital,
   the Amir-ud-Daula Library, Chowk Kotwali, a Dussehri mango orchard. East is Hazratganj and Charbagh: the arcade,
   Gomti IT Tower, Sharmaji Chai & Kirana, the Bara Imambara behind the Rumi Darwaza, Charbagh Station with the metro

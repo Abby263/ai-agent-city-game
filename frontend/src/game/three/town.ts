@@ -1,13 +1,13 @@
 import * as THREE from "three";
 import { Art } from "./materials";
-import { buildings, type Building } from "./layout";
+import { buildings, insideFootprint, type Building } from "./layout";
 import { makeDistrict } from "./district";
 import { makeLanterns } from "./seasons";
 import { GROUND_KINDS, paintedGround } from "./surfaces";
 import { makeArchitecture, tagArchitecture } from "./architecture";
 import { makeForest, type TreeSpot } from "./trees";
 import { makeStreetscape } from "./streetscape";
-import { autoRickshaw, chaiStall, cow, handcart, hoarding, postBox, vendingMachine } from "./props";
+import { autoRickshaw, chaiStall, cow, cycleRickshaw, handcart, heap, hoarding, postBox, scooter, vendingMachine, vendor } from "./props";
 import { charbagh, imambara, tagLandmarks } from "./landmarks";
 import { THEME, isLucknow } from "./theme";
 
@@ -25,6 +25,7 @@ function tagSurfaces(art: Art) {
   art.tag("foliage", P.hedge, 0x6d9e78, 0x80ac7d, 0x5d916c, 0x9cbd8b, 0x658e67, 0xefb0c2, 0xf6c2cf, 0xe999b4, 0xffd6de);
   art.tag("wood", 0x8b7766);
   for (const b of buildings) {
+    if (b.kind === "terrace") continue;
     art.tag("plaster", b.wall);
     art.tag("roof", b.roof);
   }
@@ -44,24 +45,8 @@ const random = (seed: number) => {
   return n - Math.floor(n);
 };
 
-export function makeTown(art: Art) {
-  const root = new THREE.Group();
-  const dynamic = new THREE.Group();
-  const lampHeads: THREE.Vector3[] = [];
-  tagSurfaces(art);
-  art.box(root, 20, -0.38, 20, 43, 0.7, 43, 0x80a776);
-  art.box(root, 20, -0.82, 20, 43.2, 0.22, 43.2, 0x638b74);
-  art.box(root, 0, -0.95, 0, 300, 0.1, 300, 0x91b69b);
-
-  // One ground texture avoids coplanar road intersections and keeps the mobile draw cost low.
-  const { canvas, maskCanvas, ctx } = paintedGround(2048, 2048, GROUND_KINDS);
-  const unit = 2048 / 40;
-  ctx.fillStyle = "#9cbd8b";
-  ctx.fillRect(0, 0, 2048, 2048);
-  for (let i = 0; i < 3600; i++) {
-    ctx.fillStyle = i % 2 ? "#a8c493" : "#94b480";
-    ctx.fillRect(random(i) * 2048, random(i + 5500) * 2048, 3, 7);
-  }
+/** Nakameguro: kerbed pavements either side of marked asphalt, with zebra crossings at the junctions. */
+function paintTidyRoads(ctx: CanvasRenderingContext2D, unit: number) {
   for (const road of [13.5, 26.5]) {
     ctx.fillStyle = "#e1ddcf";
     ctx.fillRect((road - 2.5) * unit, 0, 5 * unit, 2048);
@@ -98,20 +83,76 @@ export function makeTown(art: Art) {
       ctx.fillStyle = "#f7efda";
       for (let i = 0; i < 7; i++)
         for (const side of [-1, 1]) {
-          ctx.fillRect(
-            (x - 1.2 + i * 0.38) * unit,
-            (z + side * 2.05 - 0.38) * unit,
-            0.2 * unit,
-            0.76 * unit,
-          );
-          ctx.fillRect(
-            (x + side * 2.05 - 0.38) * unit,
-            (z - 1.2 + i * 0.38) * unit,
-            0.76 * unit,
-            0.2 * unit,
-          );
+          ctx.fillRect((x - 1.2 + i * 0.38) * unit, (z + side * 2.05 - 0.38) * unit, 0.2 * unit, 0.76 * unit);
+          ctx.fillRect((x + side * 2.05 - 0.38) * unit, (z - 1.2 + i * 0.38) * unit, 0.76 * unit, 0.2 * unit);
         }
     }
+}
+
+/**
+ * Lucknow's old city: worn asphalt from one building line to the other, its edges crumbling into dust; patched and
+ * re-patched; hardly a painted line. The park keeps its grass, the lanes of the mohalla are paved in brick.
+ */
+function paintLucknowGround(ctx: CanvasRenderingContext2D, unit: number) {
+  const rect = (x: number, z: number, w: number, d: number) => ctx.fillRect(x * unit, z * unit, w * unit, d * unit);
+  // The park is watered; the orchard floor is not.
+  ctx.fillStyle = "#a9b97f";
+  rect(15.6, 28, 9, 8.8);
+  // Brick-paved lanes between the houses and across the bazaar.
+  ctx.fillStyle = "#b5a988";
+  rect(0.8, 9.6, 10.6, 2);
+  rect(5.2, 1.6, 1.6, 9);
+  rect(16.2, 16.4, 8.8, 4.6);
+  for (const road of [13.5, 26.5]) {
+    ctx.fillStyle = "#6f777c";
+    rect(road - 2.5, 0, 5, 40);
+    rect(0, road - 2.5, 40, 5);
+  }
+  // Dust drifting in from the edges in soft, uneven tongues, and lighter patches where the road was dug up and relaid.
+  const blob = (x: number, z: number, r: number) => { ctx.beginPath(); ctx.ellipse(x * unit, z * unit, r * unit, r * unit * 0.8, 0, 0, Math.PI * 2); ctx.fill(); };
+  for (const road of [13.5, 26.5])
+    for (let n = 0; n < 40; n += 0.22) {
+      for (const side of [-1, 1]) {
+        const reach = random(n * 7 + road + side) * 0.75, size = 0.14 + random(n * 3 + side) * 0.3;
+        ctx.fillStyle = random(n + road) > 0.5 ? "#c9b48e" : "#bda57d";
+        blob(road + side * (2.5 - reach * 0.5), n, size);
+        blob(n, road + side * (2.5 - reach * 0.5), size);
+      }
+      if (random(n * 3.1 + road) < 0.05) {
+        ctx.fillStyle = "#959a98";
+        rect(road - 1.6 + random(n) * 2.4, n, 0.6 + random(n + 1) * 1.2, 0.5 + random(n + 2) * 1.1);
+        rect(n, road - 1.6 + random(n + 5) * 2.4, 0.5 + random(n + 6) * 1.1, 0.6 + random(n + 7) * 1.2);
+      }
+    }
+  // The only paint: a faded centre line on the two main roads, broken where it has worn away.
+  ctx.fillStyle = "#b9b4a8";
+  for (let n = 0; n < 40; n += 1.6) {
+    if (Math.abs(n - 13.5) < 3 || Math.abs(n - 26.5) < 3 || random(n * 1.7) < 0.35) continue;
+    rect(n, 13.5 - 0.03, 0.7, 0.06);
+    rect(13.5 - 0.03, n, 0.06, 0.7);
+  }
+}
+
+export function makeTown(art: Art) {
+  const root = new THREE.Group();
+  const dynamic = new THREE.Group();
+  const lampHeads: THREE.Vector3[] = [];
+  tagSurfaces(art);
+  art.box(root, 20, -0.38, 20, 43, 0.7, 43, THEME.ground.slab);
+  art.box(root, 20, -0.82, 20, 43.2, 0.22, 43.2, THEME.ground.under);
+  art.box(root, 0, -0.95, 0, 300, 0.1, 300, THEME.ground.far);
+
+  // One ground texture avoids coplanar road intersections and keeps the mobile draw cost low.
+  const { canvas, maskCanvas, ctx } = paintedGround(2048, 2048, GROUND_KINDS);
+  const unit = 2048 / 40;
+  ctx.fillStyle = THEME.ground.open;
+  ctx.fillRect(0, 0, 2048, 2048);
+  for (let i = 0; i < 3600; i++) {
+    ctx.fillStyle = THEME.ground.speckle[i % 2];
+    ctx.fillRect(random(i) * 2048, random(i + 5500) * 2048, THEME.ground.lawns ? 3 : 5 + random(i + 9) * 14, THEME.ground.lawns ? 7 : 4 + random(i + 3) * 10);
+  }
+  if (!THEME.ground.lawns) paintLucknowGround(ctx, unit);
+  else paintTidyRoads(ctx, unit);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
@@ -290,12 +331,46 @@ export function makeTown(art: Art) {
     }
   if (isLucknow) {
     // Every corner has its chai stall; fruit sellers push their thelas along the bazaar; autos wait for fares.
-    for (const [x, z] of [[10.7, 5.9], [28.8, 21.3], [74.4, 23.2], [52, 8.2], [34.6, 12.6]]) chaiStall(art, root, x, 0.03, z);
+    const clear = (x: number, z: number) => !insideFootprint(x, z, 0.35);
+    for (const [x, z] of [[10.7, 5.9], [28.8, 21.3], [74.4, 23.2], [52, 8.2], [34.6, 12.6]]) if (clear(x, z)) chaiStall(art, root, x, 0.03, z);
     const fruit = [0xf2b632, 0xe9d24a, 0xe8732e, 0xd8473c, 0x7da04a];
-    [[16, 23.7], [18.2, 21.3], [22.6, 21.2], [24.4, 16.4], [13, 30.2], [66.4, 32.9], [61.5, 24.2], [3.2, 24.6]].forEach(([x, z], i) => handcart(art, root, x, 0.03, z, fruit[i % fruit.length], i + 3));
+    [[16, 23.7], [18.2, 21.3], [22.6, 21.2], [24.4, 16.4], [13, 30.2], [66.4, 32.9], [61.5, 24.2], [3.2, 24.6]].forEach(([x, z], i) => { if (clear(x, z)) handcart(art, root, x, 0.03, z, fruit[i % fruit.length], i + 3); });
     [[11.3, 15.6, 0.2], [11.3, 16.9, -0.15], [24.4, 24.4, Math.PI], [74.6, 16.4, Math.PI / 2], [76, 16.4, Math.PI / 2 + 0.2], [77.4, 16.3, Math.PI / 2 - 0.1], [66.6, 10.9, 0.3], [51.6, 23.9, -0.4]]
-      .forEach(([x, z, angle], i) => autoRickshaw(art, root, x, 0.03, z, angle, i % 3 === 2));
-    [[15.9, 20.9, 0.7, 0xf1ece0], [29.3, 30.6, -1.1, 0xcbb9a2], [70.9, 30.2, 2.1, 0xf1ece0]].forEach(([x, z, angle, color]) => cow(art, root, x, 0.03, z, angle, color));
+      .forEach(([x, z, angle], i) => { if (clear(x, z)) autoRickshaw(art, root, x, 0.03, z, angle, i % 3 === 2); });
+    [[15.9, 20.9, 0.7, 0xf1ece0], [29.3, 30.6, -1.1, 0xcbb9a2], [70.9, 30.2, 2.1, 0xf1ece0]].forEach(([x, z, angle, color]) => { if (clear(x, z)) cow(art, root, x, 0.03, z, angle, color); });
+    // The roadside itself is a market: every few metres a vendor under an umbrella, a fruit cart, a row of parked
+    // two-wheelers, a waiting rickshaw, a heap of sand. They stand on the road's dusty edge, clear of the traffic.
+    const fruits = [0xf2b632, 0xe9d24a, 0xe8732e, 0xd8473c, 0x7da04a];
+    let k = 0;
+    const roadside = (x: number, z: number, along: "x" | "z", side: number) => {
+      const pick = random(++k * 3.7 + x + z);
+      if (pick < 0.16 || !clear(x, z)) return;
+      const facing = along === "x" ? (side > 0 ? Math.PI : 0) : side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      if (pick < 0.36) vendor(art, root, x, 0.03, z, k);
+      else if (pick < 0.5) handcart(art, root, x, 0.03, z, fruits[k % fruits.length], k);
+      else if (pick < 0.7) for (let i = 0; i < 3; i++) scooter(art, root, x + (along === "x" ? (i - 1) * 0.32 : 0), 0.02, z + (along === "z" ? (i - 1) * 0.32 : 0), facing + 0.25, [0xb7362d, 0x2b2d31, 0x2d5fa8, 0xe9e6dc][(k + i) % 4]);
+      else if (pick < 0.8) cycleRickshaw(art, root, x, 0.02, z, facing + Math.PI / 2);
+      else if (pick < 0.9) autoRickshaw(art, root, x, 0.03, z, facing + Math.PI / 2, k % 2 === 0);
+      else heap(art, root, x, 0.03, z, k);
+    };
+    const junction = (n: number, roads: number[]) => roads.some((r) => Math.abs(n - r) < 3.4);
+    for (const road of [13.5, 26.5]) for (const side of [-1, 1]) {
+      for (let n = 1.2; n < 39; n += 2.3) if (!junction(n, [13.5, 26.5])) { roadside(n, road + side * 2.05, "x", side); roadside(road + side * 2.05, n + 0.9, "z", side); }
+      for (let n = 50.5; n < 84; n += 2.6) if (!junction(n, [69])) roadside(n, road + side * 2.05, "x", side);
+    }
+    for (const side of [-1, 1]) for (let n = 1.5; n < 39; n += 2.6) if (!junction(n, [13.5, 26.5])) roadside(69 + side * 2.05, n, "z", side);
+    // Cloth banners strung across the road.
+    const banners: Array<[string, string, string]> = [["लखनऊ महोत्सव में आपका स्वागत है", "#f2c53d", "#b7245c"], ["भव्य चिकन सेल • 50% तक छूट", "#c8281e", "#fff3c4"],
+      ["नया सत्र • प्रवेश प्रारंभ", "#f6efd9", "#1f3f7a"], ["शुभ विवाह • गुप्ता परिवार", "#f47c2c", "#fff8e6"]];
+    [[7, 13.5, 0], [20.5, 13.5, 0], [33, 26.5, 0], [8.5, 26.5, 0], [13.5, 6, 1], [26.5, 20, 1], [13.5, 33.5, 1], [26.5, 34, 1], [56, 26.5, 0], [78, 13.5, 0]].forEach(([x, z, turned], i) => {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.rotation.y = turned ? 0 : Math.PI / 2;
+      root.add(g);
+      const [text, bg, fg] = banners[i % banners.length];
+      for (const face of [0, Math.PI]) art.sign(g, text, 0, 3.25, face ? -0.012 : 0.012, 4.2, 0.5, bg, fg).rotation.y = face;
+      for (const end of [-1, 1]) art.box(g, end * 2.3, 3.3, 0, 0.5, 0.012, 0.012, P.ink);
+    });
     hoarding(art, root, "मुस्कुराइए, आप लखनऊ में हैं", 11.2, 0.03, 29.4, 2.6, 0.7, "#f6efd9", "#8a2a1f", Math.PI / 2);
     hoarding(art, root, "SMILE, YOU ARE IN LUCKNOW", 71.6, 0.03, 29.6, 2.6, 0.7, "#f6efd9", "#8a2a1f", -Math.PI / 2);
     hoarding(art, root, "चिकनकारी SAREES & SUITS", 29, 0.03, 16.4, 2.2, 0.6, "#7b2d5b", "#ffe9bf", 0);
@@ -674,6 +749,8 @@ function tree(
   blossom: boolean,
   scale: number,
 ) {
+  // Where the streets are built up wall to wall, nothing grows through a building.
+  if (THEME.terraces && insideFootprint(x, z, 0.45)) return;
   const pick = random(x * 3.1 + z * 7.7);
   // Lucknow has no pines: neem, peepal and mango, with gulmohar in flower where Nakameguro has cherry.
   const kind = blossom ? "sakura" : nearShrine(x, z) && !isLucknow ? "pine" : pick < (isLucknow ? 0.5 : 0.3) ? "oak" : "keyaki";
@@ -682,6 +759,7 @@ function tree(
 }
 
 function flowerBed(parent: THREE.Group, art: Art, x: number, z: number) {
+  if (THEME.terraces && insideFootprint(x, z, 0.5)) return;
   // Built at its old size around the origin, then scaled to true scale (one unit is about 2 m).
   const g = new THREE.Group();
   g.position.set(x, 0, z);
@@ -703,6 +781,7 @@ function flowerBed(parent: THREE.Group, art: Art, x: number, z: number) {
   }
 }
 function bench(parent: THREE.Group, art: Art, x: number, z: number) {
+  if (THEME.terraces && insideFootprint(x, z, 0.4)) return;
   // Built at its old size around the origin, then scaled to true scale (one unit is about 2 m).
   const g = new THREE.Group();
   g.position.set(x, 0, z);

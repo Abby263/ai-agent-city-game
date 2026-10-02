@@ -216,7 +216,8 @@ export function autoRickshaw(art: Art, parent: THREE.Object3D, x: number, base: 
   g.position.set(x, base, z);
   g.rotation.y = angle;
   parent.add(g);
-  const body = electric ? 0x3f8fd2 : 0x2f8f4e, hood = electric ? 0xf4f4ef : 0xf2c53d;
+  // Petrol autos are green and yellow; e-rickshaws are white or blue with a flat canopy and red seats.
+  const body = electric ? 0xf1f1ec : 0x2f8f4e, hood = electric ? 0x2f62b5 : 0xf2c53d;
   art.box(g, 0, 0.3, -0.05, 0.62, 0.34, 0.95, body);
   art.box(g, 0, 0.72, -0.12, 0.64, 0.06, 0.86, hood);
   for (const side of [-1, 1]) {
@@ -226,7 +227,7 @@ export function autoRickshaw(art: Art, parent: THREE.Object3D, x: number, base: 
   art.box(g, 0, 0.5, -0.52, 0.6, 0.36, 0.03, hood);
   art.box(g, 0, 0.36, 0.52, 0.34, 0.3, 0.24, body);
   art.box(g, 0, 0.58, 0.44, 0.5, 0.26, 0.02, 0xa2cacc);
-  art.box(g, 0, 0.32, -0.22, 0.5, 0.1, 0.3, 0x3a3d42);
+  art.box(g, 0, 0.32, -0.22, 0.5, 0.1, 0.3, electric ? 0xc8281e : 0x3a3d42);
   const front = art.cylinder(g, 0, 0.11, 0.52, 0.11, 0.06, P.tyre, 0.11, 12);
   front.rotation.z = Math.PI / 2;
   for (const side of [-1, 1]) {
@@ -345,4 +346,59 @@ export function hoarding(art: Art, parent: THREE.Object3D, text: string, x: numb
   for (const sx of [-w * 0.4, w * 0.4]) art.box(g, sx, 0.7, -0.03, 0.05, 1.4, 0.05, P.ink);
   art.box(g, 0, 1.4 + h / 2, -0.02, w + 0.06, h + 0.06, 0.04, P.ink);
   art.sign(g, text, 0, 1.4 + h / 2, 0.005, w, h, bg, fg);
+}
+
+/** A street vendor: a big patched umbrella over a low table of whatever is in season. */
+export function vendor(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, seed: number) {
+  const g = new THREE.Group();
+  g.position.set(x, base, z);
+  g.rotation.y = rand(seed) * 6;
+  parent.add(g);
+  const shades = [0xe2452f, 0xf2b632, 0x3f8fd2, 0x57a85a, 0xf47c2c, 0xd9558a];
+  art.cylinder(g, 0, 0.62, 0, 0.012, 1.24, P.steel, 0.012, 6);
+  for (let i = 0; i < 2; i++) {
+    const canopy = art.cylinder(g, 0, 1.22 - i * 0.012, 0, 0.62 - i * 0.2, 0.2, shades[(seed + i * 2) % shades.length], 0.03, 8);
+    canopy.rotation.y = i * 0.4;
+  }
+  art.box(g, 0.1, 0.22, 0.12, 0.62, 0.04, 0.42, 0x8a6a48);
+  for (const sx of [-0.16, 0.36]) art.box(g, sx, 0.1, 0.12, 0.04, 0.2, 0.38, 0x6b5a48);
+  const goods = PRODUCTS.map((c) => Number(c.replace("#", "0x")));
+  for (let i = 0; i < 8; i++) {
+    const item = art.ball(g, -0.12 + (i % 4) * 0.15, 0.29, 0 + Math.floor(i / 4) * 0.2, 0.055, 0.05, 0.055, goods[(seed + i * 3) % goods.length]);
+    item.castShadow = false;
+  }
+  // The vendor's stool.
+  art.cylinder(g, -0.32, 0.11, 0.1, 0.09, 0.22, 0x3f7fae, 0.09, 8);
+}
+
+/** A cycle rickshaw waiting for a fare: hooded bench seat on two wheels, a third in front. */
+export function cycleRickshaw(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, angle: number) {
+  const g = new THREE.Group();
+  g.position.set(x, base, z);
+  g.rotation.y = angle;
+  parent.add(g);
+  for (const side of [-1, 1]) {
+    const wheel = art.cylinder(g, side * 0.26, 0.2, -0.22, 0.2, 0.025, P.tyre, 0.2, 14);
+    wheel.rotation.z = Math.PI / 2;
+  }
+  const front = art.cylinder(g, 0, 0.2, 0.62, 0.2, 0.025, P.tyre, 0.2, 14);
+  front.rotation.z = Math.PI / 2;
+  art.box(g, 0, 0.36, -0.2, 0.5, 0.06, 0.34, 0xb7362d);
+  art.box(g, 0, 0.52, -0.37, 0.5, 0.3, 0.05, 0xb7362d);
+  const hood = art.cylinder(g, 0, 0.62, -0.2, 0.3, 0.52, 0x2b4f8a, 0.3, 10);
+  hood.rotation.z = Math.PI / 2;
+  hood.scale.set(1, 1, 0.75);
+  art.box(g, 0, 0.3, 0.2, 0.03, 0.03, 0.8, P.ink);
+  art.box(g, 0, 0.5, 0.56, 0.03, 0.44, 0.03, P.ink);
+  art.box(g, 0, 0.72, 0.54, 0.3, 0.025, 0.025, P.ink);
+  art.box(g, 0, 0.46, 0.22, 0.12, 0.04, 0.16, 0x2b2d31);
+}
+
+/** A heap by the roadside: rubble, sand or sacks waiting for someone to deal with them. */
+export function heap(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, seed: number) {
+  const color = [0xb9a27c, 0x9d948a, 0xc7b08a][seed % 3];
+  for (let i = 0; i < 4; i++) {
+    const lump = art.ball(parent, x + (rand(seed + i) - 0.5) * 0.5, base + 0.06, z + (rand(seed + i * 3) - 0.5) * 0.5, 0.22 + rand(seed + i * 5) * 0.16, 0.1 + rand(seed + i * 7) * 0.08, 0.2 + rand(seed + i * 9) * 0.14, color);
+    lump.castShadow = false;
+  }
 }

@@ -3,7 +3,8 @@ import type { Art } from "./materials";
 import type { Building } from "./layout";
 import { FESTOON_BULB, LANTERN_RED, LANTERN_WHITE, aFrame, banner, bicycle, clothesline, festoon, lanterns, pottedPlant, projectingSign, scooter, shopInterior, waterTank, type Interior } from "./props";
 import { arcade, archPanel, chhatri, dome, kangura } from "./mughal";
-import { THEME, isLucknow } from "./theme";
+import { HAVELIS, THEME, isLucknow } from "./theme";
+import { laneHouse, makeTerrace, tagTerraces } from "./terraces";
 
 // Buildings at true scale (one unit is about 2 m): Japanese two-storey houses, shops with glass fronts, apartment
 // blocks with balcony grids, a glass office tower and concrete public buildings. Everything is built from shared
@@ -32,6 +33,7 @@ const C = {
 const L = { door: 0x5a3a26, shutter: 0x2f6f6a, shutterBlue: 0x3f6f9e, stone: 0xb5533c, sand: 0xe7d3a6, shade: 0x3a3028, pinkBand: 0xe3a6a0, board: 0x1f2226 };
 
 export function tagArchitecture(art: Art) {
+  tagTerraces(art);
   art.tag("metal", C.frame, C.darkMetal, C.rail, C.gutter, C.spandrel, C.fan);
   art.tag("glass", C.glass, C.glassDark, C.glassCool);
   art.glow(art.material(C.glassCool), 0xcfe2ff, 0, 1.1);
@@ -204,7 +206,7 @@ function haveli(art: Art, group: THREE.Group, b: Building) {
 }
 
 function home(art: Art, group: THREE.Group, b: Building) {
-  if (THEME.homes === "haveli" && b.id !== "barn") return haveli(art, group, b);
+  if (THEME.homes === "haveli" && b.id !== "barn") return HAVELIS.has(b.id) ? haveli(art, group, b) : laneHouse(art, group, b);
   const seed = hash(b.id);
   const { base, floors, step, top } = shell(art, group, b, 1.15);
   const f = faces(group, b);
@@ -405,6 +407,7 @@ function civic(art: Art, group: THREE.Group, b: Building) {
 /** Builds a detailed building; returns false for kinds that keep their bespoke design (station, shrine). */
 export function makeArchitecture(parent: THREE.Group, art: Art, b: Building) {
   if (b.kind === "station" || b.kind === "shrine") return false;
+  if (b.kind === "terrace") { makeTerrace(art, parent, b); return true; }
   const group = new THREE.Group();
   group.position.set(b.x, 0, b.z);
   parent.add(group);
