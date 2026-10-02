@@ -3,7 +3,9 @@ import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
 const directory = process.argv[2] ?? fileURLToPath(new URL("../public/characters/", import.meta.url));
-const roster = JSON.parse(readFileSync(new URL("../src/lib/generated/citizens.json", import.meta.url), "utf8"));
+// Every city's cast: Nakameguro's is generated from YAML profiles, Lucknow's lives beside the game code.
+const roster = ["../src/lib/generated/citizens.json", "../src/lib/cities/lucknow-cast.json"]
+  .flatMap((file) => JSON.parse(readFileSync(new URL(file, import.meta.url), "utf8")));
 const ids = new Set(roster.map(c => c.citizen_id));
 const manifest = JSON.parse(readFileSync(resolve(directory, "manifest.json"), "utf8"));
 if (!manifest.residents || typeof manifest.residents !== "object" || Array.isArray(manifest.residents)) throw new Error("Manifest must have a residents object.");

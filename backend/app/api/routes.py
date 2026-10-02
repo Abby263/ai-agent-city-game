@@ -56,7 +56,7 @@ def describe_city_time(city: CityState) -> str:
             when = f"{date.strftime('%A %d %B %Y')}, {clock}"
         except ValueError:
             pass
-    place = f"{when} in {city.city_name}, Meguro City, Tokyo"
+    place = f"{when} in {city.city_name}"
     weather = city.weather or {}
     if weather.get("label"):
         place += f". Weather: {weather['label']}, {round(float(weather.get('temp_c', 0)))}°C"

@@ -1,5 +1,7 @@
 "use client";
 
+import { activeCity } from "@/lib/cities";
+
 import { CitizenPortrait } from "./CitizenPortrait";
 import { weekday } from "@/lib/routine";
 import { activeStories } from "@/lib/stories";
@@ -18,7 +20,7 @@ export function NewsPanel({ city, onSelect }: { city: CityState; onSelect: (id: 
   return (
     <div className="panel-scroll news-panel">
       <div className="news-masthead">
-        <strong>The Nakameguro Daily</strong>
+        <strong>The {activeCity().name} Daily</strong>
         <span>{weekday(city.clock.day)}, day {city.clock.day} · population {city.citizens.length}</span>
       </div>
       {activeStories(city).length > 0 && (

@@ -38,3 +38,8 @@ d113107bd7eb59f3af4df6fc0ec29bfcc593f496d0b336aec14f086a80ce7146  faceunits01.zi
 ```
 
 Rebuild instructions: `docs/open-character-art.md` in the repository.
+
+## Lucknow residents
+
+The 26 `lko_*.glb` models are built by the same exporter from the same CC0 MakeHuman assets listed above
+(profiles: `frontend/src/lib/cities/lucknow-cast.json`). Kurtas, dupattas, caps and outfit colours are added in the game.

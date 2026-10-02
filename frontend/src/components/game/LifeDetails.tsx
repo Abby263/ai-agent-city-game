@@ -1,5 +1,7 @@
 "use client";
 
+import { activeCity } from "@/lib/cities";
+
 import { CitizenPortrait } from "./CitizenPortrait";
 import { ageInDays, daysUntilBirthday, gradeLetter, lifeStage, relationName, relatives } from "@/lib/life";
 import { weekdayNames } from "@/lib/routine";
@@ -102,7 +104,7 @@ export function LifeDetails({ citizen, city, onSelect }: { citizen: CitizenAgent
           ))}
         </div>
       ) : (
-        <p className="muted-copy">No family living in Nakameguro.</p>
+        <p className="muted-copy">No family living in {activeCity().name}.</p>
       )}
     </section>
   );

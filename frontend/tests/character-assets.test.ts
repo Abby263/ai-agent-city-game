@@ -13,7 +13,7 @@ test("asset preflight fails missing files, unsafe paths and incomplete rigs; emp
     manifest({});
     const empty = run();
     assert.equal(empty.status, 0);
-    assert.match(empty.stdout, /0\/26 imported character models/);
+    assert.match(empty.stdout, /0\/52 imported character models/);
     manifest({cit_009:{file:"missing.glb"}});
     assert.notEqual(run().status, 0);
     manifest({cit_009:{file:"../outside.glb"}});
@@ -34,7 +34,9 @@ test("bundled CC0 residents have mobile-sized embedded textures, real skins and 
   const result = spawnSync(process.execPath, [resolve("scripts/check-characters.mjs")], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   const residents = Object.keys(JSON.parse(readFileSync(resolve("public/characters/manifest.json"), "utf8")).residents);
-  const cast = (JSON.parse(readFileSync(resolve("src/lib/generated/citizens.json"), "utf8")) as Array<{ citizen_id: string }>).map((c) => c.citizen_id);
+  // Both cities' casts.
+  const cast = ["src/lib/generated/citizens.json", "src/lib/cities/lucknow-cast.json"]
+    .flatMap((file) => JSON.parse(readFileSync(resolve(file), "utf8")) as Array<{ citizen_id: string }>).map((c) => c.citizen_id);
   assert.deepEqual([...residents].sort(), [...cast].sort(), "every resident has a real body, so nobody is left as a toy figure");
   for (const id of residents) {
     const bytes = readFileSync(resolve(`public/characters/${id}.glb`));

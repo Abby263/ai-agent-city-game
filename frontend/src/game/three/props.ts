@@ -207,3 +207,142 @@ export function postBox(art: Art, parent: THREE.Object3D, x: number, base: numbe
   art.box(parent, x, base + 0.5, z + 0.135, 0.2, 0.025, 0.01, P.ink);
   art.box(parent, x, base + 0.3, z + 0.135, 0.14, 0.14, 0.008, 0xfdfbf3);
 }
+
+// ---- Lucknow street life ----
+
+/** An auto-rickshaw: green and yellow, three wheels, a canvas hood. Faces +z. */
+export function autoRickshaw(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, angle: number, electric = false) {
+  const g = new THREE.Group();
+  g.position.set(x, base, z);
+  g.rotation.y = angle;
+  parent.add(g);
+  const body = electric ? 0x3f8fd2 : 0x2f8f4e, hood = electric ? 0xf4f4ef : 0xf2c53d;
+  art.box(g, 0, 0.3, -0.05, 0.62, 0.34, 0.95, body);
+  art.box(g, 0, 0.72, -0.12, 0.64, 0.06, 0.86, hood);
+  for (const side of [-1, 1]) {
+    art.box(g, side * 0.3, 0.52, -0.5, 0.03, 0.4, 0.03, P.ink);
+    art.box(g, side * 0.3, 0.52, 0.22, 0.03, 0.4, 0.03, P.ink);
+  }
+  art.box(g, 0, 0.5, -0.52, 0.6, 0.36, 0.03, hood);
+  art.box(g, 0, 0.36, 0.52, 0.34, 0.3, 0.24, body);
+  art.box(g, 0, 0.58, 0.44, 0.5, 0.26, 0.02, 0xa2cacc);
+  art.box(g, 0, 0.32, -0.22, 0.5, 0.1, 0.3, 0x3a3d42);
+  const front = art.cylinder(g, 0, 0.11, 0.52, 0.11, 0.06, P.tyre, 0.11, 12);
+  front.rotation.z = Math.PI / 2;
+  for (const side of [-1, 1]) {
+    const wheel = art.cylinder(g, side * 0.3, 0.11, -0.32, 0.11, 0.06, P.tyre, 0.11, 12);
+    wheel.rotation.z = Math.PI / 2;
+  }
+  art.box(g, 0, 0.5, 0.65, 0.08, 0.06, 0.02, 0xffe6a1);
+  return g;
+}
+
+export function scooter(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, angle: number, color: number) {
+  const g = new THREE.Group();
+  g.position.set(x, base, z);
+  g.rotation.set(0, angle, 0.1);
+  parent.add(g);
+  for (const zz of [-0.27, 0.27]) {
+    const wheel = art.cylinder(g, 0, 0.1, zz, 0.1, 0.05, P.tyre, 0.1, 12);
+    wheel.rotation.z = Math.PI / 2;
+  }
+  art.box(g, 0, 0.24, -0.1, 0.16, 0.2, 0.42, color);
+  art.box(g, 0, 0.36, -0.14, 0.15, 0.05, 0.34, 0x2b2d31);
+  art.box(g, 0, 0.3, 0.2, 0.15, 0.36, 0.05, color);
+  art.box(g, 0, 0.5, 0.2, 0.3, 0.03, 0.03, P.ink);
+}
+
+/** A chai stall: tin roof on posts, a counter with a kettle and glasses, a bench for customers. */
+export function chaiStall(art: Art, parent: THREE.Object3D, x: number, base: number, z: number) {
+  const g = new THREE.Group();
+  g.position.set(x, base, z);
+  parent.add(g);
+  for (const sx of [-0.55, 0.55]) for (const sz of [-0.3, 0.3]) art.box(g, sx, 0.55, sz, 0.04, 1.1, 0.04, 0x6b5a48);
+  const roof = art.box(g, 0, 1.14, 0.05, 1.3, 0.03, 0.85, 0x8fa3ad);
+  roof.rotation.x = 0.12;
+  art.box(g, 0, 0.36, 0.1, 1.05, 0.06, 0.4, 0x8a6a48);
+  art.box(g, 0, 0.18, 0.1, 1.0, 0.34, 0.36, 0x3f7fae);
+  art.cylinder(g, -0.3, 0.47, 0.1, 0.07, 0.14, 0xb9bdc0, 0.05, 10);
+  art.cylinder(g, -0.3, 0.42, 0.1, 0.09, 0.05, 0x2b2d31, 0.09, 10);
+  for (let i = 0; i < 5; i++) art.cylinder(g, 0.05 + i * 0.09, 0.42, 0.16, 0.022, 0.06, 0xd9a05a, 0.026, 8);
+  for (let i = 0; i < 3; i++) art.cylinder(g, 0.1 + i * 0.13, 0.46, 0.0, 0.05, 0.13, 0xf1ead6, 0.05, 10);
+  art.box(g, 0, 0.2, 0.75, 0.9, 0.04, 0.2, 0x8a6a48);
+  for (const sx of [-0.4, 0.4]) art.box(g, sx, 0.1, 0.75, 0.04, 0.2, 0.18, 0x6b5a48);
+  return g;
+}
+
+/** A thela: a four-wheeled handcart piled with fruit. */
+export function handcart(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, fruit: number, seed: number) {
+  const g = new THREE.Group();
+  g.position.set(x, base, z);
+  g.rotation.y = (rand(seed) - 0.5) * 0.6;
+  parent.add(g);
+  art.box(g, 0, 0.36, 0, 0.9, 0.05, 0.55, 0x9a7b55);
+  for (const sx of [-0.36, 0.36]) for (const sz of [-0.3, 0.3]) {
+    const wheel = art.cylinder(g, sx, 0.14, sz, 0.14, 0.03, P.tyre, 0.14, 12);
+    wheel.rotation.x = Math.PI / 2;
+  }
+  for (let i = 0; i < 12; i++) {
+    const piece = art.ball(g, -0.33 + (i % 4) * 0.22, 0.43 + Math.floor(i / 8) * 0.07, -0.17 + (Math.floor(i / 4) % 2) * 0.3, 0.06, 0.055, 0.06, i % 5 === 4 ? 0x7da04a : fruit);
+    piece.castShadow = false;
+  }
+  art.box(g, 0.5, 0.5, 0, 0.03, 0.03, 0.5, 0x6b5a48);
+}
+
+/** A cow settled at the roadside, unbothered by everything. */
+export function cow(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, angle: number, color = 0xf1ece0) {
+  const g = new THREE.Group();
+  g.position.set(x, base, z);
+  g.rotation.y = angle;
+  parent.add(g);
+  art.ball(g, 0, 0.3, 0, 0.2, 0.19, 0.42, color);
+  art.ball(g, 0, 0.42, 0.42, 0.11, 0.12, 0.17, color);
+  art.ball(g, 0, 0.5, 0.18, 0.1, 0.09, 0.12, color);
+  for (const side of [-1, 1]) {
+    art.box(g, side * 0.07, 0.56, 0.4, 0.02, 0.1, 0.02, 0x4a4038);
+    art.box(g, side * 0.13, 0.12, 0.25, 0.06, 0.24, 0.06, color);
+    art.box(g, side * 0.13, 0.12, -0.25, 0.06, 0.24, 0.06, color);
+  }
+  art.box(g, 0, 0.3, -0.45, 0.02, 0.26, 0.02, 0x4a4038);
+}
+
+/** The black plastic water tank on every Indian roof. */
+export function waterTank(art: Art, parent: THREE.Object3D, x: number, base: number, z: number, size = 1) {
+  art.cylinder(parent, x, base + 0.26 * size, z, 0.24 * size, 0.44 * size, 0x1f2124, 0.22 * size, 14);
+  art.cylinder(parent, x, base + 0.5 * size, z, 0.1 * size, 0.06 * size, 0x1f2124, 0.1 * size, 10);
+  art.box(parent, x, base + 0.02, z, 0.6 * size, 0.04, 0.6 * size, 0xb9b4a8);
+}
+
+/** Washing on a rooftop line. */
+export function clothesline(art: Art, parent: THREE.Object3D, from: number, to: number, y: number, z: number, seed: number) {
+  for (const x of [from, to]) art.box(parent, x, y - 0.25, z, 0.03, 0.5, 0.03, P.ink);
+  art.box(parent, (from + to) / 2, y, z, Math.abs(to - from), 0.008, 0.008, P.ink);
+  const cloth = [0xd8473c, 0xf2b632, 0x3f8fd2, 0xf5f1e6, 0xd9558a, 0x57a85a, 0xf47c2c];
+  const count = Math.max(2, Math.floor(Math.abs(to - from) / 0.24));
+  for (let i = 0; i < count; i++) {
+    if (rand(seed + i * 3) < 0.25) continue;
+    const tall = 0.14 + rand(seed + i) * 0.16;
+    art.box(parent, from + ((to - from) * (i + 0.5)) / count, y - tall / 2, z, 0.16, tall, 0.012, cloth[Math.floor(rand(seed + i * 7) * cloth.length)]);
+  }
+}
+
+/** A string of marigolds and small lights along an eave; the bulbs glow at night. */
+export function festoon(art: Art, parent: THREE.Object3D, from: number, to: number, y: number, z: number, count: number) {
+  for (let i = 0; i < count; i++) {
+    const t = (i + 0.5) / count, x = from + (to - from) * t;
+    const bead = art.ball(parent, x, y - Math.sin(Math.PI * ((t * 4) % 1)) * 0.06, z, 0.035, 0.04, 0.035, i % 3 === 0 ? FESTOON_BULB : i % 2 ? MARIGOLD : MARIGOLD_DEEP);
+    bead.castShadow = false;
+  }
+}
+export const MARIGOLD = 0xf4a01c, MARIGOLD_DEEP = 0xe2731a, FESTOON_BULB = 0xfff0b8;
+
+/** A painted hoarding on posts, lettered in Hindi and English. */
+export function hoarding(art: Art, parent: THREE.Object3D, text: string, x: number, base: number, z: number, w: number, h: number, bg: string, fg: string, angle = 0) {
+  const g = new THREE.Group();
+  g.position.set(x, base, z);
+  g.rotation.y = angle;
+  parent.add(g);
+  for (const sx of [-w * 0.4, w * 0.4]) art.box(g, sx, 0.7, -0.03, 0.05, 1.4, 0.05, P.ink);
+  art.box(g, 0, 1.4 + h / 2, -0.02, w + 0.06, h + 0.06, 0.04, P.ink);
+  art.sign(g, text, 0, 1.4 + h / 2, 0.005, w, h, bg, fg);
+}

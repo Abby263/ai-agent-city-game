@@ -1,4 +1,5 @@
 import type { CitizenAgent } from "./types";
+import { activeCity } from "./cities";
 
 // Every resident is driven by a character prompt the player can read and rewrite. Until it is edited, it is written
 // from their profile and follows their life as it changes; once edited, the player's words are what the AI follows.
@@ -12,8 +13,8 @@ export function defaultCharacterPrompt(c: CitizenAgent): string {
   const job = c.life?.job?.title ?? c.profession;
   const identity = c.personality.identity as { nationality?: string; former_names?: string[] } | undefined;
   const lines = [
-    `${c.name}, ${c.age}, ${job.toLowerCase()} in Nakameguro.`,
-    identity?.nationality ? `${identity.nationality} resident of Tokyo, Japan. Be an individual, not a cultural stereotype. Respond in the player's language.` : "",
+    `${c.name}, ${c.age}, ${job.toLowerCase()} in ${activeCity().name}.`,
+    identity?.nationality ? activeCity().belonging(identity.nationality) : "",
     identity?.former_names?.length ? `Older saved journals may call you ${identity.former_names.join(", ")}; this is the same person, now named ${c.name}. Do not treat the old name as another resident.` : "",
     c.memory_summary,
     nature.traits?.length ? `Personality: ${nature.traits.join(", ").toLowerCase()}.` : "",

@@ -1,5 +1,6 @@
 import PF from "pathfinding";
 import type { CitizenAgent } from "@/lib/types";
+import { THEME } from "./theme";
 
 export type Point = { x: number; z: number };
 export type Building = {
@@ -15,7 +16,7 @@ export type Building = {
   kind: "home" | "shop" | "civic" | "school" | "hospital" | "lab" | "gym" | "apartment" | "office" | "mall" | "station" | "shrine";
 };
 
-export const buildings: Building[] = [
+const BUILDINGS: Building[] = [
   {
     id: "home_a",
     name: "Willow House",
@@ -210,6 +211,9 @@ export const buildings: Building[] = [
     kind: "lab",
   },
 ];
+
+// Every city stands on the same plots; the theme gives each building its local name and colours.
+export const buildings: Building[] = BUILDINGS.map((b) => ({ ...b, ...THEME.buildings[b.id] }));
 
 export const arrivals: Record<string, Point> = {
   loc_homes: { x: 6, z: 11.5 },

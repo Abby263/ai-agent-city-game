@@ -4,6 +4,9 @@ import ashMedium from "./vendor/ez-tree/ash_medium.json";
 import oakMedium from "./vendor/ez-tree/oak_medium.json";
 import pineMedium from "./vendor/ez-tree/pine_medium.json";
 import aspenSmall from "./vendor/ez-tree/aspen_small.json";
+import { THEME } from "./theme";
+
+const gulmohar = THEME.blossomTree === "gulmohar";
 
 // Real trees: a handful of species grown once with EZ-Tree (bark, branching, leaf cards), then repeated across the
 // town as instances, so a whole street of trees costs only a few draw calls.
@@ -69,9 +72,10 @@ function blossom(material: THREE.MeshStandardMaterial, url: string) {
     for (let i = 0; i < data.length; i += 4) {
       const lum = (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]) / 255;
       const light = Math.min(1, lum * 1.5 + 0.2);
-      data[i] = 214 + 41 * light;
-      data[i + 1] = 150 + 85 * light;
-      data[i + 2] = 175 + 70 * light;
+      // Cherry blossom is pale pink; gulmohar is flame red shading to orange.
+      data[i] = gulmohar ? 205 + 50 * light : 214 + 41 * light;
+      data[i + 1] = gulmohar ? 50 + 95 * light : 150 + 85 * light;
+      data[i + 2] = gulmohar ? 22 + 40 * light : 175 + 70 * light;
     }
     ctx.putImageData(pixels, 0, 0);
     const texture = new THREE.CanvasTexture(canvas);

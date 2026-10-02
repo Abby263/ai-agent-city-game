@@ -1,7 +1,9 @@
 import * as THREE from "three";
 import type { Art } from "./materials";
 import type { Building } from "./layout";
-import { LANTERN_RED, LANTERN_WHITE, aFrame, banner, bicycle, lanterns, pottedPlant, projectingSign, shopInterior, type Interior } from "./props";
+import { FESTOON_BULB, LANTERN_RED, LANTERN_WHITE, aFrame, banner, bicycle, clothesline, festoon, lanterns, pottedPlant, projectingSign, scooter, shopInterior, waterTank, type Interior } from "./props";
+import { arcade, archPanel, chhatri, dome, kangura } from "./mughal";
+import { THEME, isLucknow } from "./theme";
 
 // Buildings at true scale (one unit is about 2 m): Japanese two-storey houses, shops with glass fronts, apartment
 // blocks with balcony grids, a glass office tower and concrete public buildings. Everything is built from shared
@@ -26,12 +28,18 @@ const C = {
   frosted: 0xb7c3c7,
 };
 
+// Lucknow: carved wooden doors, painted shutters, sandstone trim and deep shade inside the arches.
+const L = { door: 0x5a3a26, shutter: 0x2f6f6a, shutterBlue: 0x3f6f9e, stone: 0xb5533c, sand: 0xe7d3a6, shade: 0x3a3028, pinkBand: 0xe3a6a0, board: 0x1f2226 };
+
 export function tagArchitecture(art: Art) {
   art.tag("metal", C.frame, C.darkMetal, C.rail, C.gutter, C.spandrel, C.fan);
   art.tag("glass", C.glass, C.glassDark, C.glassCool);
   art.glow(art.material(C.glassCool), 0xcfe2ff, 0, 1.1);
   art.glow(art.material(LANTERN_RED), 0xff5a30, 0.1, 1.5);
   art.glow(art.material(LANTERN_WHITE), 0xffd9a0, 0.1, 1.4);
+  art.glow(art.material(FESTOON_BULB), 0xffd98a, 0.15, 1.6);
+  art.tag("wood", L.door, L.shutter, L.shutterBlue);
+  art.tag("plaster", L.stone, L.sand);
   art.tag("plaster", C.sill, C.slab, C.ac, C.canopy);
   art.tag("paving", C.foundation);
   art.tag("wood", C.door);
@@ -142,7 +150,61 @@ function rowOfWindows(art: Art, f: Face, y: number, count: number, w: number, h:
   for (let i = 0; i < count; i++) window(art, f, -span / 2 + (span * (i + 0.5)) / count, y, w, h, shutter);
 }
 
+/**
+ * An old-city house: lime-washed walls under a flat roof you can stand on, an arched doorway, a jharokha (a small
+ * covered balcony) over the lane, shuttered arched windows, and on the roof a water tank and the day's washing.
+ */
+function haveli(art: Art, group: THREE.Group, b: Building) {
+  const seed = hash(b.id);
+  const { base, floors, step, top } = shell(art, group, b, 1.15);
+  const f = faces(group, b);
+  const doorX = (seed % 2 ? 1 : -1) * b.w * 0.24;
+  const shutter = seed % 2 ? L.shutter : L.shutterBlue;
+  // The doorway: a sandstone frame, a deep arch and a carved double door.
+  archPanel(art, f.front.group, doorX, base, 0.012, 0.86, 1.34, L.sand, 0.05);
+  archPanel(art, f.front.group, doorX, base, 0.05, 0.62, 1.12, L.door, 0.02);
+  art.box(f.front.group, doorX, base + 0.5, 0.075, 0.015, 0.96, 0.01, L.shade);
+  art.box(f.front.group, doorX, base * 0.5, 0.2, 0.95, base, 0.4, C.foundation);
+  // Arched, shuttered windows.
+  const arched = (face: Face, x: number, y: number, w: number, h: number) => {
+    archPanel(art, face.group, x, y - h / 2, 0.012, w + 0.1, h + 0.1, L.sand, 0.03);
+    const pick = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + face.width * 37.719 + b.x * 1.7) * 43758.5453) % 1;
+    archPanel(art, face.group, x, y - h / 2, 0.04, w, h, pick < 0.5 ? C.glass : pick < 0.8 ? C.glassDark : C.glassCool, 0.012);
+    for (const side of [-1, 1]) art.box(face.group, x + side * (w / 2 + 0.07), y - h * 0.12, 0.05, 0.12, h * 0.72, 0.02, shutter);
+  };
+  arched(f.front, -doorX, base + step * 0.5, 0.6, step * 0.62);
+  const upper = floors[1] ?? base + step;
+  // The jharokha: a balcony box on brackets with three little arches and its own eave.
+  const jx = seed % 3 === 0 ? 0 : -doorX * 0.55, jw = Math.min(1.5, b.w * 0.46);
+  art.box(f.front.group, jx, upper + 0.03, 0.2, jw, 0.06, 0.4, L.sand);
+  for (const side of [-1, 1]) art.box(f.front.group, jx + side * (jw / 2 - 0.08), upper - 0.1, 0.12, 0.07, 0.22, 0.22, L.sand);
+  art.box(f.front.group, jx, upper + step * 0.42, 0.2, jw, step * 0.72, 0.36, b.wall);
+  arcade(art, f.front.group, jx - jw / 2 + 0.04, jx + jw / 2 - 0.04, upper + 0.12, step * 0.56, 0.385, L.sand, L.shade, 3);
+  art.box(f.front.group, jx, upper + step * 0.82, 0.24, jw + 0.22, 0.04, 0.5, L.sand);
+  dome(art, f.front.group, jx, upper + step * 0.84, 0.2, jw * 0.2, L.sand);
+  arched(f.front, jx === 0 ? b.w * 0.34 : doorX * 0.9, upper + step * 0.5, 0.46, step * 0.5);
+  if (jx === 0) arched(f.front, -b.w * 0.34, upper + step * 0.5, 0.46, step * 0.5);
+  for (const side of [f.left, f.right]) for (const y of floors) arched(side, (seed % 3) * 0.2 - 0.2, y + step * 0.55, 0.42, step * 0.42);
+  for (const y of floors) for (const x of [-b.w * 0.24, b.w * 0.24]) arched(f.back, x, y + step * 0.55, 0.46, step * 0.42);
+  acUnit(art, seed % 2 ? f.left : f.right, b.d * 0.15, base + step + 0.2);
+  // Roof terrace: parapet, stair hut, water tank and washing.
+  art.box(group, 0, top + 0.02, 0, b.w - 0.02, 0.04, b.d - 0.02, b.roof);
+  kangura(art, f.front.group, -b.w / 2, b.w / 2, top, 0, L.sand);
+  kangura(art, f.back.group, -b.w / 2, b.w / 2, top, 0, L.sand);
+  for (const x of [-b.w / 2, b.w / 2]) art.box(group, x, top + 0.12, 0, 0.07, 0.24, b.d, b.wall);
+  art.box(group, -b.w * 0.26, top + 0.42, -b.d * 0.24, b.w * 0.34, 0.8, b.d * 0.36, b.wall);
+  art.box(group, -b.w * 0.26, top + 0.84, -b.d * 0.24, b.w * 0.38, 0.05, b.d * 0.4, L.sand);
+  waterTank(art, group, b.w * 0.26, top + 0.04, -b.d * 0.26);
+  clothesline(art, group, -b.w * 0.05, b.w * 0.42, top + 0.62, b.d * 0.22, seed);
+  // The lane outside: tulsi and other pots by the step, a scooter or a bicycle against the wall.
+  pottedPlant(art, f.front.group, doorX - 0.6, 0, 0.3, seed);
+  pottedPlant(art, f.front.group, doorX + 0.6, 0, 0.28, seed + 5);
+  if (seed % 3 !== 1) scooter(art, f.front.group, -doorX + (seed % 2 ? 0.25 : -0.25), 0.02, 0.36, Math.PI / 2 - 0.2, [0xb7362d, 0x2d5fa8, 0xe9e6dc, 0x2b2d31][seed % 4]);
+  else bicycle(art, f.front.group, -doorX, 0.02, 0.32, 0.12, 0x2b2d31);
+}
+
 function home(art: Art, group: THREE.Group, b: Building) {
+  if (THEME.homes === "haveli" && b.id !== "barn") return haveli(art, group, b);
   const seed = hash(b.id);
   const { base, floors, step, top } = shell(art, group, b, 1.15);
   const f = faces(group, b);
@@ -179,19 +241,33 @@ function shop(art: Art, group: THREE.Group, b: Building) {
   art.box(f.front.group, 0, base + height / 2, 0.03, front - 0.06, height - 0.06, 0.012, C.glass);
   const panes = Math.max(2, Math.round(front / 0.75));
   for (let i = 1; i < panes; i++) art.box(f.front.group, -front / 2 + (front * i) / panes, base + height / 2, 0.04, 0.03, height - 0.04, 0.02, C.darkMetal);
-  const brand = BRANDS[b.id] ?? BRANDS.shop;
+  const brand = (isLucknow ? LUCKNOW_BRANDS[b.id] : BRANDS[b.id]) ?? BRANDS.shop;
   shopInterior(art, f.front.group, brand.interior, seed, 0, base + height / 2, 0.0375, front - 0.08, height - 0.08);
   // No canopy: it would hide the sign band from the street.
   door(art, f.front, 0, base, true, false);
   // The sign band above the shopfront, and on a cafe a striped awning below it.
   art.sign(f.front.group, b.name, 0, base + height + 0.22, 0.06, b.w * 0.9, 0.3, brand.bg, brand.fg);
   if (brand.letters) projectingSign(art, f.front.group, brand.letters, b.w / 2 - 0.1, base + height + 0.75, 0.3, brand.bg, brand.fg);
-  lanterns(art, f.front.group, -b.w / 2 + 0.2, b.w / 2 - 0.2, base + height - 0.02, 0.42, Math.max(4, Math.round(b.w / 0.45)));
-  for (const side of [-1, 1]) banner(art, f.front.group, side * (b.w / 2 - 0.45) - 0.1, 0, 0.75, side > 0 ? brand.flag : 0xf2b632);
-  aFrame(art, f.front.group, b.w * 0.24, 0, 0.8, brand.flag);
-  pottedPlant(art, f.front.group, -0.5, 0, 0.42, seed);
-  pottedPlant(art, f.front.group, 0.5, 0, 0.42, seed + 3);
-  bicycle(art, f.front.group, -b.w * 0.3, 0.02, 0.62, 0.3, 0x4f7fae);
+  if (isLucknow) {
+    // A cloth awning, marigolds and bulbs along the eave, goods stacked outside and scooters parked askew.
+    for (let i = 0; i < 6; i++) {
+      const strip = art.box(f.front.group, -b.w / 2 + ((i + 0.5) * b.w) / 6, base + height + 0.02, 0.36, b.w / 6, 0.03, 0.7, i % 2 ? 0xf4e7d4 : brand.flag);
+      strip.rotation.x = 0.3;
+    }
+    festoon(art, f.front.group, -b.w / 2 + 0.15, b.w / 2 - 0.15, base + height - 0.12, 0.7, Math.max(10, Math.round(b.w / 0.16)));
+    for (let i = 0; i < 3; i++) art.box(f.front.group, -b.w / 2 + 0.35 + (i % 2) * 0.3, 0.14 + Math.floor(i / 2) * 0.26, 0.5, 0.28, 0.26, 0.28, i % 2 ? 0xc9a36b : 0xb58a52);
+    aFrame(art, f.front.group, b.w * 0.26, 0, 0.85, brand.flag);
+    pottedPlant(art, f.front.group, 0.5, 0, 0.42, seed + 3);
+    scooter(art, f.front.group, -b.w * 0.18, 0.02, 0.75, Math.PI / 2 - 0.3, 0xb7362d);
+    scooter(art, f.front.group, b.w * 0.36, 0.02, 0.8, Math.PI / 2 + 0.25, 0x2b2d31);
+  } else {
+    lanterns(art, f.front.group, -b.w / 2 + 0.2, b.w / 2 - 0.2, base + height - 0.02, 0.42, Math.max(4, Math.round(b.w / 0.45)));
+    for (const side of [-1, 1]) banner(art, f.front.group, side * (b.w / 2 - 0.45) - 0.1, 0, 0.75, side > 0 ? brand.flag : 0xf2b632);
+    aFrame(art, f.front.group, b.w * 0.24, 0, 0.8, brand.flag);
+    pottedPlant(art, f.front.group, -0.5, 0, 0.42, seed);
+    pottedPlant(art, f.front.group, 0.5, 0, 0.42, seed + 3);
+    bicycle(art, f.front.group, -b.w * 0.3, 0.02, 0.62, 0.3, 0x4f7fae);
+  }
   if (b.id === "loc_restaurant") {
     for (let i = 0; i < 8; i++) {
       const stripe = art.box(f.front.group, -b.w / 2 + ((i + 0.5) * b.w) / 8, base + height - 0.06, 0.3, b.w / 8, 0.035, 0.58, i % 2 ? 0xf4e7d4 : b.roof);
@@ -226,6 +302,10 @@ function apartment(art: Art, group: THREE.Group, b: Building) {
     for (const side of [f.left, f.right]) window(art, side, 0, y + step * 0.55, 0.5, step * 0.38);
   }
   flatRoof(art, group, b, top, seed);
+  if (isLucknow) {
+    for (const x of [-b.w * 0.3, 0, b.w * 0.3]) waterTank(art, group, x, top + 0.04, b.d * 0.2, 1.2);
+    for (const y of floors.slice(1)) for (let i = 0; i < units; i += 2) clothesline(art, f.front.group, -b.w / 2 + unit * i + 0.1, -b.w / 2 + unit * (i + 1) - 0.1, y + 0.62, 0.5, seed + i + Math.round(y * 7));
+  }
 }
 
 type Brand = { interior: Interior; bg: string; fg: string; flag: number; letters?: string[] };
@@ -234,6 +314,12 @@ const BRANDS: Record<string, Brand> = {
   loc_konbini: { interior: "konbini", bg: "#1f9a5d", fg: "#ffffff", flag: 0x1f9a5d, letters: ["2", "4", "h"] },
   loc_restaurant: { interior: "cafe", bg: "#4a2f20", fg: "#ffe9bf", flag: 0xc8642c, letters: ["カ", "フ", "ェ"] },
   loc_pharmacy: { interior: "pharmacy", bg: "#d8412f", fg: "#ffffff", flag: 0xd8412f, letters: ["く", "す", "り"] },
+};
+
+const LUCKNOW_BRANDS: Record<string, Brand> = {
+  loc_konbini: { interior: "konbini", bg: "#d08a2e", fg: "#fff8e6", flag: 0xd08a2e, letters: ["चा", "य"] },
+  loc_restaurant: { interior: "cafe", bg: "#7a1f1a", fg: "#ffe9bf", flag: 0x9c3b2e, letters: ["क", "बा", "ब"] },
+  loc_pharmacy: { interior: "pharmacy", bg: "#1f8a55", fg: "#ffffff", flag: 0x1f8a55, letters: ["द", "वा"] },
 };
 
 /** A glass curtain wall on every side: mullions, and dark spandrel bands at each floor. */
@@ -270,13 +356,35 @@ function civic(art: Art, group: THREE.Group, b: Building) {
     rowOfWindows(art, f.back, y + step * 0.52, count, 0.7, step * 0.45, false, 0.3);
     for (const side of [f.left, f.right]) rowOfWindows(art, side, y + step * 0.52, Math.max(1, Math.round(b.d / 1.2)), 0.6, step * 0.45, false, 0.35);
   }
-  art.sign(f.front.group, b.name, 0, top - 0.25, 0.06, b.w * 0.82, 0.3);
+  art.sign(f.front.group, b.name, 0, top - 0.25, 0.06, b.w * 0.82, 0.3, isLucknow && b.kind === "mall" ? "#1f2226" : undefined, isLucknow && b.kind === "mall" ? "#f7f1e1" : undefined);
   for (const side of [-1, 1]) pottedPlant(art, f.front.group, doorX + side * 0.55, 0, 0.45, seed + side);
-  if (b.kind === "mall" || b.kind === "gym") {
+  if (THEME.mughal) {
+    // Indo-Saracenic dress: a sandstone portal round the door, a crenellated parapet and chhatris on the corners.
+    archPanel(art, f.front.group, doorX, base, 0.008, 1.1, Math.min(step * 1.15, 1.6), L.stone, 0.02);
+    kangura(art, f.front.group, -b.w / 2, b.w / 2, top + 0.24, 0, L.sand);
+    const size = Math.min(0.7, b.w * 0.14);
+    for (const side of [-1, 1]) chhatri(art, group, side * (b.w / 2 - size * 0.7), top + 0.24, b.d / 2 - size * 0.7, size, L.sand, b.kind === "hospital" || b.kind === "school" ? L.stone : L.sand);
+    if (b.w > 5) dome(art, group, 0, top + 0.24, 0, Math.min(0.9, b.w * 0.13), L.sand);
+    if (b.kind === "mall") {
+      // Hazratganj's arcade: a covered walkway of arches under a pink band, every signboard the same black and white.
+      const walk = 0.62, bays = Math.max(5, Math.round(b.w / 1.05));
+      art.box(f.front.group, 0, base + step + 0.02, walk / 2, b.w, 0.06, walk, L.sand);
+      art.box(f.front.group, 0, base + step + 0.2, walk, b.w, 0.3, 0.05, L.pinkBand);
+      for (let i = 0; i <= bays; i++) art.cylinder(f.front.group, -b.w / 2 + (b.w * i) / bays, base + step / 2, walk, 0.06, step, L.sand, 0.07, 10);
+      for (let i = 0; i < bays; i++) {
+        const x = -b.w / 2 + (b.w * (i + 0.5)) / bays;
+        if (i % 2 === 0) art.box(f.front.group, x, base + step - 0.22, 0.07, (b.w / bays) * 0.8, 0.2, 0.02, L.board);
+      }
+      for (const y of floors.slice(1)) art.box(f.front.group, 0, y + 0.02, 0.03, b.w + 0.04, 0.12, 0.04, L.pinkBand);
+      festoon(art, f.front.group, -b.w / 2 + 0.1, b.w / 2 - 0.1, base + step - 0.02, walk + 0.04, Math.round(b.w / 0.14));
+    }
+  }
+  if (!isLucknow && (b.kind === "mall" || b.kind === "gym")) {
     lanterns(art, f.front.group, -b.w / 2 + 0.3, b.w / 2 - 0.3, base + step - 0.12, 0.3, Math.max(5, Math.round(b.w / 0.5)));
     for (const x of [-b.w * 0.36, b.w * 0.36]) banner(art, f.front.group, x, 0, 0.7, b.kind === "gym" ? 0xd0685e : 0xd9798a);
   }
-  if (b.id !== "loc_police") for (let i = 0; i < 2 + (seed % 3); i++) bicycle(art, f.front.group, b.w * 0.2 + i * 0.28, 0.02, 0.55, Math.PI / 2 - 0.25, [0x4f7fae, 0xb55f65, 0x5e8f6d][(seed + i) % 3]);
+  if (isLucknow) for (let i = 0; i < 2 + (seed % 3); i++) scooter(art, f.front.group, b.w * 0.18 + i * 0.3, 0.02, 0.6, Math.PI / 2 - 0.25 + (i % 2) * 0.3, [0xb7362d, 0x2b2d31, 0x2d5fa8, 0xe9e6dc][(seed + i) % 4]);
+  else if (b.id !== "loc_police") for (let i = 0; i < 2 + (seed % 3); i++) bicycle(art, f.front.group, b.w * 0.2 + i * 0.28, 0.02, 0.55, Math.PI / 2 - 0.25, [0x4f7fae, 0xb55f65, 0x5e8f6d][(seed + i) % 3]);
   if (b.kind === "hospital") {
     art.box(f.front.group, b.w * 0.36, top - 0.25, 0.07, 0.3, 0.09, 0.03, 0xc8423f);
     art.box(f.front.group, b.w * 0.36, top - 0.25, 0.07, 0.09, 0.3, 0.03, 0xc8423f);

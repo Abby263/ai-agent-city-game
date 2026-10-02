@@ -7,12 +7,12 @@ export type SafetyResult = { ok: true } | { ok: false; category: SafetyCategory;
 
 export const safetyMessages: Record<SafetyCategory, string> = {
   personal_info:
-    "Keep it safe: please don't share real phone numbers, emails, addresses or passwords in Nakameguro. Try again without them.",
-  link: "Links can't be shared in Nakameguro. Describe it in your own words instead.",
+    "Keep it safe: please don't share real phone numbers, emails, addresses or passwords in AgentCity. Try again without them.",
+  link: "Links can't be shared in AgentCity. Describe it in your own words instead.",
   unkind_language:
-    "That message has words that aren't allowed in Nakameguro. Try saying it in a kinder way.",
+    "That message has words that aren't allowed in AgentCity. Try saying it in a kinder way.",
   wellbeing:
-    "It sounds like something might be really hard right now. Please talk to a parent, teacher or another adult you trust. If you are in danger, contact your local emergency number. Nakameguro's citizens are AI characters and can't help with real-life problems.",
+    "It sounds like something might be really hard right now. Please talk to a parent, teacher or another adult you trust. If you are in danger, contact your local emergency number. AgentCity's residents are AI characters and can't help with real-life problems.",
 };
 
 const personalInfo = [

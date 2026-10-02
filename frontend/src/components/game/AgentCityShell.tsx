@@ -46,6 +46,8 @@ import { WorldClock } from "./WorldClock";
 import { GodPanel } from "./GodPanel";
 import { StoryTracker } from "./StoryTracker";
 import { CaseBoard } from "./CaseBoard";
+import { CityPicker } from "./CityGate";
+import { activeCity, cityText } from "@/lib/cities";
 import { Narrator } from "./Narrator";
 import { sceneOutro, type NarratorAction } from "@/lib/narrator";
 import { setNarratorVoice } from "@/lib/narrator-voice";
@@ -100,7 +102,7 @@ function chapterLine(day: number, minute: number) {
   if (minute < 450) return "Morning at home. Work ahead. Plans still unwritten.";
   if (minute < 900) return "The working day. Friendships are tested over coffee breaks.";
   if (minute < 1080) return "Late afternoon. Errands, gyms and chance meetings.";
-  return "Evening settles over Nakameguro. Windows glow one by one.";
+  return cityText("Evening settles over Nakameguro. Windows glow one by one.");
 }
 
 function usePhoneViewport() {
@@ -161,6 +163,7 @@ export function AgentCityShell() {
   const [unlocked, setUnlocked] = useState<Unlocked>({});
   const [celebration, setCelebration] = useState<Achievement[]>([]);
   const [welcome, setWelcome] = useState(false);
+  const [pickingCity, setPickingCity] = useState(false);
   const introPlaying = useGameStore((state) => state.introPlaying);
   // Cases: the one that just closed (shown once), and whether you're choosing your words for a nudge.
   const [composing, setComposing] = useState(false);
@@ -335,7 +338,7 @@ export function AgentCityShell() {
     const state = storyState(current.policy);
     const scene = useGameStore.getState().cityConversations.filter((c) => c.encounter?.story?.id === id).sort((a, b) => (b.encounter!.story!.beat) - (a.encounter!.story!.beat))[0];
     const good = state.closed[id]?.outcome !== "badly";
-    void shareCard({ kicker: "Case closed in Nakameguro", title: storyline.title, backdrop: captureScene(),
+    void shareCard({ kicker: `Case closed in ${activeCity().name}`, title: storyline.title, backdrop: captureScene(),
       verdict: { text: good ? storyline.well : storyline.badly, good },
       lines: scene ? quotable(scene.transcript).map((l) => ({ name: shortName(current.citizens.find((c) => c.citizen_id === l.speaker_id)), text: displayText(l.text) })) : [],
     }).then((how) => setMessage(how === "saved" ? "Picture saved. Post it anywhere." : how === "failed" ? "The picture could not be made." : ""));
@@ -743,7 +746,7 @@ export function AgentCityShell() {
     );
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `navora-day-${city?.clock.day ?? 1}.json`;
+    anchor.download = `${activeCity().id}-day-${city?.clock.day ?? 1}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
     setMessage("World snapshot downloaded.");
@@ -757,7 +760,10 @@ export function AgentCityShell() {
             <Compass size={24} />
           </span>
           <h1>
-            AgentCity<span>STORIES OF NAKAMEGURO</span>
+            AgentCity
+            <button className="city-switch" title="Play a different city" aria-label={`${activeCity().tagline}. Change city`} onClick={() => setPickingCity(true)}>
+              {activeCity().tagline} <ChevronDown size={11} />
+            </button>
           </h1>
         </div>
         <WorldClock city={city} />
@@ -802,7 +808,7 @@ export function AgentCityShell() {
           <select
             className="speed-select"
             aria-label="Time"
-            title="Story pace keeps something happening; Live follows real Tokyo time"
+            title={`Story pace keeps something happening; Live follows real ${activeCity().metro} time`}
             value={live ? "live" : String(speed)}
             onChange={(event) => {
               const value = event.target.value;
@@ -839,7 +845,7 @@ export function AgentCityShell() {
       </header>
 
       <div className={`game-workspace ${panel ? "with-panel" : ""}`}>
-        <section className={`world-stage ${scenePlaying ? "conversation-on-stage" : ""}`} aria-label="Nakameguro city map">
+        <section className={`world-stage ${scenePlaying ? "conversation-on-stage" : ""}`} aria-label={`${activeCity().name} city map`}>
           <GameCanvas
             city={city}
             selectedCitizenId={player?.citizen_id ?? selectedCitizenId}
@@ -860,7 +866,7 @@ export function AgentCityShell() {
           {live && city && (city.clock.minute_of_day >= 1380 || city.clock.minute_of_day < 330) && alertSeen !== "night" && !scenePlaying && !player && (
             <div className="weather-alert night-card" role="status">
               <span aria-hidden="true">😴</span>
-              <p>It&apos;s night in Tokyo, so most of Nakameguro is asleep. Come back in daylight, or fast-forward to watch a day unfold.</p>
+              <p>It&apos;s night in {activeCity().metro}, so most of {activeCity().name} is asleep. Come back in daylight, or fast-forward to watch a day unfold.</p>
               <button className="outline-action" onClick={() => { setSpeed(4); void act(() => api.setTimeMode("fast")); setAlertSeen("night"); }}>⏩ Fast-forward</button>
               <button className="icon-button" aria-label="Dismiss" onClick={() => setAlertSeen("night")}><X size={15} /></button>
             </div>
@@ -938,7 +944,7 @@ export function AgentCityShell() {
             onWrite={(actorId, text, storyId) => writeAct(actorId, text, city.stories?.find((s) => s.id === storyId)?.focus_ids ?? [], storyId)} />}
           </div>
           {!city && (
-            <div className="world-loading">{error || "Opening Nakameguro..."}</div>
+            <div className="world-loading">{error || `Opening ${activeCity().name}...`}</div>
           )}
           <div className="citizen-strip" aria-label="Citizens">
             {city?.citizens.filter((citizen) => everyone || !caseCast.size || caseCast.has(citizen.citizen_id) || citizen.citizen_id === player?.citizen_id).map((citizen) => (
@@ -1196,7 +1202,7 @@ export function AgentCityShell() {
                       </div>
                       <div className="pocket-money">
                         <span>{selected.age >= 18 ? "Money" : "Pocket money"}</span>
-                        <strong>${selected.money.toFixed(0)}</strong>
+                        <strong>{activeCity().currency}{selected.money.toFixed(0)}</strong>
                       </div>
                       <h4>On their mind</h4>
                       <ul className="goal-list">
@@ -1530,7 +1536,7 @@ export function AgentCityShell() {
               <div className="panel-scroll">
                 <div className="chapter-heading">
                   <span>CHAPTER {String(city.clock.day).padStart(2, "0")}</span>
-                  <h3>{weekday(city.clock.day)} in Nakameguro</h3>
+                  <h3>{weekday(city.clock.day)} in {activeCity().name}</h3>
                   <p>{chapterLine(city.clock.day, city.clock.minute_of_day)}</p>
                 </div>
                 <h4>Weather forecast</h4>
@@ -1649,6 +1655,7 @@ export function AgentCityShell() {
           </div>
         </button>
       )}
+      {pickingCity && <CityPicker onClose={() => setPickingCity(false)} />}
       {welcome && !introPlaying && <WelcomeGuide firstCase={story ? openCases(story)[0] : undefined} onClose={closeWelcome} />}
       {resultCase && story && !welcome && (
         <CaseResult storyline={resultCase} outcome={story.closed[resultCase.id]?.outcome ?? "well"} next={openCases(story).at(-1)}

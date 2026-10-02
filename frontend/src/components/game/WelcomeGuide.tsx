@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { Storyline } from "@/lib/storyteller";
+import { activeCity } from "@/lib/cities";
 
 export const WELCOME_KEY = "agentcity.welcomed";
 
@@ -12,7 +13,7 @@ export function WelcomeGuide({ firstCase, onClose }: { firstCase?: Storyline; on
   return (
     <div className="welcome-backdrop" role="presentation" onClick={onClose}>
       <section className="welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title" onClick={(e) => e.stopPropagation()}>
-        <small>NAKAMEGURO, TOKYO</small>
+        <small>{`${activeCity().name}, ${activeCity().metro === activeCity().name ? activeCity().country : activeCity().metro}`.toUpperCase()}</small>
         <h2 id="welcome-title">You&apos;re the neighbourhood fixer.</h2>
         <p className="welcome-lead">Everyone here is hiding something, and you know all of it. Watch their scenes play out, then have a quiet word with someone before the next one. You get three nudges a day, and every case ends well or badly.</p>
         {firstCase && (
@@ -24,7 +25,7 @@ export function WelcomeGuide({ firstCase, onClose }: { firstCase?: Storyline; on
           </div>
         )}
         <button ref={start} className="primary-action welcome-start" onClick={onClose}>Take the case</button>
-        <p className="welcome-safety">Everyone in Nakameguro is an AI character. Never share your real name, address, school, passwords or phone number.</p>
+        <p className="welcome-safety">Everyone in {activeCity().name} is an AI character. Never share your real name, address, school, passwords or phone number.</p>
       </section>
     </div>
   );

@@ -7,11 +7,14 @@ import { GROUND_KINDS, paintedGround } from "./surfaces";
 import { makeArchitecture, tagArchitecture } from "./architecture";
 import { makeForest, type TreeSpot } from "./trees";
 import { makeStreetscape } from "./streetscape";
-import { postBox, vendingMachine } from "./props";
+import { autoRickshaw, chaiStall, cow, handcart, hoarding, postBox, vendingMachine } from "./props";
+import { charbagh, imambara, tagLandmarks } from "./landmarks";
+import { THEME, isLucknow } from "./theme";
 
 /** Labels the palette with real materials before anything is built. */
 function tagSurfaces(art: Art) {
   tagArchitecture(art);
+  tagLandmarks(art);
   art.tag("grass", P.grass, 0x80a776, 0x638b74, 0x91b69b);
   art.tag("paving", P.path, P.curb);
   art.tag("asphalt", P.road);
@@ -232,7 +235,14 @@ export function makeTown(art: Art) {
   for (let i = 0; i < 6; i++)
     art.box(pergola, 19.6, 2, 28.9 + i * 0.36, 2, 0.14, 0.11, 0xe7dfc8);
 
-  // Farm plots, greenhouse and stacks of produce.
+  // Farm plots, greenhouse and stacks of produce. In Lucknow this is a mango orchard: trees in rows, crates of fruit.
+  if (isLucknow) {
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) tree(root, art, 2.4 + j * 1.5, 29.4 + i * 2.2, false, 0.62 + random(i * 4 + j) * 0.1);
+    for (let i = 0; i < 6; i++) {
+      art.box(root, 9.6 + (i % 3) * 0.5, 0.12 + Math.floor(i / 3) * 0.22, 36.2, 0.44, 0.22, 0.34, 0xb58a52);
+      for (let k = 0; k < 3; k++) art.ball(root, 9.48 + (i % 3) * 0.5 + k * 0.12, 0.26 + Math.floor(i / 3) * 0.22, 36.2, 0.06, 0.05, 0.06, 0xe9c23a);
+    }
+  } else
   for (let i = 0; i < 5; i++) {
     art.box(root, 4.1, 0.05, 29.6 + i * 1.1, 3.4, 0.08, 0.55, 0x9a8867);
     for (let j = 0; j < 7; j++)
@@ -267,7 +277,7 @@ export function makeTown(art: Art) {
   art.box(shelter, 15.6, 0.9, 10.98, 1.3, 1.1, 0.06, 0xb1d2c9);
   bench(root, art, 15.6, 11.3);
   art.box(shelter, 15, 0.9, 12.2, 0.06, 1.8, 0.06, P.ink);
-  art.sign(shelter, "BUS", 15, 1.65, 12.24, 0.55, 0.28, "#567c88", "#fff9e6");
+  art.sign(shelter, THEME.busSign, 15, 1.65, 12.24, 0.55, 0.28, "#567c88", "#fff9e6");
 
   // Street furniture adds scale at citizen height.
   for (const x of [11.2, 24.2, 28.8])
@@ -278,6 +288,18 @@ export function makeTown(art: Art) {
       lampHeads.push(new THREE.Vector3(x + 0.45, 2.68, z));
       art.box(root, x + 0.45, 2.81, z, 0.37, 0.08, 0.32, P.ink);
     }
+  if (isLucknow) {
+    // Every corner has its chai stall; fruit sellers push their thelas along the bazaar; autos wait for fares.
+    for (const [x, z] of [[10.7, 5.9], [28.8, 21.3], [74.4, 23.2], [52, 8.2], [34.6, 12.6]]) chaiStall(art, root, x, 0.03, z);
+    const fruit = [0xf2b632, 0xe9d24a, 0xe8732e, 0xd8473c, 0x7da04a];
+    [[16, 23.7], [18.2, 21.3], [22.6, 21.2], [24.4, 16.4], [13, 30.2], [66.4, 32.9], [61.5, 24.2], [3.2, 24.6]].forEach(([x, z], i) => handcart(art, root, x, 0.03, z, fruit[i % fruit.length], i + 3));
+    [[11.3, 15.6, 0.2], [11.3, 16.9, -0.15], [24.4, 24.4, Math.PI], [74.6, 16.4, Math.PI / 2], [76, 16.4, Math.PI / 2 + 0.2], [77.4, 16.3, Math.PI / 2 - 0.1], [66.6, 10.9, 0.3], [51.6, 23.9, -0.4]]
+      .forEach(([x, z, angle], i) => autoRickshaw(art, root, x, 0.03, z, angle, i % 3 === 2));
+    [[15.9, 20.9, 0.7, 0xf1ece0], [29.3, 30.6, -1.1, 0xcbb9a2], [70.9, 30.2, 2.1, 0xf1ece0]].forEach(([x, z, angle, color]) => cow(art, root, x, 0.03, z, angle, color));
+    hoarding(art, root, "मुस्कुराइए, आप लखनऊ में हैं", 11.2, 0.03, 29.4, 2.6, 0.7, "#f6efd9", "#8a2a1f", Math.PI / 2);
+    hoarding(art, root, "SMILE, YOU ARE IN LUCKNOW", 71.6, 0.03, 29.6, 2.6, 0.7, "#f6efd9", "#8a2a1f", -Math.PI / 2);
+    hoarding(art, root, "चिकनकारी SAREES & SUITS", 29, 0.03, 16.4, 2.2, 0.6, "#7b2d5b", "#ffe9bf", 0);
+  } else {
   for (const [x, z] of [
     [10.7, 5.9],
     [24.2, 5.7],
@@ -291,6 +313,7 @@ export function makeTown(art: Art) {
   for (const [x, z] of [[74.4, 23], [66.2, 32.8], [52, 8.2], [13, 30.2], [34.8, 12.4]]) {
     vendingMachine(art, root, x, 0.03, z, [0xd63f36, 0x2f62b5, 0xf4f4ef][Math.round(x + z) % 3], Math.round(x * 11 + z));
     vendingMachine(art, root, x + 0.56, 0.03, z, [0xf4f4ef, 0xd63f36, 0x2f62b5][Math.round(x + z) % 3], Math.round(x * 5 + z * 3));
+  }
   }
   for (const [x, z] of [[11.6, 20.6], [75.2, 23], [29.4, 28]]) postBox(art, root, x, 0.03, z);
   for (const [x, z] of [
@@ -359,7 +382,7 @@ export function makeTown(art: Art) {
 
 
   // Riverside with two bridges. Water remains outside the playable navigation grid.
-  art.box(root, 45, -0.12, 19, 7, 0.16, 72, 0x63b0ba);
+  art.box(root, 45, -0.12, 19, 7, 0.16, 72, THEME.river);
   for (const x of [41.5, 48.5])
     art.box(root, x, 0.2, 19, 0.35, 0.7, 72, 0xb1bca9);
   for (const z of [13.5, 26.5]) {
@@ -385,12 +408,17 @@ export function makeTown(art: Art) {
   }
   const lanterns = makeLanterns(art);
   dynamic.add(lanterns.root);
-  const petalGeometry = art.geometry(new THREE.PlaneGeometry(0.075, 0.11));
+  // Nakameguro: cherry petals on the wind. Lucknow: paper kites duelling high over the rooftops.
+  const petalGeometry = art.geometry(isLucknow ? new THREE.PlaneGeometry(0.4, 0.4).rotateZ(Math.PI / 4) : new THREE.PlaneGeometry(0.075, 0.11));
   const petals = new THREE.InstancedMesh(
     petalGeometry,
-    new THREE.MeshBasicMaterial({ color: 0xffc8db, side: THREE.DoubleSide }),
-    64,
+    new THREE.MeshBasicMaterial({ color: isLucknow ? 0xffffff : 0xffc8db, side: THREE.DoubleSide }),
+    isLucknow ? 22 : 64,
   );
+  if (isLucknow) {
+    const kiteColors = [0xe2452f, 0xf2b632, 0x3f8fd2, 0x57a85a, 0xd9558a, 0xf47c2c, 0x8a5fc2, 0xfdfbf3];
+    for (let i = 0; i < 22; i++) petals.setColorAt(i, new THREE.Color(kiteColors[i % kiteColors.length]));
+  }
   dynamic.add(petals);
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
@@ -401,6 +429,19 @@ export function makeTown(art: Art) {
       if (typeof child.userData.phase === "number")
         child.position.x += Math.sin(seconds + child.userData.phase) * 0.0009;
     });
+    if (isLucknow) {
+      for (let i = 0; i < 22; i++) {
+        // Each kite holds its patch of sky over the old city, darting and dipping as its flyer works the string.
+        const dart = Math.sin(seconds * (0.5 + random(i) * 0.6) + i * 2.1);
+        position.set(3 + random(i + 11) * 36 + dart * 1.6 + Math.sin(seconds * 0.17 + i) * 2.2,
+          7 + random(i + 5) * 7 + Math.sin(seconds * 0.9 + i * 1.7) * 0.7, 2 + random(i + 22) * 36 + Math.cos(seconds * 0.21 + i) * 1.8);
+        quaternion.setFromEuler(euler.set(-0.5, random(i) * 6 + Math.sin(seconds * 0.3 + i) * 0.4, dart * 0.35));
+        matrix.compose(position, quaternion, new THREE.Vector3(1, 1, 1));
+        petals.setMatrixAt(i, matrix);
+      }
+      petals.instanceMatrix.needsUpdate = true;
+      return;
+    }
     for (let i = 0; i < 64; i++) {
       // Half the petals drift over the old town, half along the river.
       position.set(
@@ -424,7 +465,8 @@ export function makeTown(art: Art) {
   // Real trees, added after batching: they are already instanced per species.
   const forest = makeForest(spots);
   root.add(forest.root);
-  const streetscape = makeStreetscape([...spots, ...lampHeads]);
+  // Poles keep clear of trees and lamps, and in Lucknow of the gateway and the clock tower too.
+  const streetscape = makeStreetscape([...spots, ...lampHeads, ...(isLucknow ? [{ x: 57, z: 30.3 }, { x: 55.6, z: 30.3 }, { x: 58.4, z: 30.3 }, { x: 73.4, z: 25 }, { x: 57.5, z: 28.75 }] : [])]);
   root.add(streetscape.root);
   spots.length = 0;
   // Light spilling out of shopfronts onto the pavement after dark, alongside the street lamps' pools.
@@ -445,6 +487,8 @@ function makeBuilding(parent: THREE.Group, art: Art, b: Building) {
   const group = new THREE.Group();
   group.position.set(b.x, 0, b.z);
   parent.add(group);
+  if (isLucknow && b.kind === "station") return charbagh(art, group, b);
+  if (isLucknow && b.kind === "shrine") return imambara(art, group, b);
   art.box(group, 0, 0.11, 0, b.w + 0.4, 0.2, b.d + 0.5, 0xc5c3b5);
   art.box(group, 0, b.h / 2 + 0.17, 0, b.w, b.h, b.d, b.wall);
   art.box(group, 0, 0.37, b.d / 2 + 0.015, b.w, 0.3, 0.06, 0xc0b2a1);
@@ -631,7 +675,8 @@ function tree(
   scale: number,
 ) {
   const pick = random(x * 3.1 + z * 7.7);
-  const kind = blossom ? "sakura" : nearShrine(x, z) ? "pine" : pick < 0.3 ? "oak" : "keyaki";
+  // Lucknow has no pines: neem, peepal and mango, with gulmohar in flower where Nakameguro has cherry.
+  const kind = blossom ? "sakura" : nearShrine(x, z) && !isLucknow ? "pine" : pick < (isLucknow ? 0.5 : 0.3) ? "oak" : "keyaki";
   // The old figure sizes (0.6 to 1.5) become a gentler spread around each species' natural height.
   spots.push({ x, z, kind, scale: 0.8 + (scale - 0.75) * 0.45 + pick * 0.15 });
 }

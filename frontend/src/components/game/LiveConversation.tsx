@@ -12,6 +12,7 @@ import { stopNarration } from "@/lib/narrator-voice";
 import { captureScene } from "@/lib/scene-capture";
 import { shareCard } from "@/lib/share";
 import { STORYLINES } from "@/lib/storyteller";
+import { activeCity } from "@/lib/cities";
 import { castVoices, deliveryStyle } from "@/lib/voices";
 
 const subscribeToSupport = () => () => {};
@@ -111,7 +112,7 @@ export function LiveConversation({ conversation, citizens, location, dateLabel, 
     const name = (id: string) => citizens.find((c) => c.citizen_id === id)?.name.split(" ")[0] ?? "Resident";
     const title = STORYLINES.find((s) => s.id === conversation.encounter?.story?.id)?.title ?? `${participants.map((c) => c.name.split(" ")[0]).join(" and ")} at ${location}`;
     const from = Math.max(0, lineIndex - 1);
-    void shareCard({ kicker: "Overheard in Nakameguro", title, backdrop: captureScene(),
+    void shareCard({ kicker: `Overheard in ${activeCity().name}`, title, backdrop: captureScene(),
       lines: conversation.transcript.slice(from, lineIndex + 1).map((l) => ({ name: name(l.speaker_id), text: displayText(l.text) })) })
       .then((how) => setShared(how === "saved" ? "Picture saved" : how === "failed" ? "Couldn't make the picture" : ""));
   };

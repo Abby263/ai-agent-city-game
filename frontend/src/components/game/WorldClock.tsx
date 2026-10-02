@@ -5,6 +5,7 @@ import { calendarDay, calendarStartFor, formatDate, seasonIcon, tokyoNow } from 
 import { weatherAt } from "@/lib/weather";
 import { weekday } from "@/lib/routine";
 import type { CityState } from "@/lib/types";
+import { activeCity } from "@/lib/cities";
 
 const hhmm = (minute: number) => `${String(Math.floor(minute / 60) % 24).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 
@@ -39,7 +40,7 @@ export function WorldClock({ city }: { city: CityState | null }) {
         <span aria-hidden="true">{weather.icon}</span>
         {Math.round(weather.temp_c)}°C
       </span>
-      <span className={`clock-mode ${live ? "live" : ""}`}>{live ? "LIVE · Tokyo" : "Fast-forward"}</span>
+      <span className={`clock-mode ${live ? "live" : ""}`}>{live ? `LIVE · ${activeCity().metro}` : "Fast-forward"}</span>
     </div>
   );
 }

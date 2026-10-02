@@ -1,3 +1,5 @@
+import { activeCity } from "./cities";
+
 // A scene or a closed case as a picture people can post: the frame from the town, the lines, and where to play.
 
 export type ShareCard = {
@@ -102,7 +104,7 @@ export async function renderShareCard(card: ShareCard): Promise<Blob | null> {
   ctx.fillText("AgentCity", 72, H - 62);
   ctx.fillStyle = "#b9d2cb";
   ctx.font = `400 28px ${sans}`;
-  ctx.fillText("Stories of Nakameguro", 250, H - 62);
+  ctx.fillText(`Stories of ${activeCity().name}`, 250, H - 62);
   ctx.textAlign = "right";
   ctx.fillText(SHARE_URL, W - 72, H - 62);
   ctx.textAlign = "left";

@@ -352,7 +352,7 @@ class CognitionPipeline:
             trust=38,
             warmth=38,
             familiarity=12,
-            notes="They are new to each other and only know each other from life in Nakameguro.",
+            notes="They are new to each other and only know each other from life in the neighbourhood.",
         )
         db.add(relationship)
         return relationship

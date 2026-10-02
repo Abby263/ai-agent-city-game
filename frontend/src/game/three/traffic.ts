@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { Art } from "./materials";
 import type { Point } from "./layout";
+import { autoRickshaw } from "./props";
+import { isLucknow } from "./theme";
 
 // Japan drives on the left. The route runs east over the north bridge to downtown, down the
 // avenue, and back west over the south bridge, passing both bus shelters on its first stretch.
@@ -58,9 +60,26 @@ function makeVehicle(art: Art, bus: boolean, color: number): Vehicle {
   return { root, body, distance: 0, speed: bus ? 2.1 : 2.6, length, bus, dwell: 0, stopped: 0 };
 }
 
+/** An auto-rickshaw or e-rickshaw in traffic: slower than a car, and there are a lot of them. */
+function makeAuto(art: Art, electric: boolean): Vehicle {
+  const root = new THREE.Group(), body = new THREE.Group();
+  root.add(body);
+  autoRickshaw(art, body, 0, 0.04, 0, 0, electric).scale.setScalar(1.25);
+  body.traverse((o) => { if (o instanceof THREE.Mesh) o.receiveShadow = false; });
+  art.contactShadow(root, 1.1, 1.7, 0.42);
+  return { root, body, distance: 0, speed: electric ? 1.7 : 2.2, length: 1.4, bus: false, dwell: 0, stopped: 0 };
+}
+
 export function makeTraffic(art: Art) {
   const root = new THREE.Group();
-  const vehicles = [
+  const vehicles = isLucknow ? [
+    makeVehicle(art, true, 0xd9662b),
+    makeAuto(art, false),
+    makeVehicle(art, false, 0xf1f1ec),
+    makeAuto(art, true),
+    makeAuto(art, false),
+    makeVehicle(art, false, 0xb9bdc0),
+  ] : [
     makeVehicle(art, true, 0xf2c14e),
     makeVehicle(art, false, 0xd9776b),
     makeVehicle(art, false, 0x6f93c9),

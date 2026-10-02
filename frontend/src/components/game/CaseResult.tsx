@@ -3,10 +3,11 @@
 import { useEffect, useRef } from "react";
 import { Share2 } from "lucide-react";
 import type { CaseOutcome, Storyline } from "@/lib/storyteller";
+import { activeCity } from "@/lib/cities";
 
 export function seasonRank(wins: number, total: number) {
   const share = total ? wins / total : 0;
-  return share === 1 ? "The heart of Nakameguro" : share >= 0.75 ? "Trusted fixer" : share >= 0.5 ? "Well-meaning meddler" : "Agent of chaos";
+  return share === 1 ? `The heart of ${activeCity().name}` : share >= 0.75 ? "Trusted fixer" : share >= 0.5 ? "Well-meaning meddler" : "Agent of chaos";
 }
 
 /** A case just closed: how it ended, in one line, and what's next on the desk. */
@@ -32,7 +33,7 @@ export function CaseResult({ storyline, outcome, next, record, onShare, onNewSea
         <p className="case-result-record">{record.wins} of {record.closed} cases ended well so far.</p>
         {finale ? (
           <div className="case-result-next"><small>Season over</small><strong>{seasonRank(record.wins, record.total)}</strong>
-            <p>Every case is closed. Nakameguro carries on, and so can you: keep watching, or start again and see if you can do better.</p>
+            <p>Every case is closed. {activeCity().name} carries on, and so can you: keep watching, or start again and see if you can do better.</p>
             <button className="text-action" onClick={onNewSeason}>Start a new season</button></div>
         ) : next && (
           <div className="case-result-next"><small>New case on your desk</small><strong><span aria-hidden="true">{next.icon}</span> {next.goal}</strong><p>{next.brief}</p></div>

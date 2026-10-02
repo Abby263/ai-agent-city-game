@@ -45,7 +45,7 @@ def decide_election(runtime, request: ElectionDecisionRequest) -> ElectionDecisi
         "speaker": request.citizen.model_dump(mode="json"),
         "own_nature": request.citizen.personality.get("nature", {}),
         "purpose": request.purpose,
-        "public_event": "A fictional neighbourhood-association (chonaikai) election in Nakameguro. Any two residents can run. One private ballot per resident. Abstention is allowed.",
+        "public_event": "A fictional neighbourhood-association election in this neighbourhood. Any two residents can run. One private ballot per resident. Abstention is allowed.",
         "public_candidates": [c.model_dump() for c in request.candidates],
         "eligible_people_to_approach": [r.model_dump() for r in request.residents if r.citizen_id != request.citizen.citizen_id],
         "private_memories_for_speaker_only": request.memories,

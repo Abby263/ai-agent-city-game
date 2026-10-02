@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { Art } from "./materials";
+import { THEME, isLucknow } from "./theme";
 
 // Nakameguro is a neighbourhood inside a huge city, not an island: the ground runs to the horizon, low-rise
 // streets and trees surround the town, a skyline stands in the haze and Mt Fuji rises in the west, where the sun sets.
@@ -81,7 +82,7 @@ export function makeHorizon(art: Art) {
 
   // Ground to the horizon, just under the town's own ground.
   const groundMaterial = distantMaterial(art, uniforms, false);
-  groundMaterial.color.set(0x86a577);
+  groundMaterial.color.set(isLucknow ? 0x9aa56f : 0x86a577);
   const ground = new THREE.Mesh(new THREE.CircleGeometry(900, 48), groundMaterial);
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(TOWN_CENTER.x, -0.06, TOWN_CENTER.z);
@@ -91,7 +92,7 @@ export function makeHorizon(art: Art) {
 
   // The river and its embankments continue out of town in both directions.
   const waterMaterial = distantMaterial(art, uniforms, false);
-  waterMaterial.color.set(0x5ea8b4);
+  waterMaterial.color.set(isLucknow ? THEME.river : 0x5ea8b4);
   const bankMaterial = distantMaterial(art, uniforms, false);
   bankMaterial.color.set(0xb1bca9);
   const reach = 700;
@@ -145,8 +146,9 @@ export function makeHorizon(art: Art) {
   box.translate(0, 0.5, 0);
   const cityMaterial = distantMaterial(art, uniforms, true);
   // Low-rise streets in warm plaster and tile; the far skyline in the cool greys of distance.
-  const streetPalette = [0xd8cfc2, 0xc9bfb1, 0xbcb3a6, 0xe0d7ca, 0xaab2b8, 0xc7b8a5, 0x9ea8b0];
-  const skylinePalette = [0x93a4b8, 0xa7b5c4, 0x8797ab, 0xb3bfcb, 0x7f8fa3, 0x9eabb9];
+  // Lucknow spreads low and lime-washed to the horizon: cream, ochre, pink and pale blue, few towers.
+  const streetPalette = isLucknow ? [0xe8d9b4, 0xdcc79c, 0xe9c9b5, 0xcfdbd8, 0xd9cfae, 0xf0e2c4, 0xc9b28a] : [0xd8cfc2, 0xc9bfb1, 0xbcb3a6, 0xe0d7ca, 0xaab2b8, 0xc7b8a5, 0x9ea8b0];
+  const skylinePalette = isLucknow ? [0xcdbf9f, 0xd6c8ad, 0xbfb394, 0xc8c2b4, 0xb9b09a, 0xd2c5a8] : [0x93a4b8, 0xa7b5c4, 0x8797ab, 0xb3bfcb, 0x7f8fa3, 0x9eabb9];
   const makeBlocks = (count: number, inner: number, outer: number, seed: number, size: [number, number], height: [number, number], palette: number[]) => {
     const blocks = new THREE.InstancedMesh(box, cityMaterial, count);
     let n = 0;
@@ -164,8 +166,8 @@ export function makeHorizon(art: Art) {
     disposables.push(blocks);
     return blocks;
   };
-  makeBlocks(340, 68, 200, 101, [4, 9], [3, 12], streetPalette);
-  makeBlocks(190, 250, 540, 303, [10, 22], [18, 62], skylinePalette);
+  makeBlocks(340, 68, 200, 101, [4, 9], isLucknow ? [3, 8] : [3, 12], streetPalette);
+  makeBlocks(isLucknow ? 120 : 190, 250, 540, 303, [10, 22], isLucknow ? [8, 30] : [18, 62], skylinePalette);
   disposables.push(box, cityMaterial);
 
   // Mt Fuji, far to the west-southwest, with a snow cap.
@@ -179,6 +181,28 @@ export function makeHorizon(art: Art) {
   cap.position.y = 62;
   fuji.add(cone, cap);
   fuji.position.set(TOWN_CENTER.x - 900, -6, TOWN_CENTER.z + 320);
+  if (isLucknow) {
+    // No mountain on the Gangetic plain: the old city's domes and minarets stand on the western horizon instead.
+    fuji.clear();
+    const sphere = new THREE.SphereGeometry(1, 20, 12), shaft = new THREE.CylinderGeometry(1, 1.1, 1, 10);
+    disposables.push(sphere, shaft);
+    const piece = (geometry: THREE.BufferGeometry, x: number, y: number, z: number, sx: number, sy: number, sz: number) => {
+      const mesh = new THREE.Mesh(geometry, fujiMaterial);
+      mesh.position.set(x, y, z);
+      mesh.scale.set(sx, sy, sz);
+      fuji.add(mesh);
+    };
+    for (const [x, z, s] of [[0, 0, 1], [140, 60, 0.7], [-170, -40, 0.8]] as const) {
+      piece(shaft, x, 14 * s, z, 46 * s, 28 * s, 30 * s);
+      piece(sphere, x, 34 * s, z, 20 * s, 24 * s, 20 * s);
+      for (const side of [-1, 1]) {
+        piece(sphere, x + side * 30 * s, 31 * s, z, 8 * s, 10 * s, 8 * s);
+        piece(shaft, x + side * 54 * s, 26 * s, z, 3.2 * s, 52 * s, 3.2 * s);
+        piece(sphere, x + side * 54 * s, 54 * s, z, 5 * s, 6 * s, 5 * s);
+      }
+    }
+    fuji.position.set(TOWN_CENTER.x - 620, 0, TOWN_CENTER.z + 120);
+  }
   root.add(fuji);
   disposables.push(cone.geometry, cap.geometry, fujiMaterial, capMaterial);
   const fujiBase = new THREE.Color(0x8ea3bb), capBase = new THREE.Color(0xf2f5f8), nightTint = new THREE.Color(0x141c33);

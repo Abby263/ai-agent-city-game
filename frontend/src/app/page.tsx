@@ -1,5 +1,5 @@
-import { AgentCityShell } from "@/components/game/AgentCityShell";
+import { CityGate } from "@/components/game/CityGate";
 
 export default function Home() {
-  return <AgentCityShell />;
+  return <CityGate />;
 }
