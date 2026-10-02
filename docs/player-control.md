@@ -130,9 +130,29 @@ A narrator sits at the top of the desk (`Narrator.tsx`). It does two jobs.
   The shell carries them out in order (`runNarratorActions`). If the model can't be reached the narrator falls
   back to a summary the game builds itself.
 
-The narrator speaks with the best voice the device has (`narrator-voice.ts`: a "natural" voice if there is one, an
-Indian English one in Lucknow), a little under normal speed, the place name low and slow like a title, questions
-lifted. Where the device can't speak, each beat stays up long enough to read instead. Scenes and
+**The voice.** Where the device can run it (a desktop browser with WebGPU), the narrator speaks in a natural,
+open-source neural voice: Kokoro (Apache 2.0), run in the browser by HeadTTS (MIT) in a web worker
+(`narrator-kokoro.ts`). Nothing is sent to a server and nothing costs anything per line. The model is about 325 MB;
+it is fetched in the background a few seconds after the town loads and kept by the browser afterwards, and the
+narrator bar shows the progress. A sentence takes about a second to make, and scene introductions are made while
+the two residents walk over. Until it is ready, and on phones or browsers without WebGPU, the narrator uses the
+best voice the device has (`narrator-voice.ts`: an Indian English one in Lucknow), a little under normal speed.
+Where nothing can speak, each beat stays up long enough to read. Setting `agentcity.narratorEngine` to `device` in
+local storage keeps the device voice.
+
+**The avatar.** Once the natural voice is ready the narrator appears in person in the bar (`NarratorAvatar.tsx`): a
+head-and-shoulders avatar drawn by TalkingHead (MIT), one per city (`public/avatars/narrator_*.glb`). HeadTTS
+returns when each mouth shape falls in the audio, and TalkingHead moves the lips to it, blinks and glances; the
+game holds the body still and adds a slow sway and small nods of its own, because TalkingHead's body poses are
+written for a different skeleton. The avatars are built with the residents' own pipeline
+(`scripts/blender/build-narrators.sh`: MakeHuman CC0 assets, a Mixamo-named rig, teeth and tongue, the 52 ARKit
+face shapes, and the 15 Oculus visemes mixed from them). `scripts/vendor-headtts.mjs` copies both libraries into
+place before every dev run and build.
+
+**Speaking to it** still uses the browser's own speech recognition (free, but not open source, and Chrome sends
+the audio to Google); answers that need thought go to the narrator model on the server as text.
+
+Scenes and
 the clock wait while it listens, thinks or speaks. Player words pass the same safety checks as typed text, in the
 browser and again on the server.
 

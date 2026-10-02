@@ -115,3 +115,19 @@ test("the narrator picks the most natural voice the device has, and a local one 
   assert.equal(narratorVoice([voices[4]], "lucknow"), undefined, "never a voice that can't read English");
   assert.ok(readingTime("Charbagh Station.") >= 1700 && readingTime("Kamla found a notebook hidden under Aditya's mattress.") > 3000);
 });
+
+test("the natural voice is only fetched where it can run, and never blocks the narrator", async () => {
+  const { kokoroSupported, kokoroState, loadKokoro, kokoroClip } = await import("../src/lib/narrator-kokoro");
+  assert.equal(kokoroSupported(), false, "no WebGPU here");
+  assert.equal(await loadKokoro(), false);
+  assert.equal(kokoroState().status, "unsupported");
+  await assert.rejects(kokoroClip("Charbagh Station."), /not loaded/);
+});
+
+test("the build step that copies the voice and the avatar library still fits them", async () => {
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync(new URL("../node_modules/@met4citizen/talkinghead/modules/talkinghead.mjs", import.meta.url), "utf8");
+  assert.ok(source.includes("import(moduleName).then("), "TalkingHead's dynamic lip-sync import is where the copy expects it");
+  const worker = readFileSync(new URL("../node_modules/@met4citizen/headtts/modules/worker-tts.mjs", import.meta.url), "utf8");
+  assert.ok(worker.includes("transformersModule"), "HeadTTS still loads its model runtime by URL");
+});

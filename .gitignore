@@ -25,3 +25,7 @@ redis-data/
 .vercel
 output/playwright/
 .playwright-cli/
+
+# Copied from node_modules at build time (frontend/scripts/vendor-headtts.mjs)
+frontend/public/vendor/
+frontend/src/vendor/
