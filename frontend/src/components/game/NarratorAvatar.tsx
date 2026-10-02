@@ -52,7 +52,7 @@ export function NarratorAvatar({ city }: { city: string }) {
         // The voice and its mouth shapes come from HeadTTS, so TalkingHead needs neither a speech service nor its
         // own text-to-lips modules.
         ttsEndpoint: "", lipsyncModules: [], lipsyncLang: "en", cameraView: "head", cameraRotateEnable: false,
-        modelPixelRatio: Math.min(2, window.devicePixelRatio || 1), modelFPS: 30,
+        modelPixelRatio: 1, modelFPS: 30,
         lightAmbientIntensity: 0.7, lightDirectIntensity: 3.5, lightDirectColor: 0xfff1dc,
         avatarIdleEyeContact: 0.5, avatarSpeakingEyeContact: 0.8,
       });
