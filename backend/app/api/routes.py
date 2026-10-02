@@ -19,6 +19,7 @@ from app.cognition.pipeline import CognitionPipeline
 from app.cognition.elections import ElectionDecision, ElectionDecisionRequest, decide_election
 from app.cognition.encounters import SocialDecision, SocialDecisionRequest, decide_social
 from app.cognition.actions import ActInterpretation, ActRequest, interpret
+from app.cognition.narrator import NarratorReply, NarratorRequest, narrate
 from app.config import get_settings
 from app.database import get_db
 from app.models import CitizenORM, ConversationORM, MemoryORM, RelationshipORM
@@ -213,6 +214,21 @@ def act_interpretation(request: ActRequest) -> ActInterpretation:
         raise HTTPException(status_code=503, detail=str(error)) from error
     except CognitionValidationError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/cognition/narrator", response_model=NarratorReply)
+def narrator_reply(request: NarratorRequest) -> NarratorReply:
+    """What the player said to the narrator (spoken or typed): an answer to say aloud, and game actions to carry out."""
+    _reject_unsafe_player_text(request.text)
+    try:
+        reply = narrate(cognition.client, request)
+    except CognitionUnavailableError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except CognitionValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    # Words the narrator puts in a resident's mouth or ear get the same checks as words the player types.
+    _reject_unsafe_player_text(*(action.text for action in reply.actions))
+    return reply
 
 
 @router.post("/cognition/session", response_model=SessionCognitionResponse)

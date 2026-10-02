@@ -221,6 +221,11 @@ export async function interpretAct(body: ActRequest): Promise<ActInterpretation>
     body: JSON.stringify({ ...body, actor: body.actor && withPrompt(body.actor), target: body.target && withPrompt(body.target) }) });
 }
 
+/** What the player said to the narrator: an answer to say aloud, and actions for the game to carry out. */
+export async function askNarrator(body: import("./narrator").NarratorRequest): Promise<import("./narrator").NarratorReply> {
+  return request("/cognition/narrator", { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000) });
+}
+
 /** The fixed rules every resident follows, shown next to their editable prompt. */
 export async function cognitionRules(): Promise<{ game_rules: string; safety_rules: string }> {
   return request("/cognition/rules");

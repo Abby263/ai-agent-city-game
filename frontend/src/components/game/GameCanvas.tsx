@@ -24,6 +24,7 @@ import { useGameStore } from "@/lib/store";
 import { LiveConversation } from "./LiveConversation";
 import { EarthIntro } from "./EarthIntro";
 import { registerSceneCapture } from "@/lib/scene-capture";
+import { sceneIntro } from "@/lib/narrator";
 import { renderShareCard } from "@/lib/share";
 import { calendarDay, formatDate } from "@/lib/calendar";
 import { weekday } from "@/lib/routine";
@@ -130,6 +131,25 @@ export function GameCanvas({
   }, [ready]);
   const endIntro = useCallback(() => setIntroDone(true), []);
   useEffect(() => { useGameStore.getState().setIntroPlaying(intro); }, [intro]);
+  // Camera moves asked for in words, through the narrator.
+  const cameraRequest = useGameStore((state) => state.cameraRequest);
+  const handledCamera = useRef(0);
+  useEffect(() => {
+    if (!cameraRequest || !ready || cameraRequest.at === handledCamera.current) return;
+    handledCamera.current = cameraRequest.at;
+    const timer = window.setTimeout(() => {
+      if (cameraRequest.mode === "street") {
+        setMode("street");
+        renderer.current?.setMode("street");
+        if (cameraRequest.locationId) renderer.current?.streetViewAt(cameraRequest.locationId);
+      } else {
+        setMode("orbit");
+        renderer.current?.setMode("orbit");
+        renderer.current?.overview();
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [cameraRequest, ready]);
   // Street view: how far the scene being played is, so you have to walk over to hear it.
   const [sceneDistance, setSceneDistance] = useState<number | null>(null);
   useEffect(() => {
@@ -151,7 +171,7 @@ export function GameCanvas({
       {intro && <EarthIntro townReady={ready} onDescend={descend} onDone={endIntro} />}
       {ready && conversation && city && (
         <LiveConversation key={conversation.conversation_id} conversation={conversation}
-          citizens={city.citizens} onFrame={stageConversation} onFinish={finishPlayback}
+          citizens={city.citizens} onFrame={stageConversation} onFinish={finishPlayback} intro={sceneIntro(city, conversation)}
           location={city.locations.find((p) => p.location_id === conversation.location_id)?.name ?? city.city_name}
           dateLabel={city.calendar_start ? (() => { const d = calendarDay(city.calendar_start, conversation.game_day); return `${weekday(conversation.game_day).slice(0, 3)} ${formatDate(d)}`; })() : undefined}
           onFocus={() => (mode === "street" ? renderer.current?.streetGoToScene() : renderer.current?.focusConversation())}

@@ -58,6 +58,19 @@ type GameStore = {
   introPlaying: boolean;
   setIntroPlaying: (playing: boolean) => void;
   replayConversation: (id: string) => void;
+  /** Something for the narrator to say (and show); `narrationDone` is the last one it finished saying. */
+  narration: { id: number; text: string } | null;
+  narrationDone: number;
+  narrate: (text: string) => number;
+  finishNarration: (id: number) => void;
+  /** The narrator is listening, thinking or speaking: scenes and the clock wait. */
+  narratorBusy: boolean;
+  setNarratorBusy: (busy: boolean) => void;
+  /** How far into the scene on stage we are, so the narrator can explain it. */
+  sceneLine: number;
+  /** A camera move asked for in words: down to street level somewhere, or the whole town. */
+  cameraRequest: { mode: "street" | "overview"; locationId?: string; at: number } | null;
+  requestCamera: (mode: "street" | "overview", locationId?: string) => void;
   connectionStatus: "idle" | "connecting" | "connected" | "offline";
   error: string | null;
   setCity: (city: CityState) => void;
@@ -135,6 +148,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return { playbackQueue: remaining, lastScene };
   }),
   lastScene: null,
+  narration: null,
+  narrationDone: 0,
+  narrate: (text) => {
+    const id = (get().narration?.id ?? 0) + 1;
+    set({ narration: { id, text } });
+    return id;
+  },
+  finishNarration: (id) => set((state) => ({ narrationDone: Math.max(state.narrationDone, id) })),
+  narratorBusy: false,
+  setNarratorBusy: (narratorBusy) => set({ narratorBusy }),
+  sceneLine: 0,
+  cameraRequest: null,
+  requestCamera: (mode, locationId) => set({ cameraRequest: { mode, locationId, at: Date.now() } }),
   introPlaying: false,
   setIntroPlaying: (introPlaying) => set({ introPlaying }),
   playbackHeld: false,
