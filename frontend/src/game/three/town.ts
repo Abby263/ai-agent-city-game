@@ -1,17 +1,21 @@
 import * as THREE from "three";
 import { Art } from "./materials";
-import { buildings, type Building } from "./layout";
+import { LANES, buildings, insideFootprint, type Building } from "./layout";
 import { makeDistrict } from "./district";
 import { makeLanterns } from "./seasons";
 import { GROUND_KINDS, paintedGround } from "./surfaces";
 import { makeArchitecture, tagArchitecture } from "./architecture";
 import { makeForest, type TreeSpot } from "./trees";
 import { makeStreetscape } from "./streetscape";
-import { postBox, vendingMachine } from "./props";
+import { autoRickshaw, chaiStall, cow, cycleRickshaw, handcart, heap, hoarding, postBox, scooter, vendingMachine, vendor } from "./props";
+import { akbariGate, charbagh, chaurahaIsland, imambara, tagLandmarks } from "./landmarks";
+import { THEME, isLucknow } from "./theme";
+import { CHAURAHA, CHOWK, GATE, type Street, point, roadClearance, span } from "./streets";
 
 /** Labels the palette with real materials before anything is built. */
 function tagSurfaces(art: Art) {
   tagArchitecture(art);
+  tagLandmarks(art);
   art.tag("grass", P.grass, 0x80a776, 0x638b74, 0x91b69b);
   art.tag("paving", P.path, P.curb);
   art.tag("asphalt", P.road);
@@ -22,6 +26,7 @@ function tagSurfaces(art: Art) {
   art.tag("foliage", P.hedge, 0x6d9e78, 0x80ac7d, 0x5d916c, 0x9cbd8b, 0x658e67, 0xefb0c2, 0xf6c2cf, 0xe999b4, 0xffd6de);
   art.tag("wood", 0x8b7766);
   for (const b of buildings) {
+    if (b.kind === "terrace") continue;
     art.tag("plaster", b.wall);
     art.tag("roof", b.roof);
   }
@@ -41,24 +46,8 @@ const random = (seed: number) => {
   return n - Math.floor(n);
 };
 
-export function makeTown(art: Art) {
-  const root = new THREE.Group();
-  const dynamic = new THREE.Group();
-  const lampHeads: THREE.Vector3[] = [];
-  tagSurfaces(art);
-  art.box(root, 20, -0.38, 20, 43, 0.7, 43, 0x80a776);
-  art.box(root, 20, -0.82, 20, 43.2, 0.22, 43.2, 0x638b74);
-  art.box(root, 0, -0.95, 0, 300, 0.1, 300, 0x91b69b);
-
-  // One ground texture avoids coplanar road intersections and keeps the mobile draw cost low.
-  const { canvas, maskCanvas, ctx } = paintedGround(2048, 2048, GROUND_KINDS);
-  const unit = 2048 / 40;
-  ctx.fillStyle = "#9cbd8b";
-  ctx.fillRect(0, 0, 2048, 2048);
-  for (let i = 0; i < 3600; i++) {
-    ctx.fillStyle = i % 2 ? "#a8c493" : "#94b480";
-    ctx.fillRect(random(i) * 2048, random(i + 5500) * 2048, 3, 7);
-  }
+/** Nakameguro: kerbed pavements either side of marked asphalt, with zebra crossings at the junctions. */
+function paintTidyRoads(ctx: CanvasRenderingContext2D, unit: number) {
   for (const road of [13.5, 26.5]) {
     ctx.fillStyle = "#e1ddcf";
     ctx.fillRect((road - 2.5) * unit, 0, 5 * unit, 2048);
@@ -95,20 +84,127 @@ export function makeTown(art: Art) {
       ctx.fillStyle = "#f7efda";
       for (let i = 0; i < 7; i++)
         for (const side of [-1, 1]) {
-          ctx.fillRect(
-            (x - 1.2 + i * 0.38) * unit,
-            (z + side * 2.05 - 0.38) * unit,
-            0.2 * unit,
-            0.76 * unit,
-          );
-          ctx.fillRect(
-            (x + side * 2.05 - 0.38) * unit,
-            (z - 1.2 + i * 0.38) * unit,
-            0.76 * unit,
-            0.2 * unit,
-          );
+          ctx.fillRect((x - 1.2 + i * 0.38) * unit, (z + side * 2.05 - 0.38) * unit, 0.2 * unit, 0.76 * unit);
+          ctx.fillRect((x + side * 2.05 - 0.38) * unit, (z - 1.2 + i * 0.38) * unit, 0.76 * unit, 0.2 * unit);
         }
     }
+}
+
+/**
+ * Lucknow's old city: narrow roads that bend (see streets.ts), worn asphalt from one building line to the other,
+ * its edges crumbling into dust; patched and re-patched; hardly a painted line. The park keeps its grass, the lanes of the mohalla are paved in brick.
+ */
+function paintLucknowGround(ctx: CanvasRenderingContext2D, unit: number) {
+  const rect = (x: number, z: number, w: number, d: number) => ctx.fillRect(x * unit, z * unit, w * unit, d * unit);
+  // The park is watered; the orchard floor is not.
+  ctx.fillStyle = "#a9b97f";
+  rect(15.6, 28, 9, 8.8);
+  // Brick-paved lanes between the houses and across the bazaar.
+  ctx.fillStyle = "#b5a988";
+  rect(0.8, 9.6, 10.6, 2);
+  rect(5.2, 1.6, 1.6, 9);
+  rect(16.2, 16.4, 8.8, 4.6);
+  // The ways in to each place, off the streets.
+  for (const [x0, z0, x1, z1] of LANES) if (x0 < 40) rect(x0 + 0.1, z0, x1 - x0 - 0.2, z1 - z0);
+  const trace = (street: Street) => {
+    const [from, to] = span(street);
+    ctx.beginPath();
+    for (let s = from - 0.6; s <= to + 0.7; s += 0.25) {
+      const p = point(street, Math.max(from, Math.min(to, s)));
+      const [x, z] = street.axis === "x" ? [s, p.z] : [p.x, s];
+      if (s === from - 0.6) ctx.moveTo(x * unit, z * unit); else ctx.lineTo(x * unit, z * unit);
+    }
+  };
+  ctx.lineJoin = ctx.lineCap = "round";
+  // A dusty verge first, then the surface: asphalt on the roads, old brick in the gali.
+  for (const street of CHOWK) {
+    trace(street);
+    ctx.strokeStyle = "#bfa980";
+    ctx.lineWidth = (street.half * 2 + 0.25) * unit;
+    ctx.stroke();
+  }
+  for (const street of CHOWK) {
+    trace(street);
+    ctx.strokeStyle = street.kind === "gali" ? "#a89a7c" : "#6f777c";
+    ctx.lineWidth = street.half * 2 * unit;
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#6f777c";
+  ctx.beginPath();
+  ctx.arc(CHAURAHA.x * unit, CHAURAHA.z * unit, CHAURAHA.radius * unit, 0, Math.PI * 2);
+  ctx.fill();
+  // The roads widen to meet the bridges.
+  for (const road of [13.5, 26.5]) {
+    ctx.beginPath();
+    ctx.moveTo(36.5 * unit, (road - 1.2) * unit);
+    ctx.lineTo(40 * unit, (road - 1.6) * unit);
+    ctx.lineTo(40 * unit, (road + 1.6) * unit);
+    ctx.lineTo(36.5 * unit, (road + 1.2) * unit);
+    ctx.fill();
+  }
+  // Dust drifting in from the edges in soft, uneven tongues, and lighter patches where the road was dug up and relaid.
+  const blob = (x: number, z: number, r: number) => { ctx.beginPath(); ctx.ellipse(x * unit, z * unit, r * unit, r * unit * 0.8, 0, 0, Math.PI * 2); ctx.fill(); };
+  CHOWK.forEach((street, index) => {
+    const [from, to] = span(street);
+    for (let n = from; n < to; n += 0.09) {
+      for (const side of [-1, 1]) {
+        const seed = n * 7 + index * 31 + side;
+        const p = point(street, n, side * (street.half + 0.04 - random(seed) * random(seed + 1) * 0.5));
+        if (Math.hypot(p.x - CHAURAHA.x, p.z - CHAURAHA.z) < CHAURAHA.radius) continue;
+        ctx.fillStyle = ["#c9b48e", "#bda57d", "#bfa980"][Math.floor(random(n + index) * 3)];
+        blob(p.x, p.z, 0.05 + random(seed + 3) * 0.13);
+      }
+      if (street.kind === "road" && random(n * 3.1 + index) < 0.06) {
+        const p = point(street, n, (random(n) - 0.5) * street.half);
+        ctx.fillStyle = "#959a98";
+        rect(p.x - 0.4, p.z - 0.3, 0.5 + random(n + 1) * 0.9, 0.4 + random(n + 2) * 0.7);
+      }
+    }
+  });
+  // The only paint: a faded centre line on the bazaar road, broken where it has worn away, and the gali's bricks.
+  ctx.fillStyle = "#b9b4a8";
+  for (let n = 1; n < 39; n += 1.6) {
+    if (Math.abs(n - CHAURAHA.x) < CHAURAHA.radius + 0.6 || random(n * 1.7) < 0.35) continue;
+    const a = point(CHOWK[0], n), b = point(CHOWK[0], n + 0.7);
+    ctx.beginPath();
+    ctx.moveTo(a.x * unit, (a.z - 0.03) * unit);
+    ctx.lineTo(b.x * unit, (b.z - 0.03) * unit);
+    ctx.lineTo(b.x * unit, (b.z + 0.03) * unit);
+    ctx.lineTo(a.x * unit, (a.z + 0.03) * unit);
+    ctx.fill();
+  }
+  ctx.strokeStyle = "#978a6e";
+  ctx.lineWidth = 1;
+  const gali = CHOWK.find((street) => street.kind === "gali")!;
+  for (let n = span(gali)[0]; n < span(gali)[1]; n += 0.24) {
+    const a = point(gali, n, -gali.half + 0.06), b = point(gali, n, gali.half - 0.06);
+    ctx.beginPath();
+    ctx.moveTo(a.x * unit, a.z * unit);
+    ctx.lineTo(b.x * unit, b.z * unit);
+    ctx.stroke();
+  }
+}
+
+export function makeTown(art: Art) {
+  const root = new THREE.Group();
+  const dynamic = new THREE.Group();
+  const lampHeads: THREE.Vector3[] = [];
+  tagSurfaces(art);
+  art.box(root, 20, -0.38, 20, 43, 0.7, 43, THEME.ground.slab);
+  art.box(root, 20, -0.82, 20, 43.2, 0.22, 43.2, THEME.ground.under);
+  art.box(root, 0, -0.95, 0, 300, 0.1, 300, THEME.ground.far);
+
+  // One ground texture avoids coplanar road intersections and keeps the mobile draw cost low.
+  const { canvas, maskCanvas, ctx } = paintedGround(2048, 2048, GROUND_KINDS);
+  const unit = 2048 / 40;
+  ctx.fillStyle = THEME.ground.open;
+  ctx.fillRect(0, 0, 2048, 2048);
+  for (let i = 0; i < 3600; i++) {
+    ctx.fillStyle = THEME.ground.speckle[i % 2];
+    ctx.fillRect(random(i) * 2048, random(i + 5500) * 2048, THEME.ground.lawns ? 3 : 5 + random(i + 9) * 14, THEME.ground.lawns ? 7 : 4 + random(i + 3) * 10);
+  }
+  if (!THEME.ground.lawns) paintLucknowGround(ctx, unit);
+  else paintTidyRoads(ctx, unit);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = 4;
@@ -232,7 +328,14 @@ export function makeTown(art: Art) {
   for (let i = 0; i < 6; i++)
     art.box(pergola, 19.6, 2, 28.9 + i * 0.36, 2, 0.14, 0.11, 0xe7dfc8);
 
-  // Farm plots, greenhouse and stacks of produce.
+  // Farm plots, greenhouse and stacks of produce. In Lucknow this is a mango orchard: trees in rows, crates of fruit.
+  if (isLucknow) {
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) tree(root, art, 2.4 + j * 1.5, 29.4 + i * 2.2, false, 0.62 + random(i * 4 + j) * 0.1);
+    for (let i = 0; i < 6; i++) {
+      art.box(root, 9.6 + (i % 3) * 0.5, 0.12 + Math.floor(i / 3) * 0.22, 36.2, 0.44, 0.22, 0.34, 0xb58a52);
+      for (let k = 0; k < 3; k++) art.ball(root, 9.48 + (i % 3) * 0.5 + k * 0.12, 0.26 + Math.floor(i / 3) * 0.22, 36.2, 0.06, 0.05, 0.06, 0xe9c23a);
+    }
+  } else
   for (let i = 0; i < 5; i++) {
     art.box(root, 4.1, 0.05, 29.6 + i * 1.1, 3.4, 0.08, 0.55, 0x9a8867);
     for (let j = 0; j < 7; j++)
@@ -267,17 +370,87 @@ export function makeTown(art: Art) {
   art.box(shelter, 15.6, 0.9, 10.98, 1.3, 1.1, 0.06, 0xb1d2c9);
   bench(root, art, 15.6, 11.3);
   art.box(shelter, 15, 0.9, 12.2, 0.06, 1.8, 0.06, P.ink);
-  art.sign(shelter, "BUS", 15, 1.65, 12.24, 0.55, 0.28, "#567c88", "#fff9e6");
+  art.sign(shelter, THEME.busSign, 15, 1.65, 12.24, 0.55, 0.28, "#567c88", "#fff9e6");
 
   // Street furniture adds scale at citizen height.
   for (const x of [11.2, 24.2, 28.8])
     for (const z of [2, 10, 18, 24, 32, 38]) {
+      if (isLucknow && roadClearance(x, z) < 0.1) continue;
       art.cylinder(root, x, 1.4, z, 0.055, 2.8, P.ink);
       art.box(root, x + 0.23, 2.77, z, 0.55, 0.08, 0.08, P.ink);
       art.box(root, x + 0.45, 2.68, z, 0.28, 0.17, 0.23, 0xffe6a1);
       lampHeads.push(new THREE.Vector3(x + 0.45, 2.68, z));
       art.box(root, x + 0.45, 2.81, z, 0.37, 0.08, 0.32, P.ink);
     }
+  if (isLucknow) {
+    // Every corner has its chai stall; fruit sellers push their thelas along the bazaar; autos wait for fares.
+    const clear = (x: number, z: number) => !insideFootprint(x, z, 0.35) && (x > 40 || roadClearance(x, z) > -0.45);
+    for (const [x, z] of [[10.7, 5.9], [28.8, 21.3], [74.4, 23.2], [52, 8.2], [34.6, 12.6]]) if (clear(x, z)) chaiStall(art, root, x, 0.03, z);
+    const fruit = [0xf2b632, 0xe9d24a, 0xe8732e, 0xd8473c, 0x7da04a];
+    [[16, 23.7], [18.2, 21.3], [22.6, 21.2], [24.4, 16.4], [13, 30.2], [66.4, 32.9], [61.5, 24.2], [3.2, 24.6]].forEach(([x, z], i) => { if (clear(x, z)) handcart(art, root, x, 0.03, z, fruit[i % fruit.length], i + 3); });
+    [[11.3, 15.6, 0.2], [11.3, 16.9, -0.15], [24.4, 24.4, Math.PI], [74.6, 16.4, Math.PI / 2], [76, 16.4, Math.PI / 2 + 0.2], [77.4, 16.3, Math.PI / 2 - 0.1], [66.6, 10.9, 0.3], [51.6, 23.9, -0.4]]
+      .forEach(([x, z, angle], i) => { if (clear(x, z)) autoRickshaw(art, root, x, 0.03, z, angle, i % 3 === 2); });
+    [[15.9, 20.9, 0.7, 0xf1ece0], [29.3, 30.6, -1.1, 0xcbb9a2], [70.9, 30.2, 2.1, 0xf1ece0]].forEach(([x, z, angle, color]) => { if (clear(x, z)) cow(art, root, x, 0.03, z, angle, color); });
+    // The roadside itself is a market: every few metres a vendor under an umbrella, a fruit cart, a row of parked
+    // two-wheelers, a waiting rickshaw, a heap of sand. They stand on the road's dusty edge, clear of the traffic.
+    const fruits = [0xf2b632, 0xe9d24a, 0xe8732e, 0xd8473c, 0x7da04a];
+    let k = 0;
+    const roadside = (x: number, z: number, along: "x" | "z", side: number) => {
+      const pick = random(++k * 3.7 + x + z);
+      if (pick < 0.16 || !clear(x, z)) return;
+      const facing = along === "x" ? (side > 0 ? Math.PI : 0) : side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      if (pick < 0.36) vendor(art, root, x, 0.03, z, k);
+      else if (pick < 0.5) handcart(art, root, x, 0.03, z, fruits[k % fruits.length], k);
+      else if (pick < 0.7) for (let i = 0; i < 3; i++) scooter(art, root, x + (along === "x" ? (i - 1) * 0.32 : 0), 0.02, z + (along === "z" ? (i - 1) * 0.32 : 0), facing + 0.25, [0xb7362d, 0x2b2d31, 0x2d5fa8, 0xe9e6dc][(k + i) % 4]);
+      else if (pick < 0.8) cycleRickshaw(art, root, x, 0.02, z, facing + Math.PI / 2);
+      else if (pick < 0.9) autoRickshaw(art, root, x, 0.03, z, facing + Math.PI / 2, k % 2 === 0);
+      else heap(art, root, x, 0.03, z, k);
+    };
+    const junction = (n: number, roads: number[]) => roads.some((r) => Math.abs(n - r) < 3.4);
+    // In the old city they stand in the road itself, hard up against the shop fronts, and the traffic squeezes by.
+    for (const street of CHOWK) if (street.kind === "road") for (const side of [-1, 1]) {
+      const [from, to] = span(street);
+      for (let n = from + 0.8; n < to - 0.6; n += 2.1) {
+        const p = point(street, n, side * (street.half - 0.3));
+        // Not where another road crosses.
+        const other = CHOWK.some((o) => {
+          if (o === street || o.kind !== "road") return false;
+          const q = point(o, o.axis === "x" ? p.x : p.z);
+          return Math.abs(q.x - p.x) + Math.abs(q.z - p.z) < o.half + 1.2;
+        });
+        if (other || Math.hypot(p.x - CHAURAHA.x, p.z - CHAURAHA.z) < CHAURAHA.radius + 0.8 || Math.abs(p.x - GATE.x) < 1.2) continue;
+        roadside(p.x, p.z, street.axis, side);
+      }
+    }
+    for (const road of [13.5, 26.5]) for (const side of [-1, 1])
+      for (let n = 50.5; n < 84; n += 2.6) if (!junction(n, [69])) roadside(n, road + side * 2.05, "x", side);
+    for (const side of [-1, 1]) for (let n = 1.5; n < 39; n += 2.6) if (!junction(n, [13.5, 26.5])) roadside(69 + side * 2.05, n, "z", side);
+    // The Akbari Gate across the bazaar road, and the island in the middle of the chauraha.
+    akbariGate(art, root, GATE.x, GATE.z, CHOWK[0].half * 2);
+    chaurahaIsland(art, root, CHAURAHA.x, CHAURAHA.z, CHAURAHA.island);
+    // Cloth banners strung across the road, from one building line to the other.
+    const banners: Array<[string, string, string]> = [["लखनऊ महोत्सव में आपका स्वागत है", "#f2c53d", "#b7245c"], ["भव्य चिकन सेल • 50% तक छूट", "#c8281e", "#fff3c4"],
+      ["नया सत्र • प्रवेश प्रारंभ", "#f6efd9", "#1f3f7a"], ["शुभ विवाह • गुप्ता परिवार", "#f47c2c", "#fff8e6"]];
+    const [chowk, nakhas, , sarai, victoria] = CHOWK;
+    const across: Array<[x: number, z: number, turned: number, width: number]> = [
+      ...([[chowk, 5], [chowk, 20.5], [nakhas, 33], [nakhas, 8.5], [chowk, 35]] as Array<[Street, number]>).map(([street, x]): [number, number, number, number] => [x, point(street, x).z, 0, street.half * 2]),
+      ...([[victoria, 6], [victoria, 20], [sarai, 33.5], [victoria, 34]] as Array<[Street, number]>).map(([street, z]): [number, number, number, number] => [point(street, z).x, z, 1, street.half * 2]),
+      [56, 26.5, 0, 4.6], [78, 13.5, 0, 4.6],
+    ];
+    across.forEach(([x, z, turned, width], i) => {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.rotation.y = turned ? 0 : Math.PI / 2;
+      g.scale.x = width / 4.6;
+      root.add(g);
+      const [text, bg, fg] = banners[i % banners.length];
+      for (const face of [0, Math.PI]) art.sign(g, text, 0, 3.25, face ? -0.012 : 0.012, 4.2, 0.5, bg, fg).rotation.y = face;
+      for (const end of [-1, 1]) art.box(g, end * 2.3, 3.3, 0, 0.5, 0.012, 0.012, P.ink);
+    });
+    hoarding(art, root, "मुस्कुराइए, आप लखनऊ में हैं", 11.2, 0.03, 29.4, 2.6, 0.7, "#f6efd9", "#8a2a1f", Math.PI / 2);
+    hoarding(art, root, "SMILE, YOU ARE IN LUCKNOW", 71.6, 0.03, 29.6, 2.6, 0.7, "#f6efd9", "#8a2a1f", -Math.PI / 2);
+    hoarding(art, root, "चिकनकारी SAREES & SUITS", 29, 0.03, 16.4, 2.2, 0.6, "#7b2d5b", "#ffe9bf", 0);
+  } else {
   for (const [x, z] of [
     [10.7, 5.9],
     [24.2, 5.7],
@@ -291,6 +464,7 @@ export function makeTown(art: Art) {
   for (const [x, z] of [[74.4, 23], [66.2, 32.8], [52, 8.2], [13, 30.2], [34.8, 12.4]]) {
     vendingMachine(art, root, x, 0.03, z, [0xd63f36, 0x2f62b5, 0xf4f4ef][Math.round(x + z) % 3], Math.round(x * 11 + z));
     vendingMachine(art, root, x + 0.56, 0.03, z, [0xf4f4ef, 0xd63f36, 0x2f62b5][Math.round(x + z) % 3], Math.round(x * 5 + z * 3));
+  }
   }
   for (const [x, z] of [[11.6, 20.6], [75.2, 23], [29.4, 28]]) postBox(art, root, x, 0.03, z);
   for (const [x, z] of [
@@ -359,7 +533,7 @@ export function makeTown(art: Art) {
 
 
   // Riverside with two bridges. Water remains outside the playable navigation grid.
-  art.box(root, 45, -0.12, 19, 7, 0.16, 72, 0x63b0ba);
+  art.box(root, 45, -0.12, 19, 7, 0.16, 72, THEME.river);
   for (const x of [41.5, 48.5])
     art.box(root, x, 0.2, 19, 0.35, 0.7, 72, 0xb1bca9);
   for (const z of [13.5, 26.5]) {
@@ -385,12 +559,17 @@ export function makeTown(art: Art) {
   }
   const lanterns = makeLanterns(art);
   dynamic.add(lanterns.root);
-  const petalGeometry = art.geometry(new THREE.PlaneGeometry(0.075, 0.11));
+  // Nakameguro: cherry petals on the wind. Lucknow: paper kites duelling high over the rooftops.
+  const petalGeometry = art.geometry(isLucknow ? new THREE.PlaneGeometry(0.4, 0.4).rotateZ(Math.PI / 4) : new THREE.PlaneGeometry(0.075, 0.11));
   const petals = new THREE.InstancedMesh(
     petalGeometry,
-    new THREE.MeshBasicMaterial({ color: 0xffc8db, side: THREE.DoubleSide }),
-    64,
+    new THREE.MeshBasicMaterial({ color: isLucknow ? 0xffffff : 0xffc8db, side: THREE.DoubleSide }),
+    isLucknow ? 22 : 64,
   );
+  if (isLucknow) {
+    const kiteColors = [0xe2452f, 0xf2b632, 0x3f8fd2, 0x57a85a, 0xd9558a, 0xf47c2c, 0x8a5fc2, 0xfdfbf3];
+    for (let i = 0; i < 22; i++) petals.setColorAt(i, new THREE.Color(kiteColors[i % kiteColors.length]));
+  }
   dynamic.add(petals);
   const matrix = new THREE.Matrix4();
   const quaternion = new THREE.Quaternion();
@@ -401,6 +580,19 @@ export function makeTown(art: Art) {
       if (typeof child.userData.phase === "number")
         child.position.x += Math.sin(seconds + child.userData.phase) * 0.0009;
     });
+    if (isLucknow) {
+      for (let i = 0; i < 22; i++) {
+        // Each kite holds its patch of sky over the old city, darting and dipping as its flyer works the string.
+        const dart = Math.sin(seconds * (0.5 + random(i) * 0.6) + i * 2.1);
+        position.set(3 + random(i + 11) * 36 + dart * 1.6 + Math.sin(seconds * 0.17 + i) * 2.2,
+          7 + random(i + 5) * 7 + Math.sin(seconds * 0.9 + i * 1.7) * 0.7, 2 + random(i + 22) * 36 + Math.cos(seconds * 0.21 + i) * 1.8);
+        quaternion.setFromEuler(euler.set(-0.5, random(i) * 6 + Math.sin(seconds * 0.3 + i) * 0.4, dart * 0.35));
+        matrix.compose(position, quaternion, new THREE.Vector3(1, 1, 1));
+        petals.setMatrixAt(i, matrix);
+      }
+      petals.instanceMatrix.needsUpdate = true;
+      return;
+    }
     for (let i = 0; i < 64; i++) {
       // Half the petals drift over the old town, half along the river.
       position.set(
@@ -424,7 +616,8 @@ export function makeTown(art: Art) {
   // Real trees, added after batching: they are already instanced per species.
   const forest = makeForest(spots);
   root.add(forest.root);
-  const streetscape = makeStreetscape([...spots, ...lampHeads]);
+  // Poles keep clear of trees and lamps, and in Lucknow of the gateway and the clock tower too.
+  const streetscape = makeStreetscape([...spots, ...lampHeads, ...(isLucknow ? [{ x: 57, z: 30.3 }, { x: 55.6, z: 30.3 }, { x: 58.4, z: 30.3 }, { x: 73.4, z: 25 }, { x: 57.5, z: 28.75 }] : [])]);
   root.add(streetscape.root);
   spots.length = 0;
   // Light spilling out of shopfronts onto the pavement after dark, alongside the street lamps' pools.
@@ -445,6 +638,8 @@ function makeBuilding(parent: THREE.Group, art: Art, b: Building) {
   const group = new THREE.Group();
   group.position.set(b.x, 0, b.z);
   parent.add(group);
+  if (isLucknow && b.kind === "station") return charbagh(art, group, b);
+  if (isLucknow && b.kind === "shrine") return imambara(art, group, b);
   art.box(group, 0, 0.11, 0, b.w + 0.4, 0.2, b.d + 0.5, 0xc5c3b5);
   art.box(group, 0, b.h / 2 + 0.17, 0, b.w, b.h, b.d, b.wall);
   art.box(group, 0, 0.37, b.d / 2 + 0.015, b.w, 0.3, 0.06, 0xc0b2a1);
@@ -630,13 +825,17 @@ function tree(
   blossom: boolean,
   scale: number,
 ) {
+  // Where the streets are built up wall to wall, nothing grows through a building.
+  if (THEME.terraces && (insideFootprint(x, z, 0.45) || (x < 40 && roadClearance(x, z) < 0.3))) return;
   const pick = random(x * 3.1 + z * 7.7);
-  const kind = blossom ? "sakura" : nearShrine(x, z) ? "pine" : pick < 0.3 ? "oak" : "keyaki";
+  // Lucknow has no pines: neem, peepal and mango, with gulmohar in flower where Nakameguro has cherry.
+  const kind = blossom ? "sakura" : nearShrine(x, z) && !isLucknow ? "pine" : pick < (isLucknow ? 0.5 : 0.3) ? "oak" : "keyaki";
   // The old figure sizes (0.6 to 1.5) become a gentler spread around each species' natural height.
   spots.push({ x, z, kind, scale: 0.8 + (scale - 0.75) * 0.45 + pick * 0.15 });
 }
 
 function flowerBed(parent: THREE.Group, art: Art, x: number, z: number) {
+  if (THEME.terraces && insideFootprint(x, z, 0.5)) return;
   // Built at its old size around the origin, then scaled to true scale (one unit is about 2 m).
   const g = new THREE.Group();
   g.position.set(x, 0, z);
@@ -658,6 +857,7 @@ function flowerBed(parent: THREE.Group, art: Art, x: number, z: number) {
   }
 }
 function bench(parent: THREE.Group, art: Art, x: number, z: number) {
+  if (THEME.terraces && insideFootprint(x, z, 0.4)) return;
   // Built at its old size around the origin, then scaled to true scale (one unit is about 2 m).
   const g = new THREE.Group();
   g.position.set(x, 0, z);

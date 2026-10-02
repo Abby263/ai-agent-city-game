@@ -58,6 +58,34 @@ ART = {
     'cit_045': dict(hair='short01', clothes='male_worksuit01', shoes='shoes03', brows='eyebrow011', muscle=0.38),   # Hiroshi
     'cit_046': dict(hair='ponytail01', clothes='female_elegantsuit01', shoes='shoes02', brows='eyebrow004'), # Emi
     'cit_047': dict(hair='long01', clothes='female_casualsuit01', shoes='shoes06', brows='eyebrow010'),      # Sakura
+    # Lucknow (profiles: frontend/src/lib/cities/lucknow-cast.json). Outfit colours, kurtas, dupattas and caps are
+    # added in the game (wardrobe.ts); these are the bodies, hair and base clothes.
+    'lko_009': dict(hair='long01', clothes='female_casualsuit01', shoes='shoes02', brows='eyebrow001'),     # Zoya
+    'lko_010': dict(hair='short02', clothes='male_casualsuit05', shoes='shoes01', brows='eyebrow003'),      # Kabir
+    'lko_021': dict(hair='short01', clothes='male_casualsuit06', shoes='shoes05', brows='eyebrow005', muscle=0.68),  # Arjun
+    'lko_022': dict(hair='braid01', clothes='female_casualsuit01', shoes='shoes04', brows='eyebrow002'),    # Sana
+    'lko_026': dict(hair='short04', clothes='male_casualsuit01', shoes='shoes03', brows='eyebrow007'),      # Anuj
+    'lko_027': dict(hair='ponytail01', clothes='female_casualsuit02', shoes='shoes06', brows='eyebrow010'), # Tara
+    'lko_028': dict(hair='ponytail01', clothes='female_casualsuit01', shoes='shoes05', brows='eyebrow006'), # Ananya
+    'lko_029': dict(hair='short04', clothes='male_casualsuit06', shoes='shoes06', brows='eyebrow008'),      # Rohan
+    'lko_030': dict(hair='short01', clothes='male_worksuit01', shoes='shoes03', brows='eyebrow012', muscle=0.66),   # Ramesh
+    'lko_031': dict(hair='braid01', clothes='female_elegantsuit01', shoes='shoes04', brows='eyebrow004'),   # Sunita
+    'lko_032': dict(hair='short02', clothes='male_casualsuit03', shoes='shoes01', brows='eyebrow011', muscle=0.34),  # Shyam Lal
+    'lko_033': dict(hair='braid01', clothes='female_elegantsuit01', shoes='shoes04', brows='eyebrow002'),   # Nasreen
+    'lko_034': dict(hair='short02', clothes='male_casualsuit03', shoes='shoes01', brows='eyebrow009'),      # Imran
+    'lko_035': dict(hair='ponytail01', clothes='female_elegantsuit01', shoes='shoes02', brows='eyebrow005'),     # Meera
+    'lko_036': dict(hair='short02', clothes='male_casualsuit05', shoes='shoes04', brows='eyebrow001'),      # Alok
+    'lko_037': dict(hair='long01', clothes='female_casualsuit02', shoes='shoes02', brows='eyebrow003'),     # Farah
+    'lko_038': dict(hair='short04', clothes='male_elegantsuit01', shoes='shoes04', brows='eyebrow012', muscle=0.6),  # Vikram
+    'lko_039': dict(hair='ponytail01', clothes='female_sportsuit01', shoes='shoes05', brows='eyebrow007', muscle=0.66),  # Pooja
+    'lko_040': dict(hair='short02', clothes='male_elegantsuit01', shoes='shoes04', brows='eyebrow011'),     # Rajendra
+    'lko_041': dict(hair='braid01', clothes='female_casualsuit02', shoes='shoes02', brows='eyebrow009'),    # Kamla
+    'lko_042': dict(hair='short01', clothes='male_casualsuit01', shoes='shoes06', brows='eyebrow006'),      # Aditya
+    'lko_043': dict(hair='long01', clothes='female_elegantsuit01', shoes='shoes04', brows='eyebrow008'),    # Nidhi
+    'lko_044': dict(hair='short01', clothes='male_elegantsuit01', shoes='shoes04', brows='eyebrow010'),     # Faizan
+    'lko_045': dict(hair='short01', clothes='male_casualsuit04', shoes='shoes03', brows='eyebrow011', muscle=0.38),   # Yusuf
+    'lko_046': dict(hair='ponytail01', clothes='female_elegantsuit01', shoes='shoes02', brows='eyebrow004'), # Rekha
+    'lko_047': dict(hair='long01', clothes='female_casualsuit01', shoes='shoes06', brows='eyebrow010'),      # Ishita
 }
 
 FACE_SHAPES = {
@@ -208,8 +236,11 @@ look = profile.get('personality', {}).get('appearance', {})
 gender = 1.0 if life['sex'] == 'male' else 0.0
 years = profile['age']
 stage = 'old' if years >= 60 else 'middleage' if years >= 35 else 'young'
-skin = f"{stage}_asian_{'male' if gender else 'female'}"
-eyes = 'brownlight' if seeded(args.resident).random() < 0.3 else 'brown'
+# Lucknow's residents are South Asian. MakeHuman has no such preset, so they are a blend of its three (mostly the
+# "caucasian" bone structure) under a skin recoloured to each profile's own tone.
+indian = args.resident.startswith('lko_')
+skin = f"{stage}_{'caucasian' if indian else 'asian'}_{'male' if gender else 'female'}"
+eyes = 'brown' if indian else 'brownlight' if seeded(args.resident).random() < 0.3 else 'brown'
 
 data = args.assets / 'data'
 bpy.ops.object.select_all(action='SELECT')
@@ -223,7 +254,7 @@ info.update(name=profile['name'].split()[0], rig='game_engine', skin_mhmat=f'{sk
 info['phenotype'].update(gender=gender, age=macro_age(years), height=0.5,
                          weight=macro_weight(life['weight_kg'], life['height_cm']),
                          muscle=art.get('muscle', 0.5 if gender else 0.42))
-info['phenotype']['race'] = {'asian': 1.0, 'african': 0.0, 'caucasian': 0.0}
+info['phenotype']['race'] = {'asian': 0.25, 'african': 0.15, 'caucasian': 0.6} if indian else {'asian': 1.0, 'african': 0.0, 'caucasian': 0.0}
 info['targets'] = face_targets(args.resident, gender)
 settings = HumanService.get_default_deserialization_settings()
 settings.update(subdiv_levels=0, load_clothes=True)
@@ -237,7 +268,7 @@ hair_colour = hex_rgb(look.get('hair', '#292a2c'))
 shirt_colour = hex_rgb(look.get('shirt', '#8a8f94'))
 sources = {
     # The CC0 'old' skins are strongly orange; bring them back to the resident's own tone.
-    'body': (data / 'skins' / skin / f'{skin}.mhmat', 'skin', hex_rgb(look.get('skin', '#d6ac8b')), 0.55 if stage == 'old' else 0),
+    'body': (data / 'skins' / skin / f'{skin}.mhmat', 'skin', hex_rgb(look.get('skin', '#d6ac8b')), 0.62 if indian else 0.55 if stage == 'old' else 0),
     'high-poly': (data / f'eyes/materials/{eyes}.mhmat', 'eyes', None, 0),
     art['brows']: (data / 'eyebrows' / art['brows'] / f"{art['brows']}.mhmat", 'eyebrow', hair_colour, 0.85),
     'eyelashes01': (data / 'eyelashes/eyelashes01/eyelashes01.mhmat', 'eyelash', None, 0),

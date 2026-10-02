@@ -1,5 +1,6 @@
 import type { CitizenAgent } from "./types";
 import type { WeatherNow } from "./weather";
+import { cityText } from "./cities";
 
 /** What the calendar and the sky allow today. Defaults describe a dry working day. */
 export type RoutineContext = {
@@ -32,6 +33,11 @@ const hobbies: Array<[skills: string[], stop: RoutineStop]> = [
   [["gardening"], { location_id: "loc_farm", activity: "Helping with the crops at Meguro Community Garden" }],
   [["cooking"], { location_id: "loc_restaurant", activity: "Helping in the Sunny Side Cafe kitchen" }],
   [["baseball"], { location_id: "loc_park", activity: "Baseball practice in the park" }],
+  [["cricket"], { location_id: "loc_park", activity: "Cricket practice in the park" }],
+  [["poetry", "shayari"], { location_id: "loc_library", activity: "Writing verses at the library" }],
+  [["embroidery", "chikankari"], { location_id: "loc_market", activity: "Working on embroidery at the bazaar" }],
+  [["kites"], { location_id: "loc_park", activity: "Flying kites in the park" }],
+  [["harmonium", "singing"], { location_id: "loc_restaurant", activity: "Singing practice in the back room" }],
   [["piano"], { location_id: "loc_restaurant", activity: "Piano practice at Sunny Side Cafe" }],
   [["manga"], { location_id: "loc_library", activity: "Drawing manga at the library" }],
   [["music"], { location_id: "loc_park", activity: "Practising music in the park" }],
@@ -61,7 +67,9 @@ function slotAt(citizen: CitizenAgent, minute: number) {
 export function routineStop(citizen: CitizenAgent, day: number, minuteOfDay: number, context: RoutineContext = {}): RoutineStop {
   const minute = minuteOfDay - routineOffset(citizen.citizen_id);
   const stop = citizen.life && citizen.age >= 18 ? grownUpStop(citizen, day, minute, context) : youngStop(citizen, day, minute, context);
-  return weatherAdjusted(citizen, stop, minute, context);
+  const adjusted = weatherAdjusted(citizen, stop, minute, context);
+  // Activities are written with Nakameguro's place names; other cities read them in their own.
+  return { ...adjusted, activity: cityText(adjusted.activity) };
 }
 
 function weatherAdjusted(citizen: CitizenAgent, stop: RoutineStop, minute: number, context: RoutineContext): RoutineStop {

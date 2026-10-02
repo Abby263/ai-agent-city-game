@@ -1,4 +1,6 @@
-import profiles from "./generated/citizens.json";
+import nakameguroCast from "./generated/citizens.json";
+import lucknowCast from "./cities/lucknow-cast.json";
+import { activeCity } from "./cities";
 import type { CitizenAgent, CityState, LifeState, Location } from "./types";
 import { DAYS_PER_YEAR, typicalBody } from "./life";
 import { calendarStartFor } from "./calendar";
@@ -177,13 +179,15 @@ function citizenFromProfile(profile: Profile): CitizenAgent {
     current_activity: profile.current_activity ?? "Waking up at home",
     current_thought: profile.current_thought ?? "A new day begins.",
     memory_summary:
-      profile.memory_summary ?? `${profile.name} lives in Nakameguro.`,
+      profile.memory_summary ?? `${profile.name} lives in ${activeCity().name}.`,
     mood: profile.mood ?? "Calm",
     life: lifeFromProfile(profile, 1),
   };
 }
 
 export function createInitialCity(): CityState {
+  const place = activeCity();
+  const profiles = place.id === "lucknow" ? lucknowCast : nakameguroCast;
   const citizens = (profiles as unknown as Profile[]).map(citizenFromProfile);
   // Tests pin the calendar so holidays and weather are the same on every run.
   const calendarStart = (typeof process !== "undefined" && process.env.AGENTCITY_CALENDAR_START) || calendarStartFor(1);
@@ -191,8 +195,8 @@ export function createInitialCity(): CityState {
     calendar_start: calendarStart,
     weather: weatherAt(calendarStart, 1, 360),
     weather_override: null,
-    city_id: "navora",
-    city_name: "Nakameguro",
+    city_id: place.id === "nakameguro" ? "navora" : place.id,
+    city_name: place.name,
     revision: 0,
     map_width: 92,
     map_height: 40,
@@ -219,7 +223,8 @@ export function createInitialCity(): CityState {
       sick_count: 0,
       active_events: 0,
     },
-    locations,
+    // The same map of places in every city, under the names people there use.
+    locations: locations.map((l) => ({ ...l, name: place.places[l.location_id] ?? l.name })),
     citizens,
     departed: [],
     gatherings: [],

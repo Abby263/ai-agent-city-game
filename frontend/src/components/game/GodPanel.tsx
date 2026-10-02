@@ -1,5 +1,6 @@
 "use client";
 
+import { activeCity } from "@/lib/cities";
 import { useEffect, useState } from "react";
 import { Play, Wand2 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -35,12 +36,13 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
   const watching = city.simulation_mode === "autonomous" && city.clock.running;
 
   const sky = (condition: WeatherOverride["condition"] | null) => act(() => api.setWeather(condition));
+  const place = activeCity();
   const tokyo = () => act(async () => {
-    const response = await fetch("https://api.open-meteo.com/v1/forecast?latitude=35.6895&longitude=139.6917&current=temperature_2m,weather_code,wind_speed_10m&timezone=Asia%2FTokyo", { signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw new Error("Tokyo's weather service did not answer. Try again later.");
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.coords.lat}&longitude=${place.coords.lon}&current=temperature_2m,weather_code,wind_speed_10m&timezone=${encodeURIComponent(place.timezone)}`, { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error(`${place.metro}'s weather service did not answer. Try again later.`);
     const data = (await response.json()) as { current: { temperature_2m: number; weather_code: number; wind_speed_10m: number } };
     const condition = conditionFromWmo(data.current.weather_code, data.current.wind_speed_10m);
-    onMessage(`Live from Tokyo: ${Math.round(data.current.temperature_2m)}°C, ${condition.replace("_", " ")}. Nakameguro has the same sky for the next six hours.`);
+    onMessage(`Live from ${place.metro}: ${Math.round(data.current.temperature_2m)}°C, ${condition.replace("_", " ")}. ${place.name} has the same sky for the next six hours.`);
     return api.setWeather(condition, { temp_c: data.current.temperature_2m, source: "tokyo" });
   });
   const candidates = city.citizens;
@@ -99,7 +101,7 @@ export function GodPanel({ city, busy, act, onMessage, onStarted }: {
         ))}
       </div>
       <div className="sky-extra">
-        <button className="outline-action" disabled={busy} onClick={() => void tokyo()}>🗾 Live Tokyo weather</button>
+        <button className="outline-action" disabled={busy} onClick={() => void tokyo()}>{place.emoji} Live {place.metro} weather</button>
         <button className="text-action" disabled={busy || !city.weather_override} onClick={() => void sky(null)}>Back to normal</button>
       </div>
 

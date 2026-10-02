@@ -52,6 +52,7 @@ import {
 } from "@/lib/session-simulation";
 
 import { API_URL } from "./api-url";
+import { activeCity } from "./cities";
 import { withPrompt } from "./character-prompt";
 import type { ActInterpretation, ActRequest } from "./acts";
 export { API_URL };
@@ -202,7 +203,9 @@ async function generateSessionCognition(
 ): Promise<SessionCognitionResponse> {
   return request<SessionCognitionResponse>("/cognition/session", {
     method: "POST",
-    body: JSON.stringify({ ...requestBody, city: prompted(requestBody.city) }),
+    // Every scene is written knowing how people in this city talk.
+    body: JSON.stringify({ ...requestBody, city: prompted(requestBody.city),
+      observations: activeCity().speech ? [...requestBody.observations, activeCity().speech] : requestBody.observations }),
   });
 }
 

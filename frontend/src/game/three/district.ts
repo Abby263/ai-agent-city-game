@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { Art } from "./materials";
 import { GROUND_KINDS, paintedGround } from "./surfaces";
+import { clockTower, rumiDarwaza } from "./landmarks";
+import { THEME, isLucknow } from "./theme";
 
 const INK = 0x465c68;
 export const EAST = { x0: 49, x1: 91, depth: 40, avenue: 69, roads: [13.5, 26.5], rail: [85.8, 87.4], deck: 2.6 };
@@ -15,15 +17,19 @@ type Helpers = {
 export function makeDistrict(root: THREE.Group, art: Art, helpers: Helpers) {
   const width = EAST.x1 - EAST.x0;
   const cx = (EAST.x0 + EAST.x1) / 2;
-  art.box(root, cx, -0.38, 20, width + 1, 0.7, 43, 0x80a776);
-  art.box(root, cx, -0.82, 20, width + 1.2, 0.22, 43.2, 0x638b74);
+  art.box(root, cx, -0.38, 20, width + 1, 0.7, 43, THEME.ground.slab);
+  art.box(root, cx, -0.82, 20, width + 1.2, 0.22, 43.2, THEME.ground.under);
 
   // One painted ground texture keeps roads, crossings and the plaza crisp without z-fighting.
   const { canvas, maskCanvas, ctx } = paintedGround(2048, Math.round((2048 * EAST.depth) / width), GROUND_KINDS);
   const u = canvas.width / width;
   const X = (x: number) => (x - EAST.x0) * u;
-  ctx.fillStyle = "#9cbd8b";
+  ctx.fillStyle = THEME.ground.open;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!THEME.ground.lawns) for (let i = 0; i < 2600; i++) {
+    ctx.fillStyle = THEME.ground.speckle[i % 2];
+    ctx.fillRect(Math.abs(Math.sin(i * 12.9898) * 43758.5453 % 1) * canvas.width, Math.abs(Math.sin(i * 78.233) * 43758.5453 % 1) * canvas.height, 6 + (i % 9), 4 + (i % 7));
+  }
   ctx.fillStyle = "#ddd7c8"; // station plaza and shopping street paving
   ctx.fillRect(X(72), 15.8 * u, 12.5 * u, 8.6 * u);
   ctx.fillRect(X(52), 16 * u, 14 * u, 8.2 * u);
@@ -89,38 +95,45 @@ export function makeDistrict(root: THREE.Group, art: Art, helpers: Helpers) {
     art.box(root, 83.4, (deck + 0.1) / 2, z, 0.45, deck, 0.45, 0xc4bfb5);
   }
   art.box(root, 83.4, deck + 2.45, 20, 2.6, 0.12, 12.4, 0x4f6d5a);
-  art.sign(root, "中目黒 NAKAMEGURO", 83.4, deck + 2.05, 14.2, 2.2, 0.36, "#4f6d5a", "#fff9e6");
+  art.sign(root, THEME.stationSign, 83.4, deck + 2.05, 14.2, 2.2, 0.36, isLucknow ? "#7a2418" : "#4f6d5a", "#fff9e6");
   for (const z of [16.5, 23.5]) {
     art.box(root, 83.1, deck + 0.95, z, 0.4, 0.08, 1.3, 0xb39573);
     art.box(root, 82.95, deck + 1.18, z, 0.06, 0.34, 1.3, 0xb39573);
   }
+  if (isLucknow) {
+    // The Husainabad clock tower on the station square, and the Rumi Darwaza as the way in to the Imambara.
+    clockTower(art, root, 73.4, 25);
+    rumiDarwaza(art, root, 57, 30.3);
+    for (let z = 31; z < 33; z += 0.55) art.box(root, 57, 0.03, z, 1.4, 0.05, 0.4, 0xcac4b5);
+  } else {
   art.cylinder(root, 74, 1.4, 24.4, 0.06, 2.8, INK);
-  const clock = art.cylinder(root, 74, 2.9, 24.4, 0.34, 0.08, 0xf9f0d9, 0.34, 24);
-  clock.rotation.x = Math.PI / 2;
-
-  // Hikawa Shrine: vermilion torii, stone path and lanterns.
-  const TORII = 0xc9553d;
-  for (const side of [-1, 1]) art.cylinder(root, 57 + side * 1.1, 1.35, 30.4, 0.12, 2.7, TORII, 0.1);
-  art.box(root, 57, 2.75, 30.4, 3.1, 0.18, 0.3, 0x2f2d31);
-  art.box(root, 57, 2.52, 30.4, 2.8, 0.14, 0.24, TORII);
-  art.box(root, 57, 2.2, 30.4, 2.5, 0.12, 0.18, TORII);
-  for (let z = 30.8; z < 33; z += 0.55) art.box(root, 57, 0.03, z, 0.9, 0.05, 0.4, 0xcac4b5);
-  for (const side of [-1, 1]) {
-    art.box(root, 57 + side * 1.6, 0.35, 32.2, 0.35, 0.7, 0.35, 0xb9b3a6);
-    art.box(root, 57 + side * 1.6, 0.85, 32.2, 0.5, 0.3, 0.5, 0xd8d1c1);
-    art.box(root, 57 + side * 1.6, 1.07, 32.2, 0.62, 0.12, 0.62, 0x8e887d);
-  }
-
-  // Japanese street life: vending machines, a bus shelter by the mall and a taxi rank sign.
-  for (const [x, z, color] of [[61.9, 23.8, 0xd8473c], [62.5, 23.8, 0x3f7fc2], [66.2, 33, 0xd8473c], [73, 16.3, 0xf2f2ee], [53.4, 8.4, 0x3f7fc2]] as const) {
-    art.box(root, x, 0.62, z, 0.5, 1.24, 0.42, color);
-    art.box(root, x, 0.82, z + 0.215, 0.38, 0.5, 0.02, 0xcfe3ea);
-    art.box(root, x, 0.3, z + 0.215, 0.32, 0.12, 0.02, INK);
+    const clock = art.cylinder(root, 74, 2.9, 24.4, 0.34, 0.08, 0xf9f0d9, 0.34, 24);
+    clock.rotation.x = Math.PI / 2;
+  
+    // Hikawa Shrine: vermilion torii, stone path and lanterns.
+    const TORII = 0xc9553d;
+    for (const side of [-1, 1]) art.cylinder(root, 57 + side * 1.1, 1.35, 30.4, 0.12, 2.7, TORII, 0.1);
+    art.box(root, 57, 2.75, 30.4, 3.1, 0.18, 0.3, 0x2f2d31);
+    art.box(root, 57, 2.52, 30.4, 2.8, 0.14, 0.24, TORII);
+    art.box(root, 57, 2.2, 30.4, 2.5, 0.12, 0.18, TORII);
+    for (let z = 30.8; z < 33; z += 0.55) art.box(root, 57, 0.03, z, 0.9, 0.05, 0.4, 0xcac4b5);
+    for (const side of [-1, 1]) {
+      art.box(root, 57 + side * 1.6, 0.35, 32.2, 0.35, 0.7, 0.35, 0xb9b3a6);
+      art.box(root, 57 + side * 1.6, 0.85, 32.2, 0.5, 0.3, 0.5, 0xd8d1c1);
+      art.box(root, 57 + side * 1.6, 1.07, 32.2, 0.62, 0.12, 0.62, 0x8e887d);
+    }
+  
+    // Japanese street life: vending machines, a bus shelter by the mall and a taxi rank sign.
+    for (const [x, z, color] of [[61.9, 23.8, 0xd8473c], [62.5, 23.8, 0x3f7fc2], [66.2, 33, 0xd8473c], [73, 16.3, 0xf2f2ee], [53.4, 8.4, 0x3f7fc2]] as const) {
+      art.box(root, x, 0.62, z, 0.5, 1.24, 0.42, color);
+      art.box(root, x, 0.82, z + 0.215, 0.38, 0.5, 0.02, 0xcfe3ea);
+      art.box(root, x, 0.3, z + 0.215, 0.32, 0.12, 0.02, INK);
+    }
   }
   art.box(root, 60, 1.6, 11.4, 1.5, 0.16, 1.4, 0x648e8b);
   for (const x of [59.4, 60.6]) art.box(root, x, 0.8, 11, 0.07, 1.6, 0.07, INK);
   helpers.bench(60, 11.3);
-  art.sign(root, "BUS", 59.4, 1.65, 12.24, 0.55, 0.28, "#567c88", "#fff9e6");
+  art.sign(root, THEME.busSign, 59.4, 1.65, 12.24, 0.55, 0.28, "#567c88", "#fff9e6");
 
   for (const [x, z] of [[51, 11], [52, 24.8], [66.5, 16.8], [71.8, 10.8], [80, 10.8], [51.2, 29], [60.8, 37.6], [71.8, 37.5], [80.5, 37.6], [90, 5], [90, 32], [66, 2]])
     helpers.tree(x, z, (x * 7 + z) % 3 < 1, 0.8 + ((x + z) % 5) * 0.06);
@@ -131,11 +144,33 @@ export function makeDistrict(root: THREE.Group, art: Art, helpers: Helpers) {
   for (const x of [52, 60, 66.2, 71.8, 80])
     for (const z of [10.8, 16.2, 23.8, 29.2]) {
       if ((x === 80 && z === 16.2) || (x === 60 && z === 10.8)) continue;
+      if (isLucknow) {
+        // Hazratganj's black cast-iron lamp posts: a fluted column, a crossbar and a cluster of globes.
+        const BLACK = 0x1c1e21;
+        art.cylinder(root, x, 1.15, z, 0.045, 2.3, BLACK, 0.035, 8);
+        art.cylinder(root, x, 0.12, z, 0.1, 0.24, BLACK, 0.07, 8);
+        art.box(root, x, 2.2, z, 0.62, 0.035, 0.035, BLACK);
+        for (const [dx, dy] of [[-0.3, 2.34], [0.3, 2.34], [0, 2.5]]) {
+          art.cylinder(root, x + dx, dy - 0.1, z, 0.012, 0.14, BLACK, 0.012, 6);
+          const globe = art.ball(root, x + dx, dy, z, 0.085, 0.095, 0.085, 0xffe6a1);
+          globe.castShadow = false;
+        }
+        lampHeads.push(new THREE.Vector3(x, 2.4, z));
+        continue;
+      }
       art.cylinder(root, x, 1.4, z, 0.055, 2.8, INK);
       art.box(root, x + 0.23, 2.77, z, 0.55, 0.08, 0.08, INK);
       art.box(root, x + 0.45, 2.68, z, 0.28, 0.17, 0.23, 0xffe6a1);
       art.box(root, x + 0.45, 2.81, z, 0.37, 0.08, 0.32, INK);
       lampHeads.push(new THREE.Vector3(x + 0.45, 2.68, z));
     }
+  if (isLucknow) {
+    // Red-and-white bollards down the middle of the avenue, as on Hazratganj's main road.
+    for (let z = 1; z < 39.5; z += 1.1) {
+      if (EAST.roads.some((road) => Math.abs(road - z) < 3)) continue;
+      art.cylinder(root, EAST.avenue, 0.2, z, 0.035, 0.4, 0xd63f36, 0.035, 8);
+      art.cylinder(root, EAST.avenue, 0.3, z, 0.038, 0.07, 0xf6f6f2, 0.038, 8);
+    }
+  }
   return { lampHeads };
 }

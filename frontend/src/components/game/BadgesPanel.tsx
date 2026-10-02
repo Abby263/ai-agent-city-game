@@ -1,5 +1,6 @@
 "use client";
 
+import { cityText } from "@/lib/cities";
 import { achievements, type Unlocked } from "@/lib/achievements";
 import { weekday } from "@/lib/routine";
 
@@ -23,7 +24,7 @@ export function BadgesPanel({ unlocked }: { unlocked: Unlocked }) {
               <span className="badge-icon" aria-hidden="true">{when ? a.icon : "🔒"}</span>
               <div>
                 <strong>{a.title}</strong>
-                <p>{a.hint}</p>
+                <p>{cityText(a.hint)}</p>
                 {when && <small>Earned {weekday(when.day)}, day {when.day} · {time(when.minute)}</small>}
               </div>
             </li>

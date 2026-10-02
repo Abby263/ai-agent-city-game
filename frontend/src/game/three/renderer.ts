@@ -21,6 +21,9 @@ import { groundTint, makeWeatherFx } from "./weather-fx";
 import { makeIncidents } from "./incidents";
 import { activeIncidents } from "@/lib/incidents";
 import { applyFoliage, foliageFor } from "./seasons";
+import { THEME } from "./theme";
+
+const hazeColor = new THREE.Color(THEME.haze.color);
 import { calendarDay, calendarStartFor } from "@/lib/calendar";
 import type { WeatherNow } from "@/lib/weather";
 
@@ -341,6 +344,8 @@ export class CityRenderer {
     this.ambient.intensity = sky.ambient * 0.35 * (1 - gloom * 0.15) + fx.flash * 2.2;
     this.ambient.color.setHex(0xf4f3ee).lerp(nightAmbient, sky.night);
     const skyColor = sky.sky.clone().lerp(overcast.clone().multiplyScalar(1 - sky.night * 0.7), gloom * 0.75);
+    // Dust in the air (Lucknow's plains haze) warms and flattens the daytime sky.
+    if (THEME.haze.amount) skyColor.lerp(hazeColor, THEME.haze.amount * (1 - sky.night));
     if (w?.condition === "snow") skyColor.lerp(snowSky, 0.4 * (1 - sky.night));
     if (w?.heatwave) skyColor.lerp(heatSky, 0.25 * (1 - sky.night));
     if (fx.flash) skyColor.lerp(lightningSky, fx.flash * 0.8);

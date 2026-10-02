@@ -1,13 +1,10 @@
 import { calendarDay, type CalendarDay } from "./calendar";
 import { roll } from "./life";
+import { activeCity, cityText, type Climate } from "./cities";
 
-// Nakameguro's climate follows Tokyo: monthly mean high/low (°C) and the share of days with rain.
-const climate = [
-  { high: 10, low: 1, rain: 0.17 }, { high: 11, low: 2, rain: 0.2 }, { high: 14, low: 5, rain: 0.33 },
-  { high: 19, low: 10, rain: 0.33 }, { high: 24, low: 15, rain: 0.33 }, { high: 26, low: 19, rain: 0.42 },
-  { high: 30, low: 23, rain: 0.37 }, { high: 31, low: 24, rain: 0.27 }, { high: 27, low: 21, rain: 0.37 },
-  { high: 22, low: 15, rain: 0.33 }, { high: 17, low: 9, rain: 0.27 }, { high: 12, low: 4, rain: 0.17 },
-];
+// The climate is the active city's (Tokyo for Nakameguro; Lucknow's heat, monsoon and winter fog): monthly mean
+// high/low (°C) and the share of days with rain, plus what the sky can do there.
+const climate = new Proxy([] as Climate["months"], { get: (_, key) => Reflect.get(activeCity().climate.months, key) });
 
 export type Condition = "clear" | "partly_cloudy" | "cloudy" | "fog" | "rain" | "heavy_rain" | "thunderstorm" | "snow" | "typhoon";
 export type AlertKind = "typhoon" | "heavy_rain" | "heatwave" | "snow" | "earthquake";
@@ -70,17 +67,18 @@ export function dayWeather(start: string, day: number): DayWeather {
   const key = c.date.toISOString().slice(0, 10);
   const r = (label: string) => roll("weather", key, label);
   const base = monthly(c);
-  const rainySeason = inRange(c, [6, 7], [7, 19]);
-  const typhoonSeason = inRange(c, [8, 1], [10, 20]);
+  const rules = activeCity().climate;
+  const rainySeason = inRange(c, rules.rains.from, rules.rains.to);
+  const typhoonSeason = rules.typhoons && inRange(c, [8, 1], [10, 20]);
   const typhoonStart = (d: number) => typhoonSeason && roll("weather", calendarDay(start, d).date.toISOString().slice(0, 10), "typhoon") < 0.012;
   const typhoon = typhoonStart(day) || typhoonStart(day - 1);
   const anomaly = (r("anomaly") - 0.5) * 6;
   let high = base.high + anomaly, low = base.low + anomaly * 0.6;
-  const wet = r("rain") < (rainySeason ? 0.55 : base.rain);
+  const wet = r("rain") < (rainySeason ? rules.rains.chance ?? base.rain : base.rain);
   let condition: Condition;
   if (typhoon) condition = "typhoon";
   else if (wet) {
-    const snowy = c.season === "winter" && low <= 2 && r("snow") < 0.55;
+    const snowy = rules.snow && c.season === "winter" && low <= 2 && r("snow") < 0.55;
     condition = snowy ? "snow" : r("heavy") < (rainySeason ? 0.1 : 0.14) ? "heavy_rain" : "rain";
   } else {
     const sky = r("sky");
@@ -88,11 +86,11 @@ export function dayWeather(start: string, day: number): DayWeather {
   }
   if (condition === "rain" || condition === "heavy_rain" || condition === "typhoon") high -= 3;
   if (condition === "snow") { high = Math.min(high, 4); low = Math.min(low, -1); }
-  const heatwave = inRange(c, [7, 5], [9, 5]) && !wet && high >= 32;
+  const heatwave = inRange(c, rules.heatwave.from, rules.heatwave.to) && !wet && high >= rules.heatwave.high;
   const afternoonThunder = ["rain", "heavy_rain"].includes(condition) && c.month >= 6 && c.month <= 9 && r("thunder") < 0.45;
-  const morningFog = ["clear", "partly_cloudy"].includes(condition) && [3, 4, 5, 10, 11].includes(c.month) && r("fog") < 0.12;
+  const morningFog = ["clear", "partly_cloudy"].includes(condition) && rules.fog.months.includes(c.month) && r("fog") < rules.fog.chance;
   const q = r("quake");
-  const quake = q < 0.004 ? { minute: Math.floor(r("quake-time") * 1440), intensity: 5 } : q < 0.035 ? { minute: Math.floor(r("quake-time") * 1440), intensity: 1 + Math.floor(r("quake-size") * 3) } : null;
+  const quake = q < rules.quakes[0] ? { minute: Math.floor(r("quake-time") * 1440), intensity: 5 } : q < rules.quakes[1] ? { minute: Math.floor(r("quake-time") * 1440), intensity: 1 + Math.floor(r("quake-size") * 3) } : null;
   return { condition, high: Math.round(high * 10) / 10, low: Math.round(low * 10) / 10, heatwave, morningFog, afternoonThunder, quake, rainySeason };
 }
 
@@ -136,13 +134,15 @@ export function weatherAt(start: string, day: number, minute: number, override?:
   }
   const look = looks[condition];
   const night = minute < 330 || minute >= 1110;
-  const alert: WeatherNow["alert"] = quake && quake.intensity >= 4 ? { kind: "earthquake", text: `Earthquake! Shindo ${quake.intensity}. Drop, cover, hold on, then walk to the evacuation area.` }
+  const alertFor = (): WeatherNow["alert"] => quake && quake.intensity >= 4 ? { kind: "earthquake", text: `Earthquake! Shindo ${quake.intensity}. Drop, cover, hold on, then walk to the evacuation area.` }
     : quake ? { kind: "earthquake", text: `A small earthquake (shindo ${quake.intensity}) shook Nakameguro. Everyone is fine.` }
     : condition === "typhoon" ? { kind: "typhoon", text: "Typhoon warning: stay indoors. School and most shops are closed; trains and buses are suspended." }
     : condition === "heavy_rain" ? { kind: "heavy_rain", text: "Heavy rain warning: watch out for flooding near the river." }
     : heatwave ? { kind: "heatwave", text: "Heatstroke alert: drink water, rest in the shade and check on older neighbours." }
     : condition === "snow" ? { kind: "snow", text: "Snow in Nakameguro: pavements are slippery and trains may run late." }
     : null;
+  const found = alertFor();
+  const alert = found && { ...found, text: cityText(found.text) };
   return {
     condition, icon: condition === "clear" && night ? "🌙" : look.icon, label: heatwave && condition === "clear" ? "Very hot" : look.label,
     temp_c: Math.round(temp * 10) / 10, high: w.high, low: w.low, precipitation: look.precipitation, clouds: look.clouds, wind: look.wind,

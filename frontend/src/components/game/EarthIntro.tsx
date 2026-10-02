@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { activeCity } from "@/lib/cities";
 
 // The opening shot: Earth from space turns to Japan, dives towards Tokyo, passes through the clouds and lands on
 // Nakameguro, where the town camera finishes the descent. Earth imagery: NASA Blue Marble (public domain).
 
-const NAKAMEGURO = { lat: 35.644, lon: 139.699 };
+// Where the flight lands and what it names on the way down come from the city being played.
 // The planet needs no label; captions start once there is somewhere to name.
-const CAPTIONS: Array<[number, string]> = [[0, ""], [2.6, "Japan"], [4, "Tokyo"], [5.1, "Nakameguro, Meguro City"]];
+const NAKAMEGURO = activeCity().coords;
+const CAPTIONS = activeCity().flight;
 /** Seconds: the globe turns and zooms until DIVE_END, the clouds close in, the town descends behind them, then fade. */
 const DIVE_END = 5.6, CLOUD_IN = 5.0, DESCEND_AT = 5.4, FADE_START = 6.2, FADE_END = 7.2;
 
@@ -145,7 +147,7 @@ export function EarthIntro({ townReady, onDescend, onDone }: { townReady: boolea
     latest.current.onDone();
   };
   return (
-    <div ref={root} className="earth-intro" aria-label="Flying in to Nakameguro">
+    <div ref={root} className="earth-intro" aria-label={`Flying in to ${activeCity().name}`}>
       <div ref={host} className="earth-intro-canvas" />
       <div ref={cloudEl} className="earth-intro-clouds" style={{ opacity: 0 }} />
       <p ref={captionEl} className="earth-intro-caption" />

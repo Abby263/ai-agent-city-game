@@ -1,3 +1,4 @@
+import { cityText } from "./cities";
 import { catchCondition, relationName, relatives, type LifeSink } from "./life";
 import { bondLabel } from "./social";
 import type { CitizenAgent, CityState, Emotions, Feelings, Relationship } from "./types";
@@ -72,7 +73,7 @@ export function actRequest(city: CityState, text: string, actor: CitizenAgent | 
 
 /** Romance between relatives is never allowed, whatever the words. */
 export function actBlocked(city: CityState, actor: CitizenAgent | null, target: CitizenAgent | null, act: ActInterpretation) {
-  if (!act.allowed) return act.refusal || "That can't happen in Nakameguro.";
+  if (!act.allowed) return act.refusal || cityText("That can't happen in Nakameguro.");
   const romantic = act.tone === "romantic" || ["date", "engagement", "marriage", "move_in"].includes(act.proposal);
   if (romantic && actor && target && actor.life?.partner_id !== target.citizen_id && relatives(city, actor).includes(target.citizen_id)) return "They are family.";
   if (actor && target && actor === target) return "Choose someone else.";

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Art } from "./materials";
 import { EAST } from "./district";
+import { THEME } from "./theme";
 
 const CARS = 4, CAR = 3.4, GAP = 0.25;
 const STATION_Z = 20;
@@ -13,8 +14,8 @@ export function makeTrain(art: Art) {
   const cars: THREE.Group[] = [];
   for (let i = 0; i < CARS; i++) {
     const car = new THREE.Group();
-    art.box(car, 0, 0.95, 0, 1.25, 1.35, CAR, 0xf1f1ec);
-    art.box(car, 0, 0.62, 0, 1.27, 0.14, CAR, 0x3a9a6b);
+    art.box(car, 0, 0.95, 0, 1.25, 1.35, CAR, THEME.train.body);
+    art.box(car, 0, 0.62, 0, 1.27, 0.14, CAR, THEME.train.stripe);
     art.box(car, 0, 1.68, 0, 1.1, 0.12, CAR - 0.1, 0xb9bec2);
     for (const side of [-1, 1]) {
       art.box(car, side * 0.64, 1.12, 0, 0.02, 0.42, CAR - 0.5, 0x709ba6);

@@ -3,6 +3,9 @@
 // the director brings them together and the AI plays the moment. Outcomes stay theirs (a proposal can be
 // turned down). Town-wide incidents give everyone something to talk about between scenes.
 
+import { onCityChange } from "./cities";
+import { LUCKNOW_CASE_ORDER, LUCKNOW_INCIDENTS, LUCKNOW_STORYLINES } from "./cities/lucknow-stories";
+
 export type Seed = {
   who: string;
   memory: string;
@@ -37,7 +40,7 @@ const AOI = "cit_009", REN = "cit_010", RIKU = "cit_021", MIO = "cit_022", SOTA 
   NAOKI = "cit_036", YUKA = "cit_037", TAKESHI = "cit_038", NATSUMI = "cit_039", KENJI = "cit_040", AIKO = "cit_041",
   HARUTO = "cit_042", YUI = "cit_043", DAICHI = "cit_044", HIROSHI = "cit_045", EMI = "cit_046", SAKURA = "cit_047";
 
-export const STORYLINES: Storyline[] = [
+const NAKAMEGURO_STORYLINES: Storyline[] = [
   {
     id: "ren_song", title: "The song about someone", icon: "🎸",
     goal: "Get Ren and Aoi on a date.",
@@ -237,7 +240,7 @@ export const STORYLINES: Storyline[] = [
 export type Incident = { id: string; headline: string; memory: string; who: string[] | "everyone" };
 
 /** Things that happen to the whole town, giving everyone something to talk about. */
-export const INCIDENTS: Incident[] = [
+const NAKAMEGURO_INCIDENTS: Incident[] = [
   { id: "festival", headline: "🏮 Hikawa Shrine announces its autumn festival for Saturday evening", who: "everyone",
     memory: "The shrine's autumn festival is on Saturday evening: lanterns, food stalls and fireworks over the river. Everyone's talking about who they'll go with." },
   { id: "open_mic", headline: "🎤 Sunny Side Cafe puts up a poster for Saturday's open mic", who: [REN, SAKURA, HANA, AOI, HARUTO, DAISUKE],
@@ -259,7 +262,19 @@ export type CaseOutcome = "well" | "badly";
 export type CaseNudge = { beat: number; who: string; text: string };
 
 /** Cases open in this order, strongest hook first, and a few at a time so the player can follow them. */
-export const CASE_ORDER = ["haruto_manga", "ren_song", "masao_heart", "library_books", "stolen_credit", "kaito_promise", "cafe_sale", "natsumi_osaka", "sakura_audition"];
+const NAKAMEGURO_CASE_ORDER = ["haruto_manga", "ren_song", "masao_heart", "library_books", "stolen_credit", "kaito_promise", "cafe_sale", "natsumi_osaka", "sakura_audition"];
+
+// The storylines, incidents and case order of the city being played. The arrays keep their identity and are
+// refilled when the city changes, so every importer always sees the active city's stories.
+export const STORYLINES: Storyline[] = [];
+export const INCIDENTS: Incident[] = [];
+export const CASE_ORDER: string[] = [];
+onCityChange((city) => {
+  const lucknow = city.id === "lucknow";
+  STORYLINES.splice(0, STORYLINES.length, ...(lucknow ? LUCKNOW_STORYLINES : NAKAMEGURO_STORYLINES));
+  INCIDENTS.splice(0, INCIDENTS.length, ...(lucknow ? LUCKNOW_INCIDENTS : NAKAMEGURO_INCIDENTS));
+  CASE_ORDER.splice(0, CASE_ORDER.length, ...(lucknow ? LUCKNOW_CASE_ORDER : NAKAMEGURO_CASE_ORDER));
+});
 export const OPEN_CASES = 3;
 export const NUDGES_PER_DAY = 3;
 

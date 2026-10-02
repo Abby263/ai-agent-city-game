@@ -1,0 +1,2998 @@
+[
+  {
+    "citizen_id": "lko_009",
+    "name": "Zoya Ansari",
+    "age": 20,
+    "profession": "Lab assistant",
+    "active": true,
+    "work_location_id": "loc_lab",
+    "position": [
+      3,
+      3
+    ],
+    "money": 820,
+    "health": 90,
+    "hunger": 35,
+    "energy": 80,
+    "stress": 24,
+    "happiness": 72,
+    "reputation": 56,
+    "skills": [
+      "science",
+      "debate"
+    ],
+    "mood": "Curious",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Sharp",
+          "Impatient",
+          "Loyal"
+        ],
+        "values": "Getting things right, and being taken seriously on her own merit, not as the doctor's daughter.",
+        "voice": "Quick and direct, a dry 'accha?' when unconvinced; softens with a laugh.",
+        "sensitivity": "Being talked down to; being teased about who she likes.",
+        "repair": "Brings chai and says exactly what she got wrong."
+      },
+      "playable": true,
+      "openness": 82,
+      "conscientiousness": 68,
+      "warmth": 74,
+      "risk_tolerance": 42,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      },
+      "appearance": {
+        "shirt": "#e9695f",
+        "skin": "#c68d5e",
+        "hair": "#1d1b1c",
+        "background": "#dce4df",
+        "hairstyle": "bob",
+        "outfit": "coat",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
+    },
+    "current_thought": "If the assay runs clean today, Dr. Tiwari might finally trust me with my own project.",
+    "short_term_goals": [
+      "Finish the reagent inventory",
+      "Find out what Kabir is being so strange about"
+    ],
+    "long_term_goals": [
+      "Earn a research fellowship of her own"
+    ],
+    "memory_summary": "I'm twenty and work as a lab assistant at the Drug Research Institute. Ammi is a doctor at KGMU and we live in the old haveli lane in Chowk. I grew up with Kabir, Arjun and the others in the mohalla.",
+    "friend_ids": [
+      "lko_010",
+      "lko_021"
+    ],
+    "relationship_scores": {
+      "lko_010": 42,
+      "lko_021": 42,
+      "lko_022": 42,
+      "lko_026": 42
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "lko_010",
+        "trust": 36,
+        "warmth": 38,
+        "familiarity": 18,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_021",
+        "trust": 36,
+        "warmth": 38,
+        "familiarity": 18,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_022",
+        "trust": 36,
+        "warmth": 38,
+        "familiarity": 18,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_026",
+        "trust": 36,
+        "warmth": 38,
+        "familiarity": 18,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_009",
+        "content": "I'm twenty and work as a lab assistant at the Drug Research Institute. Ammi is a doctor at KGMU and we live in the old haveli lane in Chowk. I grew up with Kabir, Arjun and the others in the mohalla.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 4,
+      "height_cm": 162,
+      "weight_kg": 54,
+      "fitness": 55,
+      "household_id": "home_b",
+      "parent_ids": [
+        "lko_033"
+      ],
+      "ambition": {
+        "goal": "Win a research fellowship",
+        "kind": "study",
+        "progress": 30
+      },
+      "conditions": [],
+      "job": {
+        "title": "Lab assistant",
+        "location_id": "loc_lab",
+        "hourly_wage": 17,
+        "start": 540,
+        "end": 1050,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "relationship_status": "single",
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_010",
+    "name": "Kabir Qureshi",
+    "age": 21,
+    "profession": "Kabab cook",
+    "active": true,
+    "work_location_id": "loc_restaurant",
+    "position": [
+      5,
+      3
+    ],
+    "money": 540,
+    "health": 83,
+    "hunger": 29,
+    "energy": 73,
+    "stress": 17,
+    "happiness": 66,
+    "reputation": 49,
+    "skills": [
+      "math",
+      "music"
+    ],
+    "mood": "Playful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Playful",
+          "Romantic",
+          "Restless"
+        ],
+        "values": "Music, good food and making people smile; proving the kabab house is not his whole future.",
+        "voice": "Teasing, quotes couplets at the wrong moments, calls everyone 'yaar'.",
+        "sensitivity": "Being told music is a hobby, not work; his father's silences.",
+        "repair": "Makes a joke, then a plate of kababs, then says sorry properly."
+      },
+      "playable": true,
+      "openness": 78,
+      "conscientiousness": 55,
+      "warmth": 70,
+      "risk_tolerance": 58,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      },
+      "appearance": {
+        "shirt": "#f0a52e",
+        "skin": "#b97a4e",
+        "hair": "#1d1b1c",
+        "background": "#e7dfe0",
+        "hairstyle": "parted",
+        "outfit": "apron",
+        "trousers": "#555951",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
+    },
+    "current_thought": "Saturday's mehfil is close. If I sing that ghazal, she'll know. Maybe that's the point.",
+    "short_term_goals": [
+      "Practise the new ghazal for Saturday's mehfil",
+      "Get through the lunch rush without burning the sheermal"
+    ],
+    "long_term_goals": [
+      "Record his own ghazals"
+    ],
+    "memory_summary": "I'm twenty-one and cook at Nawab Kabab House, which Abbu runs and his grandfather started. I sing ghazals at the Saturday mehfil in the back room. I've known Zoya all my life.",
+    "friend_ids": [
+      "lko_009",
+      "lko_021"
+    ],
+    "relationship_scores": {
+      "lko_009": 43,
+      "lko_021": 43,
+      "lko_022": 43,
+      "lko_026": 43
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "lko_009",
+        "trust": 39,
+        "warmth": 41,
+        "familiarity": 22,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_021",
+        "trust": 39,
+        "warmth": 41,
+        "familiarity": 22,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_022",
+        "trust": 39,
+        "warmth": 41,
+        "familiarity": 22,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_026",
+        "trust": 39,
+        "warmth": 41,
+        "familiarity": 22,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_010",
+        "content": "I'm twenty-one and cook at Nawab Kabab House, which Abbu runs and his grandfather started. I sing ghazals at the Saturday mehfil in the back room. I've known Zoya all my life.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 40,
+      "height_cm": 175,
+      "weight_kg": 68,
+      "fitness": 60,
+      "household_id": "home_c",
+      "parent_ids": [
+        "lko_034"
+      ],
+      "ambition": {
+        "goal": "Record an album of his own ghazals",
+        "kind": "creative",
+        "progress": 20
+      },
+      "conditions": [],
+      "job": {
+        "title": "Kabab cook",
+        "location_id": "loc_restaurant",
+        "hourly_wage": 15,
+        "start": 600,
+        "end": 1080,
+        "workdays": [
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "relationship_status": "single",
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_021",
+    "name": "Arjun Srivastava",
+    "age": 19,
+    "profession": "Trainee fitness instructor",
+    "active": true,
+    "work_location_id": "loc_gym",
+    "position": [
+      7,
+      4
+    ],
+    "money": 380,
+    "health": 84,
+    "hunger": 35,
+    "energy": 74,
+    "stress": 24,
+    "happiness": 66,
+    "reputation": 68,
+    "skills": [
+      "biology",
+      "cricket"
+    ],
+    "mood": "Energetic",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Loyal",
+          "Earnest",
+          "Insecure"
+        ],
+        "values": "Cricket, his friends, and not letting down the people who believe in him.",
+        "voice": "Eager, cricket metaphors for everything, 'bhai' in every sentence.",
+        "sensitivity": "Being left out or left behind; hearing he is not good enough for the state side.",
+        "repair": "Turns up early the next day and works twice as hard."
+      },
+      "playable": true,
+      "openness": 65,
+      "conscientiousness": 60,
+      "warmth": 73,
+      "risk_tolerance": 67,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      },
+      "appearance": {
+        "shirt": "#1fa187",
+        "skin": "#a8683f",
+        "hair": "#1d1b1c",
+        "background": "#dce4df",
+        "hairstyle": "crop",
+        "outfit": "casual",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
+    },
+    "current_thought": "Three weeks to the under-23 trials. Pooja didi says my run-up is finally straight.",
+    "short_term_goals": [
+      "Bowl fifty balls in the nets after work",
+      "Ask Pooja didi about the trial schedule"
+    ],
+    "long_term_goals": [
+      "Play cricket for Uttar Pradesh"
+    ],
+    "memory_summary": "I'm nineteen, a trainee at the Gomti Riverfront Gym, and I bowl fast. Mummy teaches at Gomti Public School. Pooja didi is training me for the under-23 trials.",
+    "friend_ids": [
+      "lko_009",
+      "lko_010"
+    ],
+    "relationship_scores": {
+      "lko_009": 44,
+      "lko_010": 44,
+      "lko_022": 44,
+      "lko_026": 44
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "lko_009",
+        "trust": 42,
+        "warmth": 44,
+        "familiarity": 26,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_010",
+        "trust": 42,
+        "warmth": 44,
+        "familiarity": 26,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_022",
+        "trust": 42,
+        "warmth": 44,
+        "familiarity": 26,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_026",
+        "trust": 42,
+        "warmth": 44,
+        "familiarity": 26,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_021",
+        "content": "I'm nineteen, a trainee at the Gomti Riverfront Gym, and I bowl fast. Mummy teaches at Gomti Public School. Pooja didi is training me for the under-23 trials.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 9,
+      "height_cm": 180,
+      "weight_kg": 74,
+      "fitness": 78,
+      "household_id": "home_d",
+      "parent_ids": [
+        "lko_035"
+      ],
+      "ambition": {
+        "goal": "Make the Uttar Pradesh under-23 cricket squad",
+        "kind": "fitness",
+        "progress": 35
+      },
+      "conditions": [],
+      "job": {
+        "title": "Trainee fitness instructor",
+        "location_id": "loc_gym",
+        "hourly_wage": 14,
+        "start": 780,
+        "end": 1260,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "relationship_status": "single",
+      "wants_children": false,
+      "gym_days": [
+        5,
+        6
+      ]
+    }
+  },
+  {
+    "citizen_id": "lko_022",
+    "name": "Sana Rizvi",
+    "age": 21,
+    "profession": "Pharmacy assistant",
+    "active": true,
+    "work_location_id": "loc_pharmacy",
+    "position": [
+      4,
+      6
+    ],
+    "money": 760,
+    "health": 85,
+    "hunger": 35,
+    "energy": 75,
+    "stress": 24,
+    "happiness": 67,
+    "reputation": 51,
+    "skills": [
+      "writing",
+      "chemistry"
+    ],
+    "mood": "Thoughtful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Private",
+          "Principled",
+          "Kind"
+        ],
+        "values": "Honesty, her aunt's happiness, and never being the subject of gossip.",
+        "voice": "Soft and precise, formal 'aap' even with friends, chooses words carefully.",
+        "sensitivity": "Gossip about her family; fuss about her asthma.",
+        "repair": "Writes a short note and leaves it where you'll find it."
+      },
+      "playable": true,
+      "openness": 88,
+      "conscientiousness": 71,
+      "warmth": 62,
+      "risk_tolerance": 33,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      },
+      "appearance": {
+        "shirt": "#bfdcf2",
+        "skin": "#d4a273",
+        "hair": "#2a211c",
+        "background": "#e7dfe0",
+        "hairstyle": "long",
+        "outfit": "coat",
+        "trousers": "#555951",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
+    },
+    "current_thought": "Phuphi has been smiling at her phone. I hope whoever it is deserves her.",
+    "short_term_goals": [
+      "Restock the inhalers before the fog season",
+      "Finish her short story for the college magazine"
+    ],
+    "long_term_goals": [
+      "Become a pharmacist with her own shop"
+    ],
+    "memory_summary": "I'm twenty-one and work at Chowk Medical Store. I live with my aunt Farah, the librarian, who raised me. I have asthma, which the winter fog makes worse.",
+    "friend_ids": [
+      "lko_009",
+      "lko_010"
+    ],
+    "relationship_scores": {
+      "lko_009": 45,
+      "lko_010": 45,
+      "lko_021": 45,
+      "lko_026": 45
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "lko_009",
+        "trust": 45,
+        "warmth": 47,
+        "familiarity": 18,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_010",
+        "trust": 45,
+        "warmth": 47,
+        "familiarity": 18,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_021",
+        "trust": 45,
+        "warmth": 47,
+        "familiarity": 18,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_026",
+        "trust": 45,
+        "warmth": 47,
+        "familiarity": 18,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_022",
+        "content": "I'm twenty-one and work at Chowk Medical Store. I live with my aunt Farah, the librarian, who raised me. I have asthma, which the winter fog makes worse.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 120,
+      "height_cm": 165,
+      "weight_kg": 54,
+      "fitness": 50,
+      "household_id": "home_f",
+      "parent_ids": [],
+      "family_roles": {
+        "lko_037": "aunt"
+      },
+      "ambition": {
+        "goal": "Qualify as a pharmacist",
+        "kind": "study",
+        "progress": 60
+      },
+      "conditions": [
+        {
+          "id": "asthma",
+          "name": "asthma",
+          "severity": 26,
+          "contagious": false,
+          "chronic": true,
+          "treated": true,
+          "since_day": -1500,
+          "treated_until": 6
+        }
+      ],
+      "job": {
+        "title": "Pharmacy assistant",
+        "location_id": "loc_pharmacy",
+        "hourly_wage": 18,
+        "start": 540,
+        "end": 1080,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "relationship_status": "single",
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_026",
+    "name": "Anuj Mishra",
+    "age": 19,
+    "profession": "Apprentice electrician",
+    "active": true,
+    "work_location_id": "loc_power",
+    "position": [
+      8,
+      7
+    ],
+    "money": 450,
+    "health": 89,
+    "hunger": 35,
+    "energy": 79,
+    "stress": 24,
+    "happiness": 71,
+    "reputation": 55,
+    "skills": [
+      "robotics",
+      "sketching"
+    ],
+    "mood": "Thoughtful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Careful",
+          "Curious",
+          "Dutiful"
+        ],
+        "values": "His family, fixing things properly, and Dadaji's stories.",
+        "voice": "Measured, asks 'matlab?' when he wants the real answer, respectful to elders.",
+        "sensitivity": "Being caught between Papa and Dadaji; broken promises.",
+        "repair": "Fixes something of yours without being asked."
+      },
+      "playable": true,
+      "openness": 76,
+      "conscientiousness": 66,
+      "warmth": 64,
+      "risk_tolerance": 38,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      },
+      "appearance": {
+        "shirt": "#2f73b0",
+        "skin": "#b97a4e",
+        "hair": "#1d1b1c",
+        "background": "#dfe4ea",
+        "hairstyle": "parted",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
+    },
+    "current_thought": "Dadaji's coat pocket had a hospital slip in it. Cardiology. He hasn't said a word.",
+    "short_term_goals": [
+      "Learn the transformer checks at the substation",
+      "Find a way to ask Dadaji about that slip"
+    ],
+    "long_term_goals": [
+      "Become a certified electrical engineer"
+    ],
+    "memory_summary": "I'm nineteen, an apprentice at the power substation. I live with Papa, Mummy and Dadaji in our old house in Chowk. Dadaji taught me chess and kite flying.",
+    "friend_ids": [
+      "lko_009",
+      "lko_010"
+    ],
+    "relationship_scores": {
+      "lko_009": 46,
+      "lko_010": 46,
+      "lko_021": 46,
+      "lko_022": 46
+    },
+    "relationships": [
+      {
+        "other_citizen_id": "lko_009",
+        "trust": 36,
+        "warmth": 50,
+        "familiarity": 22,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_010",
+        "trust": 36,
+        "warmth": 50,
+        "familiarity": 22,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_021",
+        "trust": 36,
+        "warmth": 50,
+        "familiarity": 22,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      },
+      {
+        "other_citizen_id": "lko_022",
+        "trust": 36,
+        "warmth": 50,
+        "familiarity": 22,
+        "notes": "They grew up together in the same Chowk mohalla and went to the same school; they can become closer through repeated conversations."
+      }
+    ],
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_026",
+        "content": "I'm nineteen, an apprentice at the power substation. I live with Papa, Mummy and Dadaji in our old house in Chowk. Dadaji taught me chess and kite flying.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 200,
+      "height_cm": 176,
+      "weight_kg": 66,
+      "fitness": 48,
+      "household_id": "home_a",
+      "parent_ids": [
+        "lko_030",
+        "lko_031"
+      ],
+      "ambition": {
+        "goal": "Build a solar pump for the orchard",
+        "kind": "creative",
+        "progress": 45
+      },
+      "conditions": [],
+      "job": {
+        "title": "Apprentice electrician",
+        "location_id": "loc_power",
+        "hourly_wage": 15,
+        "start": 480,
+        "end": 1020,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "relationship_status": "single",
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_027",
+    "name": "Tara Verma",
+    "age": 20,
+    "profession": "Library assistant",
+    "active": true,
+    "work_location_id": "loc_library",
+    "position": [
+      5,
+      6
+    ],
+    "skills": [
+      "illustration",
+      "storytelling"
+    ],
+    "mood": "Hopeful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Shy",
+          "Imaginative",
+          "Stubborn"
+        ],
+        "values": "Her drawings, quiet corners, and her sister, though she'd never say so.",
+        "voice": "Hesitant at first, then a rush of words; trails off with 'woh... never mind'.",
+        "sensitivity": "Being left out of decisions; her sketchbook being seen before she's ready.",
+        "repair": "Draws you something small and slides it across the table."
+      },
+      "playable": true,
+      "openness": 88,
+      "warmth": 70,
+      "conscientiousness": 58,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      },
+      "appearance": {
+        "shirt": "#d9558a",
+        "skin": "#d4a273",
+        "hair": "#2a211c",
+        "background": "#dce4df",
+        "hairstyle": "bob",
+        "outfit": "casual",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
+    },
+    "current_thought": "Half my sketchbook is Kabir with his guitar. Nobody can ever see it.",
+    "short_term_goals": [
+      "Finish the chikankari motif drawings for the library exhibition",
+      "Work up the nerve to show someone her sketchbook"
+    ],
+    "long_term_goals": [
+      "Illustrate a book of Lucknow's stories"
+    ],
+    "memory_summary": "I'm twenty and work at the Amir-ud-Daula Library. I live with my elder sister Pooja; our parents are in Kanpur. I draw, mostly in secret.",
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_027",
+        "content": "I'm twenty and work at the Amir-ud-Daula Library. I live with my elder sister Pooja; our parents are in Kanpur. I draw, mostly in secret.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 17,
+      "height_cm": 158,
+      "weight_kg": 50,
+      "fitness": 52,
+      "household_id": "home_h",
+      "parent_ids": [
+        "ext_verma_parents"
+      ],
+      "ambition": {
+        "goal": "Publish an illustrated book of Lucknow stories",
+        "kind": "creative",
+        "progress": 25
+      },
+      "conditions": [],
+      "job": {
+        "title": "Library assistant",
+        "location_id": "loc_library",
+        "hourly_wage": 14,
+        "start": 600,
+        "end": 1080,
+        "workdays": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "relationship_status": "single",
+      "wants_children": false
+    },
+    "money": 420
+  },
+  {
+    "citizen_id": "lko_028",
+    "name": "Ananya Singh",
+    "age": 21,
+    "profession": "Junior software engineer",
+    "active": true,
+    "work_location_id": "loc_office",
+    "position": [
+      7,
+      6
+    ],
+    "skills": [
+      "robotics",
+      "chess"
+    ],
+    "mood": "Focused",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Direct",
+          "Fair-minded",
+          "Driven"
+        ],
+        "values": "Credit where it's due, good code, and her father being all right.",
+        "voice": "Straight to the point, 'see, the thing is...', no patience for flattery.",
+        "sensitivity": "Stolen credit; anyone tiptoeing around her mother's death.",
+        "repair": "Says 'I was wrong' in so many words, once, and moves on."
+      },
+      "playable": true,
+      "openness": 76,
+      "warmth": 56,
+      "conscientiousness": 90,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      },
+      "appearance": {
+        "shirt": "#208c82",
+        "skin": "#c68d5e",
+        "hair": "#1d1b1c",
+        "background": "#e7dfe0",
+        "hairstyle": "bun",
+        "outfit": "jacket",
+        "trousers": "#555951",
+        "shoes": "#eeeae2",
+        "glasses": false
+      }
+    },
+    "current_thought": "My retention model was on every slide and my name was on none of them.",
+    "short_term_goals": [
+      "Ship the release without breaking the build",
+      "Decide what to say to Nidhi"
+    ],
+    "long_term_goals": [
+      "Lead her own engineering team"
+    ],
+    "memory_summary": "I'm twenty-one and write software at Gomti IT Tower in Hazratganj. Papa is an inspector at Chowk Kotwali. Mummy died three years ago and it's been the two of us since.",
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_028",
+        "content": "I'm twenty-one and write software at Gomti IT Tower in Hazratganj. Papa is an inspector at Chowk Kotwali. Mummy died three years ago and it's been the two of us since.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 60,
+      "height_cm": 166,
+      "weight_kg": 57,
+      "fitness": 66,
+      "household_id": "home_g",
+      "parent_ids": [
+        "lko_038"
+      ],
+      "ambition": {
+        "goal": "Be promoted to team lead",
+        "kind": "money",
+        "progress": 48,
+        "target": 1500
+      },
+      "conditions": [],
+      "job": {
+        "title": "Junior software engineer",
+        "location_id": "loc_office",
+        "hourly_wage": 22,
+        "start": 540,
+        "end": 1110,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "relationship_status": "single",
+      "wants_children": false
+    },
+    "money": 1250
+  },
+  {
+    "citizen_id": "lko_029",
+    "name": "Rohan Tiwari",
+    "age": 20,
+    "profession": "Chaat cook",
+    "active": true,
+    "work_location_id": "loc_mall",
+    "position": [
+      8,
+      5
+    ],
+    "skills": [
+      "gardening",
+      "cooking"
+    ],
+    "mood": "Warm",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Warm",
+          "Generous",
+          "Guarded"
+        ],
+        "values": "Feeding people well and promises that are kept.",
+        "voice": "Easy and friendly, 'arre, eat first, talk later'.",
+        "sensitivity": "His father's broken promises; being called 'just a chaat-wala'.",
+        "repair": "Cooks for you. If he's really sorry, basket chaat."
+      },
+      "playable": true,
+      "openness": 68,
+      "warmth": 85,
+      "conscientiousness": 75,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      },
+      "appearance": {
+        "shirt": "#f4f3ee",
+        "skin": "#b97a4e",
+        "hair": "#1d1b1c",
+        "background": "#dfe4ea",
+        "hairstyle": "crop",
+        "outfit": "apron",
+        "trousers": "#55515d",
+        "shoes": "#eeeae2",
+        "glasses": true
+      }
+    },
+    "current_thought": "Papa promised he'd come to the tasting. Third time this year he didn't.",
+    "short_term_goals": [
+      "Perfect the basket chaat for the weekend rush",
+      "Stop pretending the missed tasting didn't hurt"
+    ],
+    "long_term_goals": [
+      "Open his own chaat counter in Hazratganj"
+    ],
+    "memory_summary": "I'm twenty and cook at the food court in Hazratganj Arcade. Papa is a scientist at the Drug Research Institute and forgets everything that isn't an experiment. I held my first tasting on Saturday.",
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_029",
+        "content": "I'm twenty and cook at the food court in Hazratganj Arcade. Papa is a scientist at the Drug Research Institute and forgets everything that isn't an experiment. I held my first tasting on Saturday.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 2,
+      "height_cm": 172,
+      "weight_kg": 63,
+      "fitness": 58,
+      "household_id": "home_e",
+      "parent_ids": [
+        "lko_036"
+      ],
+      "ambition": {
+        "goal": "Open his own chaat counter",
+        "kind": "social",
+        "progress": 30
+      },
+      "conditions": [],
+      "job": {
+        "title": "Chaat cook",
+        "location_id": "loc_mall",
+        "hourly_wage": 15,
+        "start": 600,
+        "end": 1140,
+        "workdays": [
+          0,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "relationship_status": "single",
+      "wants_children": false
+    },
+    "money": 520
+  },
+  {
+    "citizen_id": "lko_030",
+    "name": "Ramesh Mishra",
+    "age": 46,
+    "profession": "Mango grower",
+    "active": true,
+    "work_location_id": "loc_farm",
+    "position": [
+      3,
+      3
+    ],
+    "money": 640,
+    "health": 90,
+    "hunger": 8,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Steady",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Hardworking",
+          "Gentle",
+          "Stubborn"
+        ],
+        "values": "Honest work, the orchard his father planted, and being there for his family.",
+        "voice": "Few words, dry jokes, talks about the rains and the mango blossom.",
+        "sensitivity": "Money worries he keeps to himself; being told the orchard should be sold for flats.",
+        "repair": "Shows up with a crate of Dussehri mangoes and fixes what is broken."
+      },
+      "appearance": {
+        "skin": "#a8683f",
+        "hair": "#1d1b1c",
+        "shirt": "#6b8a3a",
+        "background": "#dce4df",
+        "hairstyle": "crop",
+        "outfit": "jacket",
+        "trousers": "#41484e",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "If the weather holds, the late crop will fetch a fair price at Aminabad.",
+    "short_term_goals": [
+      "Get the crates to Aminabad Bazaar",
+      "Teach Anuj to run the orchard's pump"
+    ],
+    "long_term_goals": [
+      "Keep the orchard in the family"
+    ],
+    "memory_summary": "I tend the Dussehri Mango Orchard my father planted. Sunita and I have a grown son, Anuj, who has just started at the substation. Babuji lives with us now and his heart worries me.",
+    "relationship_scores": {
+      "lko_031": 88,
+      "lko_032": 85,
+      "lko_026": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_030",
+        "content": "I tend the Dussehri Mango Orchard my father planted. Sunita and I have a grown son, Anuj, who has just started at the substation. Babuji lives with us now and his heart worries me.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 48,
+      "height_cm": 181,
+      "weight_kg": 84,
+      "fitness": 68,
+      "household_id": "home_a",
+      "parent_ids": [
+        "lko_032"
+      ],
+      "partner_id": "lko_031",
+      "children_ids": [
+        "lko_026"
+      ],
+      "relationship_status": "married",
+      "job": {
+        "title": "Mango grower",
+        "location_id": "loc_farm",
+        "hourly_wage": 21,
+        "start": 360,
+        "end": 900,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Plant a new block of Dussehri saplings",
+        "kind": "career",
+        "progress": 35
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_031",
+    "name": "Sunita Mishra",
+    "age": 44,
+    "profession": "Bank clerk",
+    "active": true,
+    "work_location_id": "loc_bank",
+    "position": [
+      3,
+      3
+    ],
+    "money": 720,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Calm",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Practical",
+          "Warm",
+          "Watchful"
+        ],
+        "values": "A household that runs, a son who is settled, and no secrets at the dinner table.",
+        "voice": "Brisk and kind, 'chalo, first eat something'.",
+        "sensitivity": "Being kept in the dark; the family's money worries.",
+        "repair": "Talks it through over tea until it is actually settled."
+      },
+      "appearance": {
+        "skin": "#c68d5e",
+        "hair": "#1d1b1c",
+        "shirt": "#7b4a92",
+        "background": "#e7dfe0",
+        "hairstyle": "bob",
+        "outfit": "jacket",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "Babuji has been quieter than usual. Ramesh hasn't noticed, or is pretending not to.",
+    "short_term_goals": [
+      "Close the month's ledgers at the bank",
+      "Get Babuji to eat properly"
+    ],
+    "long_term_goals": [
+      "See Anuj settled and the orchard secure"
+    ],
+    "memory_summary": "I work at Aminabad Bank. My husband Ramesh tends the family mango orchard, our son Anuj is an apprentice at the substation, and my father-in-law lives with us in Chowk.",
+    "relationship_scores": {
+      "lko_030": 88,
+      "lko_032": 78,
+      "lko_026": 90
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_031",
+        "content": "I work at Aminabad Bank. My husband Ramesh tends the family mango orchard, our son Anuj is an apprentice at the substation, and my father-in-law lives with us in Chowk.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 150,
+      "height_cm": 165,
+      "weight_kg": 71,
+      "fitness": 50,
+      "household_id": "home_a",
+      "parent_ids": [],
+      "partner_id": "lko_030",
+      "children_ids": [
+        "lko_026"
+      ],
+      "relationship_status": "married",
+      "job": {
+        "title": "Bank clerk",
+        "location_id": "loc_bank",
+        "hourly_wage": 24,
+        "start": 540,
+        "end": 1020,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Be promoted to branch officer",
+        "kind": "career",
+        "progress": 40
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_032",
+    "name": "Shyam Lal Mishra",
+    "age": 81,
+    "profession": "Retired mango grower",
+    "active": true,
+    "work_location_id": null,
+    "position": [
+      3,
+      3
+    ],
+    "money": 1400,
+    "health": 62,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 25,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Wistful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Proud",
+          "Witty",
+          "Stubborn"
+        ],
+        "values": "Standing on his own feet, his grandson, and a good game of chess.",
+        "voice": "Old Lucknow courtesy, 'pehle aap', stories that begin 'in our time'.",
+        "sensitivity": "Being treated as fragile; fuss about his health.",
+        "repair": "Offers a game of chess and lets you win, once."
+      },
+      "appearance": {
+        "skin": "#b97a4e",
+        "hair": "#d9d7d2",
+        "shirt": "#a07c50",
+        "background": "#dfe4ea",
+        "hairstyle": "parted",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#383a38",
+        "glasses": true
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "The doctor wants more tests on Tuesday. No need to frighten the whole house over an old engine.",
+    "short_term_goals": [
+      "Teach Anuj the Sicilian defence",
+      "Keep the appointment slip out of sight"
+    ],
+    "long_term_goals": [
+      "See the orchard pass safely to the next generation"
+    ],
+    "memory_summary": "I'm eighty-one. I planted the Dussehri orchard my son Ramesh now tends, and I live with him, Sunita and my grandson Anuj. My wife passed some years ago. My heart is not what it was, and that is my own business.",
+    "relationship_scores": {
+      "lko_030": 86,
+      "lko_031": 80,
+      "lko_026": 92
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_032",
+        "content": "I'm eighty-one. I planted the Dussehri orchard my son Ramesh now tends, and I live with him, Sunita and my grandson Anuj. My wife passed some years ago. My heart is not what it was, and that is my own business.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 25,
+      "height_cm": 172,
+      "weight_kg": 70,
+      "fitness": 30,
+      "household_id": "home_a",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "lko_030"
+      ],
+      "relationship_status": "widowed",
+      "job": null,
+      "ambition": {
+        "goal": "Teach Anuj everything he knows about chess",
+        "kind": "social",
+        "progress": 40
+      },
+      "conditions": [
+        {
+          "id": "heart-condition",
+          "name": "heart condition",
+          "severity": 58,
+          "contagious": false,
+          "chronic": true,
+          "treated": true,
+          "since_day": -900,
+          "treated_until": 3
+        }
+      ],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_033",
+    "name": "Nasreen Ansari",
+    "age": 42,
+    "profession": "Doctor",
+    "active": true,
+    "work_location_id": "loc_hospital",
+    "position": [
+      5,
+      3
+    ],
+    "money": 2100,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Focused",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Composed",
+          "Caring",
+          "Exacting"
+        ],
+        "values": "Her patients' trust, her daughter's independence, and doing things properly.",
+        "voice": "Calm and precise, a gentle 'beta' for patients of any age.",
+        "sensitivity": "Patients who hide things from their families; being second-guessed.",
+        "repair": "Explains her reasons patiently, then asks what you need."
+      },
+      "appearance": {
+        "skin": "#c68d5e",
+        "hair": "#1d1b1c",
+        "shirt": "#f3f3ef",
+        "background": "#dce4df",
+        "hairstyle": "bun",
+        "outfit": "coat",
+        "trousers": "#41484e",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "Shyam Lal ji's results worry me. He asked me not to tell his family. He must tell them himself.",
+    "short_term_goals": [
+      "Review the cardiology referrals",
+      "Have breakfast with Zoya for once"
+    ],
+    "long_term_goals": [
+      "Set up a free heart clinic in Chowk"
+    ],
+    "memory_summary": "I'm a doctor at KGMU Hospital. I raised my daughter Zoya on my own in our house in Chowk; she is a lab assistant now and as stubborn as I am.",
+    "relationship_scores": {
+      "lko_009": 90
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_033",
+        "content": "I'm a doctor at KGMU Hospital. I raised my daughter Zoya on my own in our house in Chowk; she is a lab assistant now and as stubborn as I am.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 11,
+      "height_cm": 162,
+      "weight_kg": 58,
+      "fitness": 62,
+      "household_id": "home_b",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "lko_009"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Doctor",
+        "location_id": "loc_hospital",
+        "hourly_wage": 40,
+        "start": 480,
+        "end": 1020,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Open a free cardiac clinic for the old city",
+        "kind": "career",
+        "progress": 55
+      },
+      "conditions": [],
+      "wants_children": false,
+      "gym_days": [
+        1,
+        3
+      ]
+    }
+  },
+  {
+    "citizen_id": "lko_034",
+    "name": "Imran Qureshi",
+    "age": 45,
+    "profession": "Kabab house owner",
+    "active": true,
+    "work_location_id": "loc_restaurant",
+    "position": [
+      4,
+      6
+    ],
+    "money": 900,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Restless",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Loud",
+          "Big-hearted",
+          "Restless"
+        ],
+        "values": "The family name on the shop, feeding the whole lane, and his son's happiness, awkwardly.",
+        "voice": "Booming, generous, 'arre bhai, sit, sit, you'll eat first'.",
+        "sensitivity": "Letting people down; anyone saying the kababs aren't what they were.",
+        "repair": "Feeds you until you forgive him."
+      },
+      "appearance": {
+        "skin": "#b97a4e",
+        "hair": "#1d1b1c",
+        "shirt": "#b9502a",
+        "background": "#e7dfe0",
+        "hairstyle": "parted",
+        "outfit": "apron",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "The Delhi people's offer is in the drawer. Eighty years of this shop, and I'm actually thinking about it.",
+    "short_term_goals": [
+      "Get the galawati mince right for the weekend",
+      "Decide what to tell Kabir about the offer"
+    ],
+    "long_term_goals": [
+      "Leave Kabir something better than a hot kitchen"
+    ],
+    "memory_summary": "I run Nawab Kabab House in Chowk, which my grandfather started. My son Kabir cooks with me and sings in the back room on Saturdays. A restaurant chain from Delhi has offered to buy the shop and I've told nobody.",
+    "relationship_scores": {
+      "lko_010": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_034",
+        "content": "I run Nawab Kabab House in Chowk, which my grandfather started. My son Kabir cooks with me and sings in the back room on Saturdays. A restaurant chain from Delhi has offered to buy the shop and I've told nobody.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 210,
+      "height_cm": 174,
+      "weight_kg": 88,
+      "fitness": 40,
+      "household_id": "home_c",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "lko_010"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Kabab house owner",
+        "location_id": "loc_restaurant",
+        "hourly_wage": 23,
+        "start": 360,
+        "end": 900,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Open a second kabab house in Hazratganj",
+        "kind": "money",
+        "progress": 30,
+        "target": 3000
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_035",
+    "name": "Meera Srivastava",
+    "age": 39,
+    "profession": "Teacher",
+    "active": true,
+    "work_location_id": "loc_school",
+    "position": [
+      7,
+      4
+    ],
+    "money": 780,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Cheerful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Encouraging",
+          "Organised",
+          "Anxious"
+        ],
+        "values": "Her students, her son's future, and things being done on time.",
+        "voice": "Teacherly and warm, 'very good, now once more'.",
+        "sensitivity": "Arjun's future being left to chance; being thought overprotective.",
+        "repair": "Apologises plainly and brings homemade sweets."
+      },
+      "appearance": {
+        "skin": "#c99a6b",
+        "hair": "#1d1b1c",
+        "shirt": "#e6b230",
+        "background": "#dfe4ea",
+        "hairstyle": "bob",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "If Arjun doesn't make the squad, he needs a plan. He won't hear it from me.",
+    "short_term_goals": [
+      "Mark the class nine science papers",
+      "Not ask Arjun about the trials again"
+    ],
+    "long_term_goals": [
+      "See Arjun settled, cricket or not"
+    ],
+    "memory_summary": "I teach science at Gomti Public School. I raised my son Arjun alone; he's a trainee at the riverfront gym and dreams of playing for Uttar Pradesh.",
+    "relationship_scores": {
+      "lko_021": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_035",
+        "content": "I teach science at Gomti Public School. I raised my son Arjun alone; he's a trainee at the riverfront gym and dreams of playing for Uttar Pradesh.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 300,
+      "height_cm": 168,
+      "weight_kg": 66,
+      "fitness": 55,
+      "household_id": "home_d",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "lko_021"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Teacher",
+        "location_id": "loc_school",
+        "hourly_wage": 27,
+        "start": 450,
+        "end": 960,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Become head of the science department",
+        "kind": "career",
+        "progress": 45
+      },
+      "conditions": [],
+      "wants_children": false,
+      "gym_days": [
+        5
+      ]
+    }
+  },
+  {
+    "citizen_id": "lko_036",
+    "name": "Alok Tiwari",
+    "age": 47,
+    "profession": "Scientist",
+    "active": true,
+    "work_location_id": "loc_lab",
+    "position": [
+      8,
+      5
+    ],
+    "money": 1800,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Absent-minded",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Kind",
+          "Absent-minded",
+          "Brilliant"
+        ],
+        "values": "The work, and his son, in that order more often than he'd like.",
+        "voice": "Rambling, enthusiastic, loses the thread and finds it again with 'so, as I was saying'.",
+        "sensitivity": "Being reminded of promises he forgot; his late nights at the lab.",
+        "repair": "Clears a whole day and actually turns up."
+      },
+      "appearance": {
+        "skin": "#c68d5e",
+        "hair": "#2a211c",
+        "shirt": "#eceee9",
+        "background": "#dce4df",
+        "hairstyle": "parted",
+        "outfit": "coat",
+        "trousers": "#41484e",
+        "shoes": "#383a38",
+        "glasses": true
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "I missed Rohan's tasting. The assay overran. I keep telling myself he understands.",
+    "short_term_goals": [
+      "Finish the compound screening",
+      "Be on time for something of Rohan's"
+    ],
+    "long_term_goals": [
+      "Publish the work of his career"
+    ],
+    "memory_summary": "I'm a scientist at the Drug Research Institute. My son Rohan cooks at the arcade in Hazratganj. I missed his first tasting on Saturday because an experiment overran.",
+    "relationship_scores": {
+      "lko_029": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_036",
+        "content": "I'm a scientist at the Drug Research Institute. My son Rohan cooks at the arcade in Hazratganj. I missed his first tasting on Saturday because an experiment overran.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 90,
+      "height_cm": 170,
+      "weight_kg": 69,
+      "fitness": 45,
+      "household_id": "home_e",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "lko_029"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Scientist",
+        "location_id": "loc_lab",
+        "hourly_wage": 35,
+        "start": 540,
+        "end": 1080,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Publish his drug-screening study",
+        "kind": "career",
+        "progress": 70
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_037",
+    "name": "Farah Rizvi",
+    "age": 38,
+    "profession": "Librarian",
+    "active": true,
+    "work_location_id": "loc_library",
+    "position": [
+      4,
+      6
+    ],
+    "money": 950,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Gentle",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Shy",
+          "Well-read",
+          "Lonely"
+        ],
+        "values": "Books, her niece, and a quiet life nobody talks about.",
+        "voice": "Soft Urdu-inflected courtesy, 'ji, of course', quotes Ghalib under her breath.",
+        "sensitivity": "Being talked about; pity.",
+        "repair": "Sets aside a book she knows you'll love."
+      },
+      "appearance": {
+        "skin": "#d4a273",
+        "hair": "#2a211c",
+        "shirt": "#8a5cab",
+        "background": "#e7dfe0",
+        "hairstyle": "long",
+        "outfit": "casual",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "Inspector sahib has borrowed the same Premchand three times this month. I think I know why.",
+    "short_term_goals": [
+      "Catalogue the Urdu poetry collection",
+      "Decide what to do about a certain borrower"
+    ],
+    "long_term_goals": [
+      "Fill the library with young readers again"
+    ],
+    "memory_summary": "I'm the librarian at the Amir-ud-Daula Library. I raised my niece Sana, who works at the medical store. Inspector Vikram Singh keeps borrowing books he has already read.",
+    "relationship_scores": {
+      "lko_022": 82,
+      "lko_038": 62
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_037",
+        "content": "I'm the librarian at the Amir-ud-Daula Library. I raised my niece Sana, who works at the medical store. Inspector Vikram Singh keeps borrowing books he has already read.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 33,
+      "height_cm": 166,
+      "weight_kg": 60,
+      "fitness": 48,
+      "household_id": "home_f",
+      "parent_ids": [],
+      "family_roles": {
+        "lko_022": "niece"
+      },
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Librarian",
+        "location_id": "loc_library",
+        "hourly_wage": 23,
+        "start": 600,
+        "end": 1080,
+        "workdays": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Start an evening reading circle",
+        "kind": "social",
+        "progress": 20
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_038",
+    "name": "Vikram Singh",
+    "age": 45,
+    "profession": "Police inspector",
+    "active": true,
+    "work_location_id": "loc_police",
+    "position": [
+      7,
+      6
+    ],
+    "money": 1200,
+    "health": 90,
+    "hunger": 30,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Composed",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Upright",
+          "Reserved",
+          "Tender"
+        ],
+        "values": "Duty, his daughter, and a memory he is afraid of betraying.",
+        "voice": "Formal and brief on duty; off duty, long pauses and careful words.",
+        "sensitivity": "Feeling he is betraying his late wife; his daughter's worry.",
+        "repair": "Does the right thing first and explains afterwards."
+      },
+      "appearance": {
+        "skin": "#b97a4e",
+        "hair": "#1d1b1c",
+        "shirt": "#b5a273",
+        "background": "#dfe4ea",
+        "hairstyle": "crop",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "I've borrowed 'Godaan' three times this month just to speak to her at the counter.",
+    "short_term_goals": [
+      "Walk the evening beat through Chowk",
+      "Return a book he has already read"
+    ],
+    "long_term_goals": [
+      "Retire knowing Ananya is happy"
+    ],
+    "memory_summary": "I'm an inspector at Chowk Kotwali. My wife Amrita died three years ago; my daughter Ananya writes software in Hazratganj. Lately I go to the library more than I need to.",
+    "relationship_scores": {
+      "lko_028": 90,
+      "lko_037": 62
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_038",
+        "content": "I'm an inspector at Chowk Kotwali. My wife Amrita died three years ago; my daughter Ananya writes software in Hazratganj. Lately I go to the library more than I need to.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 130,
+      "height_cm": 179,
+      "weight_kg": 80,
+      "fitness": 72,
+      "household_id": "home_g",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "lko_028"
+      ],
+      "relationship_status": "widowed",
+      "job": {
+        "title": "Police inspector",
+        "location_id": "loc_police",
+        "hourly_wage": 29,
+        "start": 480,
+        "end": 1080,
+        "workdays": [
+          0,
+          1,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Run the police half-marathon",
+        "kind": "fitness",
+        "progress": 25
+      },
+      "conditions": [],
+      "wants_children": false,
+      "gym_days": [
+        0,
+        2,
+        4
+      ]
+    }
+  },
+  {
+    "citizen_id": "lko_039",
+    "name": "Pooja Verma",
+    "age": 29,
+    "profession": "Fitness coach",
+    "active": true,
+    "work_location_id": "loc_gym",
+    "position": [
+      5,
+      6
+    ],
+    "money": 1800,
+    "health": 90,
+    "hunger": 8,
+    "energy": 78,
+    "stress": 35,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Driven",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Driven",
+          "Impulsive",
+          "Protective"
+        ],
+        "values": "Her athletes, her ambition, and her little sister, whom she refuses to mother.",
+        "voice": "Brisk and encouraging, 'come on, one more', laughs loudly.",
+        "sensitivity": "Being treated as Tara's parent; being called selfish.",
+        "repair": "Says sorry fast and makes a plan to fix it."
+      },
+      "appearance": {
+        "skin": "#a8683f",
+        "hair": "#1d1b1c",
+        "shirt": "#ff6444",
+        "background": "#dce4df",
+        "hairstyle": "bun",
+        "outfit": "casual",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "Head coach in Bengaluru, starting next month. I haven't told Tara. Or Arjun.",
+    "short_term_goals": [
+      "Run the dawn batch at the riverfront",
+      "Answer the Bengaluru studio by Friday"
+    ],
+    "long_term_goals": [
+      "Run her own sports academy"
+    ],
+    "memory_summary": "I'm twenty-nine and coach at the Gomti Riverfront Gym. I live with my younger sister Tara. A studio in Bengaluru has offered me head coach. I'm training Arjun for the under-23 trials.",
+    "relationship_scores": {
+      "lko_027": 86
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_039",
+        "content": "I'm twenty-nine and coach at the Gomti Riverfront Gym. I live with my younger sister Tara. A studio in Bengaluru has offered me head coach. I'm training Arjun for the under-23 trials.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 77,
+      "height_cm": 170,
+      "weight_kg": 62,
+      "fitness": 88,
+      "household_id": "home_h",
+      "parent_ids": [
+        "ext_verma_parents"
+      ],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Fitness coach",
+        "location_id": "loc_gym",
+        "hourly_wage": 20,
+        "start": 360,
+        "end": 900,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Become a head coach",
+        "kind": "money",
+        "progress": 36,
+        "target": 5000
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_040",
+    "name": "Rajendra Sharma",
+    "age": 54,
+    "profession": "Station superintendent",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_station",
+    "position": [
+      55,
+      5
+    ],
+    "money": 1600,
+    "health": 92,
+    "hunger": 12,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Composed",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Dutiful",
+          "Proud",
+          "Strict"
+        ],
+        "values": "The railway, punctuality, and a son who will have a secure government job.",
+        "voice": "Clipped and formal, 'time is time', softens only at home.",
+        "sensitivity": "Disorder; his son throwing away security for a dream.",
+        "repair": "Never says sorry; quietly does the thing you asked for."
+      },
+      "appearance": {
+        "skin": "#b97a4e",
+        "hair": "#2a211c",
+        "shirt": "#2a3d57",
+        "background": "#e7dfe0",
+        "hairstyle": "parted",
+        "outfit": "jacket",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "Aditya's railway recruitment exam is in two weeks. Twenty years I've worked so he could have this.",
+    "short_term_goals": [
+      "Keep the morning expresses on time",
+      "Check that Aditya is studying"
+    ],
+    "long_term_goals": [
+      "See Aditya confirmed in a railway post"
+    ],
+    "memory_summary": "I'm the station superintendent at Charbagh. My wife Kamla runs the chai and kirana shop below our flat in Hazratganj, and our son Aditya works under me on the platforms.",
+    "relationship_scores": {
+      "lko_041": 88,
+      "lko_042": 86
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_040",
+        "content": "I'm the station superintendent at Charbagh. My wife Kamla runs the chai and kirana shop below our flat in Hazratganj, and our son Aditya works under me on the platforms.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 140,
+      "height_cm": 170,
+      "weight_kg": 68,
+      "fitness": 50,
+      "household_id": "apt_101",
+      "parent_ids": [],
+      "partner_id": "lko_041",
+      "children_ids": [
+        "lko_042"
+      ],
+      "relationship_status": "married",
+      "job": {
+        "title": "Station superintendent",
+        "location_id": "loc_station",
+        "hourly_wage": 30,
+        "start": 330,
+        "end": 1050,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "ambition": {
+        "goal": "Retire as divisional manager",
+        "kind": "career",
+        "progress": 60
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_041",
+    "name": "Kamla Sharma",
+    "age": 51,
+    "profession": "Shop owner",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_konbini",
+    "position": [
+      55,
+      5
+    ],
+    "money": 1200,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Cheerful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Nosy",
+          "Loving",
+          "Tireless"
+        ],
+        "values": "Knowing everything that happens in the lane, and keeping her family together.",
+        "voice": "Warm, rapid, 'arre suno!', every sentence a small headline.",
+        "sensitivity": "Being called a gossip; secrets inside her own house.",
+        "repair": "An extra-strong chai and a lowered voice."
+      },
+      "appearance": {
+        "skin": "#c68d5e",
+        "hair": "#1d1b1c",
+        "shirt": "#e8edef",
+        "background": "#dfe4ea",
+        "hairstyle": "bob",
+        "outfit": "apron",
+        "trousers": "#55515d",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "I found pages of poetry under Aditya's mattress. They're good. Should I tell his father?",
+    "short_term_goals": [
+      "Open the shop before the first metro",
+      "Find out who measured up the kabab house"
+    ],
+    "long_term_goals": [
+      "See the shop outlast the supermarkets"
+    ],
+    "memory_summary": "I run Sharmaji Chai & Kirana in Hazratganj, the shop my father-in-law opened. My husband Rajendra is superintendent at Charbagh and our son Aditya works there too. Ishita helps me in the evenings.",
+    "relationship_scores": {
+      "lko_040": 88,
+      "lko_042": 88
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_041",
+        "content": "I run Sharmaji Chai & Kirana in Hazratganj, the shop my father-in-law opened. My husband Rajendra is superintendent at Charbagh and our son Aditya works there too. Ishita helps me in the evenings.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 260,
+      "height_cm": 158,
+      "weight_kg": 56,
+      "fitness": 45,
+      "household_id": "apt_101",
+      "parent_ids": [],
+      "partner_id": "lko_040",
+      "children_ids": [
+        "lko_042"
+      ],
+      "relationship_status": "married",
+      "job": {
+        "title": "Chai and kirana shop owner",
+        "location_id": "loc_konbini",
+        "hourly_wage": 22,
+        "start": 420,
+        "end": 1140,
+        "workdays": [
+          0,
+          1,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "ambition": {
+        "goal": "Add a second counter to the shop",
+        "kind": "money",
+        "progress": 30,
+        "target": 4000
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_042",
+    "name": "Aditya Sharma",
+    "age": 22,
+    "profession": "Station staff",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_station",
+    "position": [
+      55,
+      5
+    ],
+    "money": 900,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [
+      "cricket",
+      "poetry"
+    ],
+    "mood": "Restless",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Funny",
+          "Secretive",
+          "Sensitive"
+        ],
+        "values": "Words that say what he can't, and being more than the superintendent's son.",
+        "voice": "Short answers to elders, loud jokes with friends, a couplet when he thinks nobody's listening.",
+        "sensitivity": "His father's expectations; being laughed at for writing poetry.",
+        "repair": "Makes a joke to break the ice, then tells the truth."
+      },
+      "appearance": {
+        "skin": "#b97a4e",
+        "hair": "#1d1b1c",
+        "shirt": "#5c80bb",
+        "background": "#dce4df",
+        "hairstyle": "parted",
+        "outfit": "jacket",
+        "trousers": "#41484e",
+        "shoes": "#eeeae2",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "The mushaira is on Sunday. My name is on the list as 'Adi Lakhnavi'. Papa thinks I'm revising for the railway exam.",
+    "short_term_goals": [
+      "Finish the nazm for Sunday's mushaira",
+      "Keep the notebook hidden from Papa"
+    ],
+    "long_term_goals": [
+      "Be read as a poet, not known as a clerk"
+    ],
+    "memory_summary": "I'm twenty-two and work the platforms at Charbagh Station, where Papa is superintendent and expects a lot. I write shayari in secret. I still live with my parents above the shop in Hazratganj.",
+    "relationship_scores": {
+      "lko_040": 82,
+      "lko_041": 86
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_042",
+        "content": "I'm twenty-two and work the platforms at Charbagh Station, where Papa is superintendent and expects a lot. I write shayari in secret. I still live with my parents above the shop in Hazratganj.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 55,
+      "height_cm": 177,
+      "weight_kg": 70,
+      "fitness": 72,
+      "household_id": "apt_101",
+      "parent_ids": [
+        "lko_040",
+        "lko_041"
+      ],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Station staff",
+        "location_id": "loc_station",
+        "hourly_wage": 17,
+        "start": 360,
+        "end": 960,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Recite at the Lucknow Mahotsav mushaira",
+        "kind": "fitness",
+        "progress": 40
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_043",
+    "name": "Nidhi Kapoor",
+    "age": 28,
+    "profession": "Marketing specialist",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_office",
+    "position": [
+      55,
+      5
+    ],
+    "money": 2200,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Stressed",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Ambitious",
+          "Charming",
+          "Exhausted"
+        ],
+        "values": "Getting ahead, and being liked while she does it.",
+        "voice": "Polished and fast, 'let's circle back', drops the act when she's tired.",
+        "sensitivity": "Being seen as a fraud; the promotion slipping away.",
+        "repair": "Owns up in public, which costs her."
+      },
+      "appearance": {
+        "skin": "#d4a273",
+        "hair": "#2a211c",
+        "shirt": "#c94a6b",
+        "background": "#e7dfe0",
+        "hairstyle": "long",
+        "outfit": "jacket",
+        "trousers": "#555951",
+        "shoes": "#eeeae2",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "I used Ananya's model in my pitch and didn't credit her. The promotion decision is Friday. I feel sick.",
+    "short_term_goals": [
+      "Get through Friday's promotion review",
+      "Work out what to say to Ananya"
+    ],
+    "long_term_goals": [
+      "Run a marketing team of her own"
+    ],
+    "memory_summary": "I'm twenty-eight and work in marketing at Gomti IT Tower. I moved here from Delhi two years ago and live alone in Hazratganj. On Monday I presented Ananya Singh's model as the team's idea.",
+    "relationship_scores": {
+      "lko_044": 55
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_043",
+        "content": "I'm twenty-eight and work in marketing at Gomti IT Tower. I moved here from Delhi two years ago and live alone in Hazratganj. On Monday I presented Ananya Singh's model as the team's idea.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 20,
+      "height_cm": 161,
+      "weight_kg": 52,
+      "fitness": 58,
+      "household_id": "apt_102",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Marketing specialist",
+        "location_id": "loc_office",
+        "hourly_wage": 31,
+        "start": 540,
+        "end": 1110,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Be promoted to marketing lead",
+        "kind": "career",
+        "progress": 35
+      },
+      "conditions": [],
+      "wants_children": false,
+      "gym_days": [
+        1,
+        3
+      ]
+    }
+  },
+  {
+    "citizen_id": "lko_044",
+    "name": "Faizan Ali",
+    "age": 31,
+    "profession": "Arcade manager",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_mall",
+    "position": [
+      55,
+      5
+    ],
+    "money": 2400,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Easygoing",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Easygoing",
+          "Dependable",
+          "Shy in love"
+        ],
+        "values": "A well-run arcade and one particular customer's favourite table.",
+        "voice": "Relaxed and polite, 'ji, bilkul', a nervous laugh around Nidhi.",
+        "sensitivity": "Being overlooked; being rushed.",
+        "repair": "Quietly sorts the problem out before you ask twice."
+      },
+      "appearance": {
+        "skin": "#c68d5e",
+        "hair": "#1d1b1c",
+        "shirt": "#44536c",
+        "background": "#dfe4ea",
+        "hairstyle": "crop",
+        "outfit": "jacket",
+        "trousers": "#55515d",
+        "shoes": "#eeeae2",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "Five days running I've kept her table at the coffee house. Today I'll actually say something.",
+    "short_term_goals": [
+      "Sort out the arcade's Diwali lights",
+      "Ask Nidhi to lunch, properly"
+    ],
+    "long_term_goals": [
+      "Manage the whole Hazratganj market association"
+    ],
+    "memory_summary": "I'm thirty-one and manage Hazratganj Arcade. I've kept Nidhi Kapoor's favourite table at the coffee house free for five days without managing to say why.",
+    "relationship_scores": {
+      "lko_043": 55
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_044",
+        "content": "I'm thirty-one and manage Hazratganj Arcade. I've kept Nidhi Kapoor's favourite table at the coffee house free for five days without managing to say why.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 190,
+      "height_cm": 176,
+      "weight_kg": 78,
+      "fitness": 50,
+      "household_id": "apt_201",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Arcade manager",
+        "location_id": "loc_mall",
+        "hourly_wage": 28,
+        "start": 600,
+        "end": 1140,
+        "workdays": [
+          0,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "ambition": {
+        "goal": "Run the market association",
+        "kind": "money",
+        "progress": 30,
+        "target": 8000
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_045",
+    "name": "Mirza Yusuf Baig",
+    "age": 74,
+    "profession": "Retired zardozi master",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": null,
+    "position": [
+      55,
+      5
+    ],
+    "money": 3200,
+    "health": 80,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 62,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Wistful",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Courtly",
+          "Nostalgic",
+          "Sharp-eyed"
+        ],
+        "values": "Craft done by hand, kite strings, and the Lucknow he remembers.",
+        "voice": "Elaborate old-city Urdu courtesy, 'huzoor', 'pehle aap', a couplet for every occasion.",
+        "sensitivity": "Machine embroidery sold as zardozi; being pitied for living alone.",
+        "repair": "An apology so graceful you forget what it was for."
+      },
+      "appearance": {
+        "skin": "#c99a6b",
+        "hair": "#d9d7d2",
+        "shirt": "#7c6748",
+        "background": "#dce4df",
+        "hairstyle": "crop",
+        "outfit": "jacket",
+        "trousers": "#41484e",
+        "shoes": "#383a38",
+        "glasses": true
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "Mithu has not come back to her cage since yesterday. She was Begum's parrot.",
+    "short_term_goals": [
+      "Put up notices for Mithu the parrot",
+      "Fly a kite from the terrace before the light goes"
+    ],
+    "long_term_goals": [
+      "Teach the craft to one last apprentice"
+    ],
+    "memory_summary": "I'm seventy-four, a retired zardozi master. I live alone in Hazratganj since my wife passed. Her parrot Mithu is my company, and my blood pressure is my doctor's hobby.",
+    "relationship_scores": {},
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_045",
+        "content": "I'm seventy-four, a retired zardozi master. I live alone in Hazratganj since my wife passed. Her parrot Mithu is my company, and my blood pressure is my doctor's hobby.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "male",
+      "birthday_in_days": 300,
+      "height_cm": 165,
+      "weight_kg": 60,
+      "fitness": 34,
+      "household_id": "apt_202",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "widowed",
+      "job": null,
+      "ambition": {
+        "goal": "Teach zardozi to a young apprentice",
+        "kind": "social",
+        "progress": 0
+      },
+      "conditions": [
+        {
+          "id": "high-blood-pressure",
+          "name": "high blood pressure",
+          "severity": 40,
+          "contagious": false,
+          "chronic": true,
+          "treated": true,
+          "since_day": -2000,
+          "treated_until": 5
+        }
+      ],
+      "wants_children": false,
+      "loneliness": 70
+    }
+  },
+  {
+    "citizen_id": "lko_046",
+    "name": "Rekha Bajpai",
+    "age": 44,
+    "profession": "Clinic doctor",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_clinic",
+    "position": [
+      55,
+      5
+    ],
+    "money": 2600,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [],
+    "mood": "Tired",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Capable",
+          "Overworked",
+          "Proud of her daughter"
+        ],
+        "values": "Her patients, and her daughter believing in herself.",
+        "voice": "Tired but kind, 'tell me from the beginning'.",
+        "sensitivity": "Working too late to notice things; her daughter hiding things from her.",
+        "repair": "Makes time, which is the hardest thing she has."
+      },
+      "appearance": {
+        "skin": "#c68d5e",
+        "hair": "#1d1b1c",
+        "shirt": "#f0f1ee",
+        "background": "#e7dfe0",
+        "hairstyle": "bun",
+        "outfit": "coat",
+        "trousers": "#555951",
+        "shoes": "#383a38",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "Ishita has been singing behind a closed door all week and says it's nothing.",
+    "short_term_goals": [
+      "Clear the evening queue at the clinic",
+      "Be home before Ishita's shift ends"
+    ],
+    "long_term_goals": [
+      "See Ishita on a real stage"
+    ],
+    "memory_summary": "I run the Hazratganj Clinic. I raised my daughter Ishita alone; she works evenings at the chai and kirana shop and sings like her grandmother did.",
+    "relationship_scores": {
+      "lko_047": 90,
+      "lko_045": 50
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_046",
+        "content": "I run the Hazratganj Clinic. I raised my daughter Ishita alone; she works evenings at the chai and kirana shop and sings like her grandmother did.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 75,
+      "height_cm": 160,
+      "weight_kg": 54,
+      "fitness": 55,
+      "household_id": "apt_301",
+      "parent_ids": [],
+      "partner_id": null,
+      "children_ids": [
+        "lko_047"
+      ],
+      "relationship_status": "single",
+      "job": {
+        "title": "Clinic doctor",
+        "location_id": "loc_clinic",
+        "hourly_wage": 38,
+        "start": 540,
+        "end": 1080,
+        "workdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "ambition": {
+        "goal": "Add a second doctor to the clinic",
+        "kind": "career",
+        "progress": 40
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  },
+  {
+    "citizen_id": "lko_047",
+    "name": "Ishita Bajpai",
+    "age": 19,
+    "profession": "Shop assistant",
+    "active": true,
+    "home_location_id": "loc_apartments",
+    "current_location_id": "loc_apartments",
+    "work_location_id": "loc_konbini",
+    "position": [
+      55,
+      5
+    ],
+    "money": 330,
+    "health": 92,
+    "hunger": 30,
+    "energy": 80,
+    "stress": 30,
+    "happiness": 70,
+    "reputation": 60,
+    "skills": [
+      "singing",
+      "science"
+    ],
+    "mood": "Nervous",
+    "personality": {
+      "nature": {
+        "traits": [
+          "Shy",
+          "Gifted",
+          "Self-doubting"
+        ],
+        "values": "Her music, and not being put on the spot.",
+        "voice": "Quiet, apologises before asking for anything, sings when she thinks she's alone.",
+        "sensitivity": "Being pushed onto a stage; letting people down.",
+        "repair": "Hums something for you, then says it in words."
+      },
+      "appearance": {
+        "skin": "#d4a273",
+        "hair": "#1d1b1c",
+        "shirt": "#f28a9d",
+        "background": "#dfe4ea",
+        "hairstyle": "bob",
+        "outfit": "apron",
+        "trousers": "#55515d",
+        "shoes": "#eeeae2",
+        "glasses": false
+      },
+      "playable": true,
+      "identity": {
+        "nationality": "Indian",
+        "hometown": "Lucknow, India",
+        "former_names": []
+      }
+    },
+    "current_thought": "The audition at the Bhatkhande music college is on the 20th. I'd have to give up my evening shifts to practise.",
+    "short_term_goals": [
+      "Practise raag Yaman for the audition",
+      "Work up to asking Kamla aunty for time off"
+    ],
+    "long_term_goals": [
+      "Study classical vocal music"
+    ],
+    "memory_summary": "I'm nineteen and work evenings at Sharmaji Chai & Kirana. Mummy is the doctor at the Hazratganj Clinic. I have an audition at the Bhatkhande music college and I've told nobody.",
+    "relationship_scores": {
+      "lko_046": 90
+    },
+    "seed_memories": [
+      {
+        "memory_id": "mem_seed_lko_047",
+        "content": "I'm nineteen and work evenings at Sharmaji Chai & Kirana. Mummy is the doctor at the Hazratganj Clinic. I have an audition at the Bhatkhande music college and I've told nobody.",
+        "importance": 0.8
+      }
+    ],
+    "life": {
+      "sex": "female",
+      "birthday_in_days": 160,
+      "height_cm": 157,
+      "weight_kg": 47,
+      "fitness": 50,
+      "household_id": "apt_301",
+      "parent_ids": [
+        "lko_046"
+      ],
+      "partner_id": null,
+      "children_ids": [],
+      "relationship_status": "single",
+      "job": {
+        "title": "Shop assistant",
+        "location_id": "loc_konbini",
+        "hourly_wage": 13,
+        "start": 780,
+        "end": 1260,
+        "workdays": [
+          0,
+          2,
+          4,
+          5,
+          6
+        ]
+      },
+      "ambition": {
+        "goal": "Win a place at the Bhatkhande music college",
+        "kind": "creative",
+        "progress": 30
+      },
+      "conditions": [],
+      "wants_children": false
+    }
+  }
+]

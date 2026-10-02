@@ -25,6 +25,7 @@ import { LiveConversation } from "./LiveConversation";
 import { EarthIntro } from "./EarthIntro";
 import { registerSceneCapture } from "@/lib/scene-capture";
 import { sceneIntro } from "@/lib/narrator";
+import { activeCity } from "@/lib/cities";
 import { renderShareCard } from "@/lib/share";
 import { calendarDay, formatDate } from "@/lib/calendar";
 import { weekday } from "@/lib/routine";
@@ -96,7 +97,7 @@ export function GameCanvas({
         console.error("3D town initialization failed", cause);
         if (!cancelled)
           setError(
-            "Nakameguro needs WebGL 2 graphics. Enable hardware acceleration or try a supported browser.",
+            `${activeCity().name} needs WebGL 2 graphics. Enable hardware acceleration or try a supported browser.`,
           );
       }
     }
@@ -194,7 +195,7 @@ export function GameCanvas({
           ) : (
             <>
               <LoaderCircle className="reply-spinner" size={22} />
-              <span>Opening Nakameguro...</span>
+              <span>Opening {activeCity().name}...</span>
             </>
           )}
         </div>

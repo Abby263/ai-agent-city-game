@@ -1,5 +1,8 @@
 import PF from "pathfinding";
 import type { CitizenAgent } from "@/lib/types";
+import { THEME } from "./theme";
+import { accessLanes, terraces } from "./infill";
+import { CHAURAHA, GATE } from "./streets";
 
 export type Point = { x: number; z: number };
 export type Building = {
@@ -12,10 +15,14 @@ export type Building = {
   h: number;
   wall: number;
   roof: number;
-  kind: "home" | "shop" | "civic" | "school" | "hospital" | "lab" | "gym" | "apartment" | "office" | "mall" | "station" | "shrine";
+  kind: "home" | "shop" | "civic" | "school" | "hospital" | "lab" | "gym" | "apartment" | "office" | "mall" | "station" | "shrine" | "terrace";
+  /** Terraces only: which way the front looks, their street's style, and a seed for their details. */
+  face?: "n" | "s" | "e" | "w";
+  style?: "chowk" | "ganj" | "mohalla" | "wall" | "railing";
+  seed?: number;
 };
 
-export const buildings: Building[] = [
+const BUILDINGS: Building[] = [
   {
     id: "home_a",
     name: "Willow House",
@@ -211,6 +218,9 @@ export const buildings: Building[] = [
   },
 ];
 
+// Every city stands on the same plots; the theme gives each building its local name and colours.
+const PLACES: Building[] = BUILDINGS.map((b) => ({ ...b, ...THEME.buildings[b.id] }));
+
 export const arrivals: Record<string, Point> = {
   loc_homes: { x: 6, z: 11.5 },
   loc_school: { x: 19.3, z: 9 },
@@ -237,6 +247,25 @@ export const arrivals: Record<string, Point> = {
   loc_clinic: { x: 76, z: 35.2 },
 };
 
+// Things standing in the street that a terrace must not be built over: lamp posts, the gateway, the clock tower.
+const STREET_FURNITURE: Point[] = [
+  ...[52, 60, 66.2, 71.8, 80].flatMap((x) => [10.8, 16.2, 23.8, 29.2].map((z) => ({ x: x + 0.2, z }))),
+  ...[11.2, 24.2, 28.8].flatMap((x) => [2, 10, 18, 24, 32, 38].map((z) => ({ x: x + 0.2, z }))),
+  { x: 57, z: 30.3 }, { x: 73.4, z: 25 },
+  // The Akbari Gate's piers, either side of the bazaar road.
+  { x: GATE.x, z: GATE.z - 2 }, { x: GATE.x, z: GATE.z + 2 },
+];
+/** The places the game uses, plus (in Lucknow) the terraces that fill the streets between them. */
+export const buildings: Building[] = THEME.terraces ? [...PLACES, ...terraces(PLACES, arrivals, STREET_FURNITURE)] : PLACES;
+
+/** Lucknow only: the brick lanes that lead from the streets to each place's way in, as [x0, z0, x1, z1]. */
+export const LANES = THEME.terraces ? accessLanes(PLACES, arrivals) : [];
+
+/** True if a point is inside (or within `margin` of) any building: used to keep trees and street props out of walls. */
+export function insideFootprint(x: number, z: number, margin = 0.2) {
+  return buildings.some((b) => Math.abs(x - b.x) < b.w / 2 + margin && Math.abs(z - b.z) < b.d / 2 + margin);
+}
+
 /** Town bounds in world units: the old town (x 0-40), the river (41.5-48.5) and downtown (49-91). */
 export const WORLD = { width: 92, depth: 40 };
 export const RIVER = { from: 41.2, to: 48.8, bridges: [13.5, 26.5] };
@@ -257,7 +286,9 @@ for (let z = 0; z < DEPTH; z++)
         (b) =>
           Math.abs(px - b.x) < b.w / 2 + 0.25 &&
           Math.abs(pz - b.z) < b.d / 2 + 0.25,
-      ) || Math.hypot((px - 21.8) / 1.4, (pz - 31.8) / 1.8) < 1;
+      ) || Math.hypot((px - 21.8) / 1.4, (pz - 31.8) / 1.8) < 1
+      // Lucknow's chauraha: nobody walks across the railed island.
+      || (THEME.terraces && Math.hypot(px - CHAURAHA.x, pz - CHAURAHA.z) < CHAURAHA.island + 0.2);
     grid.setWalkableAt(x, z, !blocked);
   }
 const finder = new PF.AStarFinder({

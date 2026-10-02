@@ -18,7 +18,13 @@ export type Accessory =
   | { kind: "backpack"; color: number }
   | { kind: "guitar" }
   | { kind: "bag"; color: number }
-  | { kind: "cane" };
+  | { kind: "cane" }
+  /** The skirt of a kurta or kameez, from the waist to the knee (or the shin, for a saree-length drape). */
+  | { kind: "kurta"; color: number; long?: boolean }
+  /** A dupatta over both shoulders, its ends hanging in front. */
+  | { kind: "dupatta"; color: number }
+  /** A close-fitting cap (the Lucknowi topi). */
+  | { kind: "topi"; color: number };
 
 export type Wardrobe = { top: number; bottom: number; accessories: Accessory[] };
 
@@ -49,6 +55,33 @@ const WARDROBE: Record<string, Wardrobe> = {
   cit_045: { top: 0x7c6748, bottom: 0x4a4a43, accessories: [{ kind: "flatCap", color: 0x66735a }] },                      // Hiroshi, retired carpenter
   cit_046: { top: 0xf0f1ee, bottom: 0x775889, accessories: [{ kind: "stethoscope" }, { kind: "scarf", color: 0xa9c7e8 }] }, // Emi, clinic doctor
   cit_047: { top: 0xf28a9d, bottom: 0x454a55, accessories: [{ kind: "apron", color: 0x27995a }, { kind: "headphones", color: 0xf4f1ea }] }, // Sakura, konbini clerk
+  // ---- Lucknow ----
+  lko_009: { top: 0xe9695f, bottom: 0xf1ece0, accessories: [{ kind: "kurta", color: 0xe9695f }, { kind: "dupatta", color: 0xf6e7c4 }] },                   // Zoya, lab assistant
+  lko_010: { top: 0xf0a52e, bottom: 0xf1ece0, accessories: [{ kind: "kurta", color: 0xf0a52e }, { kind: "guitar" }] },                                    // Kabir, kabab cook and singer
+  lko_021: { top: 0x1fa187, bottom: 0x1f2328, accessories: [{ kind: "cap", color: 0x2d5fa8 }, { kind: "backpack", color: 0xe2572b }] },                   // Arjun, cricketer
+  lko_022: { top: 0xbfdcf2, bottom: 0xf1ece0, accessories: [{ kind: "kurta", color: 0xbfdcf2 }, { kind: "dupatta", color: 0x5c80bb }] },                   // Sana, pharmacy
+  lko_026: { top: 0x2f73b0, bottom: 0x474b55, accessories: [{ kind: "cap", color: 0xe8b53a }] },                                                          // Anuj, electrician
+  lko_027: { top: 0xd9558a, bottom: 0x363d4b, accessories: [{ kind: "kurta", color: 0xd9558a, long: true }, { kind: "bag", color: 0xd9a03c }] },                       // Tara, artist
+  lko_028: { top: 0x208c82, bottom: 0x272b33, accessories: [{ kind: "headphones", color: 0x202227 }, { kind: "lanyard", color: 0xe0523f }] },             // Ananya, engineer
+  lko_029: { top: 0xf4f3ee, bottom: 0x2c2f37, accessories: [{ kind: "chefCap" }, { kind: "apron", color: 0xc8432f }] },                                   // Rohan, chaat cook
+  lko_030: { top: 0x6b8a3a, bottom: 0xe9e2cf, accessories: [{ kind: "kurta", color: 0x6b8a3a }, { kind: "scarf", color: 0xc8442e }] },                     // Ramesh, mango grower
+  lko_031: { top: 0x7b4a92, bottom: 0x5f3474, accessories: [{ kind: "kurta", color: 0x7b4a92, long: true }, { kind: "dupatta", color: 0xf0d79a }] },       // Sunita, bank clerk
+  lko_032: { top: 0xf3efe2, bottom: 0xf3efe2, accessories: [{ kind: "kurta", color: 0xf3efe2 }, { kind: "scarf", color: 0xd08a2e }, { kind: "cane" }] },   // Shyam Lal
+  lko_033: { top: 0xf3f3ef, bottom: 0x2a7a7c, accessories: [{ kind: "kurta", color: 0xf3f3ef }, { kind: "stethoscope" }] },                                // Nasreen, doctor
+  lko_034: { top: 0xf1ead8, bottom: 0xf1ead8, accessories: [{ kind: "kurta", color: 0xf1ead8 }, { kind: "topi", color: 0xfbfaf4 }, { kind: "scarf", color: 0xb9502a }] }, // Imran, kabab house owner
+  lko_035: { top: 0xe6b230, bottom: 0x8a3d2f, accessories: [{ kind: "kurta", color: 0xe6b230, long: true }, { kind: "dupatta", color: 0x8a3d2f }] },       // Meera, teacher
+  lko_036: { top: 0xeceee9, bottom: 0x3d444b, accessories: [{ kind: "lanyard", color: 0xd0492f }] },                                                      // Alok, scientist
+  lko_037: { top: 0x8a5cab, bottom: 0xe9e2d2, accessories: [{ kind: "kurta", color: 0x8a5cab, long: true }, { kind: "dupatta", color: 0xe9e2d2 }] },                   // Farah, librarian
+  lko_038: { top: 0xb5a273, bottom: 0xa8956a, accessories: [{ kind: "cap", color: 0x9c8a5a, band: 0xb7362d }] },                                          // Vikram, police inspector (khaki)
+  lko_039: { top: 0xff6444, bottom: 0x22252a, accessories: [{ kind: "headband", color: 0xffffff }] },                                                     // Pooja, coach
+  lko_040: { top: 0x2a3d57, bottom: 0x222936, accessories: [{ kind: "cap", color: 0x2a3d57, band: 0xc23b2e }] },                                          // Rajendra, station superintendent
+  lko_041: { top: 0xd9662b, bottom: 0xb9502a, accessories: [{ kind: "kurta", color: 0xd9662b, long: true }, { kind: "dupatta", color: 0xf2c53d }] },       // Kamla, shop owner
+  lko_042: { top: 0x5c80bb, bottom: 0x293040, accessories: [{ kind: "bag", color: 0x8a5a2b }] },                                                          // Aditya, station staff
+  lko_043: { top: 0xc94a6b, bottom: 0x292b32, accessories: [{ kind: "bag", color: 0x1f2024 }] },                                                          // Nidhi, marketing
+  lko_044: { top: 0x44536c, bottom: 0x2a2d36, accessories: [{ kind: "lanyard", color: 0xe0a030 }] },                                                      // Faizan, arcade manager
+  lko_045: { top: 0xefe6d0, bottom: 0xefe6d0, accessories: [{ kind: "kurta", color: 0xefe6d0, long: true }, { kind: "topi", color: 0xfbfaf4 }] },          // Mirza Yusuf, zardozi master
+  lko_046: { top: 0xf0f1ee, bottom: 0x775889, accessories: [{ kind: "kurta", color: 0xf0f1ee }, { kind: "stethoscope" }, { kind: "dupatta", color: 0x775889 }] }, // Rekha, clinic doctor
+  lko_047: { top: 0xf28a9d, bottom: 0xf1ece0, accessories: [{ kind: "kurta", color: 0xf28a9d }, { kind: "dupatta", color: 0xfbf3e0 }] },                   // Ishita, singer
 };
 
 export const wardrobeFor = (citizenId: string): Wardrobe | undefined => WARDROBE[citizenId];
@@ -244,6 +277,35 @@ export function addAccessory(accessory: Accessory, frame: BodyFrame, mount: Moun
         strap([0.1, neck - 0.01, 0.03], [-side * 0.9, hip + 0.02, -BACK * 0.9], 0.03, 0.01, leather),
         part(new THREE.BoxGeometry(0.08, 0.2, 0.26), leather, -side, hip - 0.08, 0.03));
       mount("spine_03", group, new THREE.Vector3());
+      break;
+    }
+    case "kurta": {
+      // Open at the bottom and a little wider there, so legs swing inside it.
+      const length = accessory.long ? 0.66 : 0.44;
+      const cloth = mat(accessory.color, 0.9);
+      cloth.side = THREE.DoubleSide;
+      const skirt = part(new THREE.CylinderGeometry(0.185, accessory.long ? 0.2 : 0.215, length + 0.07, 18, 1, true), cloth, 0, 0.14 - (length + 0.07) / 2, 0.02);
+      skirt.scale.z = 0.9;
+      mount("pelvis", skirt, new THREE.Vector3());
+      break;
+    }
+    case "dupatta": {
+      // Worn across the body: over the left shoulder, down across the chest to the right hip, the other end down the back.
+      const cloth = mat(accessory.color, 0.92);
+      const shoulder: [number, number, number] = [0.115, neck - 0.015, 0.01];
+      group.add(strap(shoulder, [0.02, neck - 0.19, FRONT * 0.9], 0.085, 0.012, cloth),
+        strap([0.02, neck - 0.19, FRONT * 0.9], [-0.13, hip + 0.1, FRONT * 0.72], 0.085, 0.012, cloth),
+        strap(shoulder, [0.12, hip + 0.12, -BACK * 0.95], 0.085, 0.012, cloth));
+      mount("spine_03", group, new THREE.Vector3());
+      break;
+    }
+    case "topi": {
+      const cloth = mat(accessory.color, 0.9);
+      group.add(part(new THREE.CylinderGeometry(r * 1.0, r * 1.06, 0.06, 20), cloth, 0, 0.035, 0));
+      const top = part(new THREE.SphereGeometry(r * 1.0, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2), cloth, 0, 0.065, 0);
+      top.scale.y = 0.28;
+      group.add(top);
+      mount("head", group, crown);
       break;
     }
     case "cane": {

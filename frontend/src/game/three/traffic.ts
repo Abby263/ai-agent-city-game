@@ -1,22 +1,61 @@
 import * as THREE from "three";
 import { Art } from "./materials";
 import type { Point } from "./layout";
+import { autoRickshaw } from "./props";
+import { isLucknow } from "./theme";
+import { CHAURAHA, CHOWK, at } from "./streets";
 
 // Japan drives on the left. The route runs east over the north bridge to downtown, down the
 // avenue, and back west over the south bridge, passing both bus shelters on its first stretch.
-const loop: Point[] = [
+const GRID_LOOP: Point[] = [
   { x: 12.75, z: 12.75 },
   { x: 69.75, z: 12.75 },
   { x: 69.75, z: 27.25 },
   { x: 12.75, z: 27.25 },
 ];
+
+/**
+ * Lucknow drives on the left too, when it keeps to a side at all. The same round trip, along the old city's bent
+ * roads: east down the bazaar road and round the chauraha, over the bridge, down Hazratganj's avenue, back over
+ * the south bridge and through Nakhas, then north up Sarai Road to the bazaar again.
+ */
+function lucknowLoop(): Point[] {
+  const [chowk, nakhas, , sarai] = CHOWK;
+  const out: Point[] = [];
+  const ring = CHAURAHA.island + 0.85;
+  let rounded = false;
+  for (let x = 13.6; x <= 39.2; x += 0.8) {
+    if (Math.abs(x - CHAURAHA.x) < ring + 0.3) {
+      // Round the island by the north side: clockwise, as on any Indian roundabout.
+      if (!rounded) for (let a = Math.PI - 0.35; a >= 0.35; a -= 0.3) out.push({ x: CHAURAHA.x + Math.cos(a) * ring, z: CHAURAHA.z - Math.sin(a) * ring });
+      rounded = true;
+      continue;
+    }
+    out.push({ x, z: at(chowk, x) - 0.5 });
+  }
+  out.push({ x: 41, z: 12.75 }, { x: 69.75, z: 12.75 }, { x: 69.75, z: 27.25 }, { x: 41, z: 27.25 });
+  for (let x = 39.2; x >= 14.6; x -= 0.8) out.push({ x, z: at(nakhas, x) + 0.35 });
+  for (let z = 26.2; z >= 15; z -= 0.8) out.push({ x: at(sarai, z) - 0.35, z });
+  return out;
+}
+
+const loop = isLucknow ? lucknowLoop() : GRID_LOOP;
 const segments = loop.map((from, i) => {
   const to = loop[(i + 1) % loop.length];
   return { from, to, length: Math.hypot(to.x - from.x, to.z - from.z) };
 });
 const LOOP_LENGTH = segments.reduce((sum, s) => sum + s.length, 0);
-// Distances along the first segment where the bus doors meet the shelters (old town and Kokashita Arcade).
-const BUS_STOPS = [16.1 - 12.75, 60.5 - 12.75];
+/** How far round the loop the eastbound lane first passes `x`. */
+function distanceAt(x: number) {
+  let d = 0;
+  for (const s of segments) {
+    if (s.from.x <= x && s.to.x > x) return d + (s.length * (x - s.from.x)) / (s.to.x - s.from.x);
+    d += s.length;
+  }
+  return 0;
+}
+// Where the bus doors meet the shelters (old town and Kokashita Arcade).
+const BUS_STOPS = [distanceAt(16.1), distanceAt(60.5)];
 
 export function pointOnLoop(distance: number) {
   let d = ((distance % LOOP_LENGTH) + LOOP_LENGTH) % LOOP_LENGTH;
@@ -58,9 +97,34 @@ function makeVehicle(art: Art, bus: boolean, color: number): Vehicle {
   return { root, body, distance: 0, speed: bus ? 2.1 : 2.6, length, bus, dwell: 0, stopped: 0 };
 }
 
+/** An auto-rickshaw or e-rickshaw in traffic: slower than a car, and there are a lot of them. */
+function makeAuto(art: Art, electric: boolean): Vehicle {
+  const root = new THREE.Group(), body = new THREE.Group();
+  root.add(body);
+  autoRickshaw(art, body, 0, 0.04, 0, 0, electric).scale.setScalar(1.25);
+  body.traverse((o) => { if (o instanceof THREE.Mesh) o.receiveShadow = false; });
+  art.contactShadow(root, 1.1, 1.7, 0.42);
+  return { root, body, distance: 0, speed: electric ? 1.7 : 2.2, length: 1.4, bus: false, dwell: 0, stopped: 0 };
+}
+
+// In Lucknow's narrow roads people and traffic share the same few metres, so drivers pass closer.
+const YIELD = isLucknow ? 0.75 : 1.25;
+
 export function makeTraffic(art: Art) {
   const root = new THREE.Group();
-  const vehicles = [
+  // Lucknow's roads belong to the three-wheelers: autos and e-rickshaws outnumber everything else.
+  const vehicles = isLucknow ? [
+    makeVehicle(art, true, 0xd9662b),
+    makeAuto(art, false),
+    makeAuto(art, true),
+    makeVehicle(art, false, 0xf1f1ec),
+    makeAuto(art, true),
+    makeAuto(art, false),
+    makeAuto(art, true),
+    makeVehicle(art, false, 0xb9bdc0),
+    makeAuto(art, false),
+    makeAuto(art, true),
+  ] : [
     makeVehicle(art, true, 0xf2c14e),
     makeVehicle(art, false, 0xd9776b),
     makeVehicle(art, false, 0x6f93c9),
@@ -85,7 +149,7 @@ export function makeTraffic(art: Art) {
       if (suspended) continue;
       if (v.dwell > 0) { v.dwell -= dt; continue; }
       const ahead = pointOnLoop(v.distance + v.length / 2 + 0.9);
-      const blockedByPerson = pedestrians.some((p) => Math.hypot(p.x - ahead.x, p.z - ahead.z) < 1.25);
+      const blockedByPerson = pedestrians.some((p) => Math.hypot(p.x - ahead.x, p.z - ahead.z) < YIELD);
       const gapToNext = Math.min(...vehicles.filter((o) => o !== v).map((o) =>
         (((o.distance - v.distance) % LOOP_LENGTH) + LOOP_LENGTH) % LOOP_LENGTH - (o.length + v.length) / 2));
       if (blockedByPerson || gapToNext < 0.9) {

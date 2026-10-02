@@ -2297,3 +2297,26 @@ select {
   .live-dialogue[data-compact="true"] .live-line { flex-direction: row; align-items: center; }
   .live-dialogue[data-compact="true"] .live-line .dialogue-progress { display: none; }
 }
+
+/* Choosing a city. */
+.city-switch { display: flex; align-items: center; gap: 4px; margin-top: 5px; padding: 0; border: 0; background: none; color: #b9bec9; font-size: 11px; font-weight: 400; letter-spacing: 0.02em; cursor: pointer; }
+.city-switch:hover { color: #ffe19c; }
+.city-picker { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 20px; overflow-y: auto;
+  background: radial-gradient(circle at 30% 20%, #24384a, #10161c 70%); color: #f2f4f1; }
+.city-picker-inner { width: min(860px, 100%); text-align: center; }
+.city-picker-inner > small { font-size: 11px; letter-spacing: 0.2em; color: #f0ce78; }
+.city-picker-inner h1 { margin: 6px 0 8px; font-family: Georgia, serif; font-weight: 400; font-size: clamp(28px, 5vw, 44px); }
+.city-picker-inner > p { margin: 0 auto 24px; max-width: 520px; font-size: 14.5px; line-height: 1.6; color: #c5cdd0; }
+.city-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.city-card { display: grid; gap: 6px; padding: 22px 20px 18px; text-align: left; color: #fff; border-radius: 18px; border: 1px solid #ffffff2e; cursor: pointer;
+  background: linear-gradient(160deg, #2f5d6b, #1d2f3d); box-shadow: 0 14px 40px #0006; transition: transform 0.15s, border-color 0.15s; }
+.city-card[data-city="lucknow"] { background: linear-gradient(160deg, #b8683a, #5a2b3a); }
+.city-card:hover, .city-card:focus-visible { transform: translateY(-3px); border-color: #ffe19c; outline: none; }
+.city-card[aria-pressed="true"] { border-color: #89ffe0; }
+.city-card-art { font-size: 44px; line-height: 1; }
+.city-card strong { font-family: Georgia, serif; font-weight: 400; font-size: 30px; }
+.city-card em { font-style: normal; font-size: 12px; letter-spacing: 0.04em; color: #ffe4b8; }
+.city-card > span:not(.city-card-art) { font-size: 13.5px; line-height: 1.55; color: #e9eeee; min-height: 3.1em; }
+.city-card b { justify-self: start; margin-top: 8px; padding: 8px 14px; border-radius: 999px; background: #ffffff22; font-size: 13px; font-weight: 600; }
+.city-picker-close { margin-top: 18px; color: #c5cdd0; }
+@media (max-width: 760px) { .city-switch { font-size: 8.5px; margin-top: 3px; } }

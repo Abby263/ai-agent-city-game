@@ -34,14 +34,16 @@ import { dayWeather, weatherAt, type WeatherOverride } from "./weather";
 import { weatherEffects } from "./life";
 import { activeIncidents } from "./incidents";
 import { addBeat, beatForConversation, beatForNews, startStory } from "./stories";
+import { CITY_LIST, activeCity, cityText, storagePrefix } from "./cities";
 import type { LifeNews } from "./life";
 import { bedRest, careNeeded, caregiverFor, ensureLife, gatheringFor, healthCap, lifeDay, lifeTick, recordMeal, relationName, relatives, shiftLife } from "./life";
 import type { BondLookup, LifeFactory, LifeSink } from "./life";
 
 const SESSION_VERSION = "v12";
-const CITY_KEY = `agentcity.${SESSION_VERSION}.city`;
-const RELATIONSHIPS_KEY = `agentcity.${SESSION_VERSION}.relationships`;
-const CONVERSATIONS_KEY = `agentcity.${SESSION_VERSION}.conversations`;
+// Storage names are short tags; readJson/writeJson put the active city's prefix in front, so each city keeps its own world.
+const CITY_KEY = "city";
+const RELATIONSHIPS_KEY = "relationships";
+const CONVERSATIONS_KEY = "conversations";
 
 type PlayerTaskData = {
   task: string;
@@ -408,7 +410,11 @@ export async function sessionSetMode(mode: SimulationMode) {
 export function resetSession() {
   if (typeof window === "undefined") return;
   const storage = window.localStorage as Storage;
-  const keys = Array.from({ length: storage.length ?? 0 }, (_, i) => storage.key(i)).filter((key): key is string => Boolean(key?.startsWith(`agentcity.${SESSION_VERSION}.`)));
+  const prefix = storagePrefix(SESSION_VERSION);
+  // Nakameguro's keys have no city in them, so leave any other city's world alone.
+  const others = CITY_LIST.filter((c) => c.id !== activeCity().id).map((c) => `agentcity.${SESSION_VERSION}.${c.id}.`);
+  const keys = Array.from({ length: storage.length ?? 0 }, (_, i) => storage.key(i))
+    .filter((key): key is string => Boolean(key?.startsWith(prefix)) && !others.some((other) => key!.startsWith(other)));
   keys.forEach((key) => storage.removeItem(key));
 }
 
@@ -1174,6 +1180,7 @@ function firstNames(city: CityState) {
 function lifeSink(city: CityState): LifeSink {
   return (news) => {
     beatForNews(city, news);
+    news = { ...news, headline: cityText(news.headline) };
     const event = addEvent(city, { event_type: `life_${news.kind}`, description: news.headline, actors: news.actors,
       location_id: news.location_id ?? null, priority: news.priority ?? 2 });
     for (const memory of news.memories ?? [])
@@ -1287,7 +1294,7 @@ export function describeNow(city: CityState) {
   const day = calendarDay(city.calendar_start ?? calendarStartFor(city.clock.day), city.clock.day);
   const clock = `${String(Math.floor(city.clock.minute_of_day / 60)).padStart(2, "0")}:${String(city.clock.minute_of_day % 60).padStart(2, "0")}`;
   const w = city.weather;
-  return `${weekday(city.clock.day)} ${day.dayOfMonth}/${day.month}/${day.year}, ${clock} in ${city.city_name}, Tokyo${day.holiday ? ` (${day.holiday})` : ""}${w ? `. Weather: ${w.label}, ${Math.round(w.temp_c)}°C${w.alert ? `. ${w.alert.text}` : ""}` : ""}`;
+  return `${weekday(city.clock.day)} ${day.dayOfMonth}/${day.month}/${day.year}, ${clock} in ${city.city_name}, ${activeCity().metro === city.city_name ? activeCity().country : activeCity().metro}${day.holiday ? ` (${day.holiday})` : ""}${w ? `. Weather: ${w.label}, ${Math.round(w.temp_c)}°C${w.alert ? `. ${w.alert.text}` : ""}` : ""}`;
 }
 
 export function routineContext(city: CityState): RoutineContext {
@@ -1860,6 +1867,8 @@ function stageStoryScene(city: CityState, now: number) {
     return Boolean(c && sociallyAvailable(c, player) && !meetingFor(city, c));
   });
   if (!next) return;
+  // The very first scene of a world is its first case; the others wait a little for those two to be up and about.
+  if (story.last_scene < 0 && city.clock.day === 1 && city.clock.minute_of_day < 510 && next.storyline.id !== openCases(story)[0]?.id) return;
   const { storyline, beat, index } = next;
   const actor = person(beat.actor)!, target = person(beat.target)!;
   for (const seed of beat.prelude ?? []) plantSeed(city, seed);
@@ -3052,7 +3061,7 @@ function addEvent(
     event_type: input.event_type,
     location_id: input.location_id ?? null,
     actors: input.actors ?? [],
-    description: input.description,
+    description: cityText(input.description),
     payload: input.payload ?? {},
     priority: input.priority ?? 1,
     visibility: "public",
@@ -3085,7 +3094,7 @@ function addMemory(
 }
 
 function citizenMemoryKey(citizenId: string) {
-  return `agentcity.${SESSION_VERSION}.memory.${citizenId}`;
+  return `memory.${citizenId}`;
 }
 
 function seedCitizenMemoryFiles(city: CityState) {
@@ -3464,7 +3473,7 @@ function clone<T>(value: T): T {
 function readJson<T>(key: string): T | null {
   if (!sessionMemoryEnabled()) return null;
   try {
-    const value = window.localStorage.getItem(key);
+    const value = window.localStorage.getItem(storagePrefix(SESSION_VERSION) + key);
     return value ? (JSON.parse(value) as T) : null;
   } catch {
     return null;
@@ -3474,7 +3483,7 @@ function readJson<T>(key: string): T | null {
 function writeJson(key: string, value: unknown) {
   if (!sessionMemoryEnabled()) return;
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    window.localStorage.setItem(storagePrefix(SESSION_VERSION) + key, JSON.stringify(value));
   } catch {
     // Short-term memory is best effort in browsers with restricted storage.
   }

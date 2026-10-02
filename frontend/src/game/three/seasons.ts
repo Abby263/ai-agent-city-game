@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { Art } from "./materials";
+import { isLucknow } from "./theme";
 
 // Base tree colours used in town.ts: four sakura shades and four green shades.
 const SAKURA = [0xefb0c2, 0xf6c2cf, 0xe999b4, 0xffd6de];
@@ -10,6 +11,8 @@ export type Foliage = { sakura: number[]; green: number[]; petals: number | null
 /** Tokyo's year in trees: hanami, fresh leaves, deep summer green, autumn colour, bare winter. */
 export function foliageFor(month: number, day: number): Foliage {
   const v = month * 100 + day;
+  // Lucknow: kites fly all year (the "petals" are kites there), and the riverbank is strung with lights for Diwali.
+  if (isLucknow) return { sakura: SAKURA, green: GREEN, petals: 0xffffff, lanterns: v >= 1101 && v <= 1115, label: v >= 1101 && v <= 1115 ? "Diwali lights" : "Kite weather" };
   if (v >= 325 && v <= 408) return { sakura: SAKURA, green: [0x7fae74, 0x8dba7c, 0x6e9f6c, 0xa7c98f], petals: 0xffc8db, lanterns: true, label: "Cherry blossoms" };
   if (v >= 409 && v <= 425) return { sakura: [0xc9d9a2, 0xe8c6cf, 0xb5d08f, 0xf1d8de], green: [0x86b878, 0x98c585, 0x76a970, 0xb0d196], petals: 0xf6d6df, lanterns: v <= 415, label: "Fresh leaves" };
   if (v >= 426 && v <= 1031) return { sakura: [0x6f9f6a, 0x7fae74, 0x5e8f60, 0x8fbf7f], green: GREEN, petals: null, lanterns: false, label: "Summer green" };
