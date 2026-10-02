@@ -10,9 +10,10 @@ header; each city keeps its own saved world in the browser. Two ship today:
 
 ## How a city is put together
 
-Every city is the same kind of neighbourhood on the same street grid: two cross streets, a river with two bridges
-and a rail viaduct, with the same 23 places (`loc_market`, `loc_station`, ...). That shared skeleton is what lets
-the simulation (routines, jobs, households, cases, the narrator) run unchanged. What differs is everything a
+Every city is the same kind of neighbourhood on the same plots: an old town, a river with two bridges, a downtown
+and a rail viaduct, with the same 23 places (`loc_market`, `loc_station`, ...) standing where they always stand.
+That shared skeleton is what lets the simulation (routines, jobs, households, cases, the narrator) run unchanged.
+The streets between the plots can be a city's own (see Lucknow's street map below). What differs is everything a
 player sees and hears.
 
 | Layer | File | What it holds |
@@ -37,6 +38,11 @@ residents' character prompts and, for scenes, a line on how people there speak.
 Built from photographs of Hazratganj, Chowk, Aminabad, Charbagh's forecourt and ordinary residential lanes. What
 those have in common, and what the town therefore does (`theme.ts`, `infill.ts`, `terraces.ts`):
 
+- **Its own street map.** `streets.ts` draws the old city: the bazaar road bending from the bridge to the Akbari
+  Gate, a second road through Nakhas, two cross streets that never run straight, a gali only wide enough to walk,
+  and a chauraha where traffic goes round a railed island with a small domed pavilion. The roads are 5 to 6 m
+  between building lines (Nakameguro's are 10 m with pavements). Ground painting, terraces, poles and wires,
+  traffic and street vendors all read the same map; Hazratganj keeps its broad, straight colonial roads.
 - **No lawns, few road markings.** Open ground is bare dusty earth; roads are worn, patched asphalt from one
   building line to the other, their edges crumbling into dust. Only the park is green; only Hazratganj has
   pavements, zebra crossings, railings, bollards and cast-iron lamp posts with globes.
@@ -55,7 +61,9 @@ those have in common, and what the town therefore does (`theme.ts`, `infill.ts`,
   autos and e-rickshaws. Every pole feeds a dozen houses by its own drooping cable.
 
 The terraces and walls join the building list, so people walk round them and cameras stay out of them;
-`tests/lucknow-streets.test.ts` checks that nothing overlaps and every place and front door can still be reached.
+every place and front door keeps a brick lane to the nearest street. `tests/lucknow-streets.test.ts` checks that
+nothing overlaps or stands in a road, that every place and front door can still be reached, that each road can be
+walked end to end, and that traffic stays on the roads and goes round the island.
 
 - **Places.** West of the Gomti is the old city: Chowk Mohalla, Aminabad Bazaar, Nawab Kabab House, KGMU Hospital,
   the Amir-ud-Daula Library, Chowk Kotwali, a Dussehri mango orchard. East is Hazratganj and Charbagh: the arcade,

@@ -1,7 +1,7 @@
 import { activeCity } from "@/lib/cities";
 
-// How the active city looks. Both cities share one street grid (two cross streets, a river with two bridges, a
-// rail viaduct); the theme decides what stands on it: building names, colours and styles, landmarks, street life,
+// How the active city looks. Both cities share the same plots (an old town, a river with two bridges, a downtown,
+// a rail viaduct); Lucknow's old city has its own streets between them (streets.ts). The theme decides the rest: building names, colours and styles, landmarks, street life,
 // trees, the far horizon and the tint of the air. Chosen once, when the town is first built.
 
 export type HomeStyle = "gable" | "haveli";

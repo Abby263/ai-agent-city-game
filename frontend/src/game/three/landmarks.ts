@@ -140,3 +140,79 @@ export function clockTower(art: Art, root: THREE.Group, x: number, z: number) {
   const vane = art.ball(g, 0, y + 2.5, 0, 0.09, 0.09, 0.09, GOLD);
   vane.castShadow = false;
 }
+
+/**
+ * The Akbari Gate, the way in to Chowk: a plain, heavy gateway of lakhori brick and lime plaster across the bazaar
+ * road, three storeys of it, with a pointed arch the traffic squeezes through, a blind arch either side, and a
+ * naubat khana (a gallery for the drummers) over the top. `span` is the width of the road it stands across.
+ */
+export function akbariGate(art: Art, root: THREE.Group, x: number, z: number, span: number) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  // Built facing +z, then turned to face along the east-west road.
+  g.rotation.y = Math.PI / 2;
+  root.add(g);
+  const pier = 0.75, w = span + pier * 2, h = 3.5, depth = 0.9;
+  archway(art, g, 0, 0, 0, w, h, depth, CREAM, span - 0.16, 2.7);
+  for (const face of [1, -1]) {
+    const front = new THREE.Group();
+    front.rotation.y = face > 0 ? 0 : Math.PI;
+    g.add(front);
+    // A raised frame round the arch, blind niches on the piers, a string course, and the gallery's own small arches.
+    for (const side of [-1, 1]) {
+      art.box(front, side * (span / 2 + 0.02), h / 2, depth / 2 + 0.02, 0.1, h, 0.04, CREAM_DARK);
+      archPanel(art, front, side * (span / 2 + pier / 2 + 0.04), 0.5, depth / 2 + 0.004, pier * 0.5, 1.0, SHADE, 0.012);
+      archPanel(art, front, side * (span / 2 + pier / 2 + 0.04), 1.9, depth / 2 + 0.004, pier * 0.5, 0.8, SHADE, 0.012);
+    }
+    art.box(front, 0, h - 0.5, depth / 2 + 0.02, w + 0.1, 0.08, 0.05, CREAM_DARK);
+    art.sign(front, "अकबरी दरवाज़ा  AKBARI GATE", 0, h - 0.24, depth / 2 + 0.03, span * 0.8, 0.3, "#e9dcc0", "#5a2a1c");
+    kangura(art, front, -w / 2, w / 2, h, depth / 2 - 0.04, CREAM_DARK, 0.26);
+  }
+  // The naubat khana: a long low gallery of five arches, a chhatri at either end.
+  const gallery = 1.0, gw = span + 0.5;
+  art.box(g, 0, h + 0.1 + gallery / 2, 0, gw, gallery, depth * 0.8, CREAM);
+  for (const face of [1, -1]) {
+    const front = new THREE.Group();
+    front.rotation.y = face > 0 ? 0 : Math.PI;
+    g.add(front);
+    arcade(art, front, -gw / 2 + 0.1, gw / 2 - 0.1, h + 0.2, gallery * 0.7, depth * 0.4 + 0.004, CREAM_DARK, SHADE, 5);
+  }
+  art.box(g, 0, h + 0.14 + gallery, 0, gw + 0.16, 0.08, depth * 0.8 + 0.16, CREAM_DARK);
+  for (const side of [-1, 1]) chhatri(art, g, side * (w / 2 - 0.42), h + 0.1, 0, 0.6, CREAM, CREAM);
+}
+
+/**
+ * A chauraha's island: a round kerb painted in black and yellow, iron railings, and in the middle a small domed
+ * pavilion on a plinth, strung with lights. A traffic policeman's stand waits under an umbrella at its edge.
+ */
+export function chaurahaIsland(art: Art, root: THREE.Group, x: number, z: number, r: number) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  root.add(g);
+  art.cylinder(g, 0, 0.09, 0, r, 0.18, 0xb8b2a2, r, 28);
+  const posts = 16;
+  for (let i = 0; i < posts; i++) {
+    const a = (i / posts) * Math.PI * 2, px = Math.cos(a) * r, pz = Math.sin(a) * r;
+    // Kerb stones, alternately black and yellow.
+    const stone = art.box(g, Math.cos(a) * (r + 0.02), 0.1, Math.sin(a) * (r + 0.02), 0.06, 0.2, (Math.PI * 2 * r) / posts * 1.02, i % 2 ? 0x24262a : 0xe8b923);
+    stone.rotation.y = -a;
+    art.cylinder(g, px * 0.9, 0.45, pz * 0.9, 0.022, 0.54, 0x24262a, 0.022, 6);
+    const b = ((i + 1) / posts) * Math.PI * 2, mx = (Math.cos(a) + Math.cos(b)) / 2 * r * 0.9, mz = (Math.sin(a) + Math.sin(b)) / 2 * r * 0.9;
+    for (const y of [0.42, 0.66]) {
+      const rail = art.box(g, mx, y, mz, 0.02, 0.02, 2 * r * 0.9 * Math.sin(Math.PI / posts), 0x24262a);
+      rail.rotation.y = -(a + b) / 2;
+    }
+  }
+  art.cylinder(g, 0, 0.36, 0, r * 0.52, 0.36, CREAM, r * 0.58, 8);
+  chhatri(art, g, 0, 0.54, 0, r * 0.72, CREAM, WHITE);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + 0.3;
+    art.ball(g, Math.cos(a) * r * 0.7, 0.3, Math.sin(a) * r * 0.7, 0.13, 0.14, 0.13, 0x5f8f4c);
+    art.ball(g, Math.cos(a) * r * 0.7, 0.42, Math.sin(a) * r * 0.7, 0.07, 0.06, 0.07, i % 2 ? 0xe8732e : 0xf2c53d);
+  }
+  // The policeman's stand: a striped drum under a big umbrella, on the side the bazaar road comes in from.
+  art.cylinder(g, -r - 0.42, 0.17, 0.5, 0.2, 0.34, 0xf2f2ee, 0.2, 10);
+  art.cylinder(g, -r - 0.42, 0.2, 0.5, 0.205, 0.1, 0x24262a, 0.205, 10);
+  art.cylinder(g, -r - 0.42, 0.95, 0.5, 0.015, 1.3, 0x24262a, 0.015, 6);
+  art.cylinder(g, -r - 0.42, 1.62, 0.5, 0.02, 0.2, 0xd63f36, 0.5, 10);
+}

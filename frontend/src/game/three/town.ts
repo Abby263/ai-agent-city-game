@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { Art } from "./materials";
-import { buildings, insideFootprint, type Building } from "./layout";
+import { LANES, buildings, insideFootprint, type Building } from "./layout";
 import { makeDistrict } from "./district";
 import { makeLanterns } from "./seasons";
 import { GROUND_KINDS, paintedGround } from "./surfaces";
@@ -8,8 +8,9 @@ import { makeArchitecture, tagArchitecture } from "./architecture";
 import { makeForest, type TreeSpot } from "./trees";
 import { makeStreetscape } from "./streetscape";
 import { autoRickshaw, chaiStall, cow, cycleRickshaw, handcart, heap, hoarding, postBox, scooter, vendingMachine, vendor } from "./props";
-import { charbagh, imambara, tagLandmarks } from "./landmarks";
+import { akbariGate, charbagh, chaurahaIsland, imambara, tagLandmarks } from "./landmarks";
 import { THEME, isLucknow } from "./theme";
+import { CHAURAHA, CHOWK, GATE, type Street, point, roadClearance, span } from "./streets";
 
 /** Labels the palette with real materials before anything is built. */
 function tagSurfaces(art: Art) {
@@ -90,8 +91,8 @@ function paintTidyRoads(ctx: CanvasRenderingContext2D, unit: number) {
 }
 
 /**
- * Lucknow's old city: worn asphalt from one building line to the other, its edges crumbling into dust; patched and
- * re-patched; hardly a painted line. The park keeps its grass, the lanes of the mohalla are paved in brick.
+ * Lucknow's old city: narrow roads that bend (see streets.ts), worn asphalt from one building line to the other,
+ * its edges crumbling into dust; patched and re-patched; hardly a painted line. The park keeps its grass, the lanes of the mohalla are paved in brick.
  */
 function paintLucknowGround(ctx: CanvasRenderingContext2D, unit: number) {
   const rect = (x: number, z: number, w: number, d: number) => ctx.fillRect(x * unit, z * unit, w * unit, d * unit);
@@ -103,33 +104,84 @@ function paintLucknowGround(ctx: CanvasRenderingContext2D, unit: number) {
   rect(0.8, 9.6, 10.6, 2);
   rect(5.2, 1.6, 1.6, 9);
   rect(16.2, 16.4, 8.8, 4.6);
+  // The ways in to each place, off the streets.
+  for (const [x0, z0, x1, z1] of LANES) if (x0 < 40) rect(x0 + 0.1, z0, x1 - x0 - 0.2, z1 - z0);
+  const trace = (street: Street) => {
+    const [from, to] = span(street);
+    ctx.beginPath();
+    for (let s = from - 0.6; s <= to + 0.7; s += 0.25) {
+      const p = point(street, Math.max(from, Math.min(to, s)));
+      const [x, z] = street.axis === "x" ? [s, p.z] : [p.x, s];
+      if (s === from - 0.6) ctx.moveTo(x * unit, z * unit); else ctx.lineTo(x * unit, z * unit);
+    }
+  };
+  ctx.lineJoin = ctx.lineCap = "round";
+  // A dusty verge first, then the surface: asphalt on the roads, old brick in the gali.
+  for (const street of CHOWK) {
+    trace(street);
+    ctx.strokeStyle = "#bfa980";
+    ctx.lineWidth = (street.half * 2 + 0.25) * unit;
+    ctx.stroke();
+  }
+  for (const street of CHOWK) {
+    trace(street);
+    ctx.strokeStyle = street.kind === "gali" ? "#a89a7c" : "#6f777c";
+    ctx.lineWidth = street.half * 2 * unit;
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#6f777c";
+  ctx.beginPath();
+  ctx.arc(CHAURAHA.x * unit, CHAURAHA.z * unit, CHAURAHA.radius * unit, 0, Math.PI * 2);
+  ctx.fill();
+  // The roads widen to meet the bridges.
   for (const road of [13.5, 26.5]) {
-    ctx.fillStyle = "#6f777c";
-    rect(road - 2.5, 0, 5, 40);
-    rect(0, road - 2.5, 40, 5);
+    ctx.beginPath();
+    ctx.moveTo(36.5 * unit, (road - 1.2) * unit);
+    ctx.lineTo(40 * unit, (road - 1.6) * unit);
+    ctx.lineTo(40 * unit, (road + 1.6) * unit);
+    ctx.lineTo(36.5 * unit, (road + 1.2) * unit);
+    ctx.fill();
   }
   // Dust drifting in from the edges in soft, uneven tongues, and lighter patches where the road was dug up and relaid.
   const blob = (x: number, z: number, r: number) => { ctx.beginPath(); ctx.ellipse(x * unit, z * unit, r * unit, r * unit * 0.8, 0, 0, Math.PI * 2); ctx.fill(); };
-  for (const road of [13.5, 26.5])
-    for (let n = 0; n < 40; n += 0.22) {
+  CHOWK.forEach((street, index) => {
+    const [from, to] = span(street);
+    for (let n = from; n < to; n += 0.09) {
       for (const side of [-1, 1]) {
-        const reach = random(n * 7 + road + side) * 0.75, size = 0.14 + random(n * 3 + side) * 0.3;
-        ctx.fillStyle = random(n + road) > 0.5 ? "#c9b48e" : "#bda57d";
-        blob(road + side * (2.5 - reach * 0.5), n, size);
-        blob(n, road + side * (2.5 - reach * 0.5), size);
+        const seed = n * 7 + index * 31 + side;
+        const p = point(street, n, side * (street.half + 0.04 - random(seed) * random(seed + 1) * 0.5));
+        if (Math.hypot(p.x - CHAURAHA.x, p.z - CHAURAHA.z) < CHAURAHA.radius) continue;
+        ctx.fillStyle = ["#c9b48e", "#bda57d", "#bfa980"][Math.floor(random(n + index) * 3)];
+        blob(p.x, p.z, 0.05 + random(seed + 3) * 0.13);
       }
-      if (random(n * 3.1 + road) < 0.05) {
+      if (street.kind === "road" && random(n * 3.1 + index) < 0.06) {
+        const p = point(street, n, (random(n) - 0.5) * street.half);
         ctx.fillStyle = "#959a98";
-        rect(road - 1.6 + random(n) * 2.4, n, 0.6 + random(n + 1) * 1.2, 0.5 + random(n + 2) * 1.1);
-        rect(n, road - 1.6 + random(n + 5) * 2.4, 0.5 + random(n + 6) * 1.1, 0.6 + random(n + 7) * 1.2);
+        rect(p.x - 0.4, p.z - 0.3, 0.5 + random(n + 1) * 0.9, 0.4 + random(n + 2) * 0.7);
       }
     }
-  // The only paint: a faded centre line on the two main roads, broken where it has worn away.
+  });
+  // The only paint: a faded centre line on the bazaar road, broken where it has worn away, and the gali's bricks.
   ctx.fillStyle = "#b9b4a8";
-  for (let n = 0; n < 40; n += 1.6) {
-    if (Math.abs(n - 13.5) < 3 || Math.abs(n - 26.5) < 3 || random(n * 1.7) < 0.35) continue;
-    rect(n, 13.5 - 0.03, 0.7, 0.06);
-    rect(13.5 - 0.03, n, 0.06, 0.7);
+  for (let n = 1; n < 39; n += 1.6) {
+    if (Math.abs(n - CHAURAHA.x) < CHAURAHA.radius + 0.6 || random(n * 1.7) < 0.35) continue;
+    const a = point(CHOWK[0], n), b = point(CHOWK[0], n + 0.7);
+    ctx.beginPath();
+    ctx.moveTo(a.x * unit, (a.z - 0.03) * unit);
+    ctx.lineTo(b.x * unit, (b.z - 0.03) * unit);
+    ctx.lineTo(b.x * unit, (b.z + 0.03) * unit);
+    ctx.lineTo(a.x * unit, (a.z + 0.03) * unit);
+    ctx.fill();
+  }
+  ctx.strokeStyle = "#978a6e";
+  ctx.lineWidth = 1;
+  const gali = CHOWK.find((street) => street.kind === "gali")!;
+  for (let n = span(gali)[0]; n < span(gali)[1]; n += 0.24) {
+    const a = point(gali, n, -gali.half + 0.06), b = point(gali, n, gali.half - 0.06);
+    ctx.beginPath();
+    ctx.moveTo(a.x * unit, a.z * unit);
+    ctx.lineTo(b.x * unit, b.z * unit);
+    ctx.stroke();
   }
 }
 
@@ -323,6 +375,7 @@ export function makeTown(art: Art) {
   // Street furniture adds scale at citizen height.
   for (const x of [11.2, 24.2, 28.8])
     for (const z of [2, 10, 18, 24, 32, 38]) {
+      if (isLucknow && roadClearance(x, z) < 0.1) continue;
       art.cylinder(root, x, 1.4, z, 0.055, 2.8, P.ink);
       art.box(root, x + 0.23, 2.77, z, 0.55, 0.08, 0.08, P.ink);
       art.box(root, x + 0.45, 2.68, z, 0.28, 0.17, 0.23, 0xffe6a1);
@@ -331,7 +384,7 @@ export function makeTown(art: Art) {
     }
   if (isLucknow) {
     // Every corner has its chai stall; fruit sellers push their thelas along the bazaar; autos wait for fares.
-    const clear = (x: number, z: number) => !insideFootprint(x, z, 0.35);
+    const clear = (x: number, z: number) => !insideFootprint(x, z, 0.35) && (x > 40 || roadClearance(x, z) > -0.45);
     for (const [x, z] of [[10.7, 5.9], [28.8, 21.3], [74.4, 23.2], [52, 8.2], [34.6, 12.6]]) if (clear(x, z)) chaiStall(art, root, x, 0.03, z);
     const fruit = [0xf2b632, 0xe9d24a, 0xe8732e, 0xd8473c, 0x7da04a];
     [[16, 23.7], [18.2, 21.3], [22.6, 21.2], [24.4, 16.4], [13, 30.2], [66.4, 32.9], [61.5, 24.2], [3.2, 24.6]].forEach(([x, z], i) => { if (clear(x, z)) handcart(art, root, x, 0.03, z, fruit[i % fruit.length], i + 3); });
@@ -354,18 +407,41 @@ export function makeTown(art: Art) {
       else heap(art, root, x, 0.03, z, k);
     };
     const junction = (n: number, roads: number[]) => roads.some((r) => Math.abs(n - r) < 3.4);
-    for (const road of [13.5, 26.5]) for (const side of [-1, 1]) {
-      for (let n = 1.2; n < 39; n += 2.3) if (!junction(n, [13.5, 26.5])) { roadside(n, road + side * 2.05, "x", side); roadside(road + side * 2.05, n + 0.9, "z", side); }
-      for (let n = 50.5; n < 84; n += 2.6) if (!junction(n, [69])) roadside(n, road + side * 2.05, "x", side);
+    // In the old city they stand in the road itself, hard up against the shop fronts, and the traffic squeezes by.
+    for (const street of CHOWK) if (street.kind === "road") for (const side of [-1, 1]) {
+      const [from, to] = span(street);
+      for (let n = from + 0.8; n < to - 0.6; n += 2.1) {
+        const p = point(street, n, side * (street.half - 0.3));
+        // Not where another road crosses.
+        const other = CHOWK.some((o) => {
+          if (o === street || o.kind !== "road") return false;
+          const q = point(o, o.axis === "x" ? p.x : p.z);
+          return Math.abs(q.x - p.x) + Math.abs(q.z - p.z) < o.half + 1.2;
+        });
+        if (other || Math.hypot(p.x - CHAURAHA.x, p.z - CHAURAHA.z) < CHAURAHA.radius + 0.8 || Math.abs(p.x - GATE.x) < 1.2) continue;
+        roadside(p.x, p.z, street.axis, side);
+      }
     }
+    for (const road of [13.5, 26.5]) for (const side of [-1, 1])
+      for (let n = 50.5; n < 84; n += 2.6) if (!junction(n, [69])) roadside(n, road + side * 2.05, "x", side);
     for (const side of [-1, 1]) for (let n = 1.5; n < 39; n += 2.6) if (!junction(n, [13.5, 26.5])) roadside(69 + side * 2.05, n, "z", side);
-    // Cloth banners strung across the road.
+    // The Akbari Gate across the bazaar road, and the island in the middle of the chauraha.
+    akbariGate(art, root, GATE.x, GATE.z, CHOWK[0].half * 2);
+    chaurahaIsland(art, root, CHAURAHA.x, CHAURAHA.z, CHAURAHA.island);
+    // Cloth banners strung across the road, from one building line to the other.
     const banners: Array<[string, string, string]> = [["लखनऊ महोत्सव में आपका स्वागत है", "#f2c53d", "#b7245c"], ["भव्य चिकन सेल • 50% तक छूट", "#c8281e", "#fff3c4"],
       ["नया सत्र • प्रवेश प्रारंभ", "#f6efd9", "#1f3f7a"], ["शुभ विवाह • गुप्ता परिवार", "#f47c2c", "#fff8e6"]];
-    [[7, 13.5, 0], [20.5, 13.5, 0], [33, 26.5, 0], [8.5, 26.5, 0], [13.5, 6, 1], [26.5, 20, 1], [13.5, 33.5, 1], [26.5, 34, 1], [56, 26.5, 0], [78, 13.5, 0]].forEach(([x, z, turned], i) => {
+    const [chowk, nakhas, , sarai, victoria] = CHOWK;
+    const across: Array<[x: number, z: number, turned: number, width: number]> = [
+      ...([[chowk, 5], [chowk, 20.5], [nakhas, 33], [nakhas, 8.5], [chowk, 35]] as Array<[Street, number]>).map(([street, x]): [number, number, number, number] => [x, point(street, x).z, 0, street.half * 2]),
+      ...([[victoria, 6], [victoria, 20], [sarai, 33.5], [victoria, 34]] as Array<[Street, number]>).map(([street, z]): [number, number, number, number] => [point(street, z).x, z, 1, street.half * 2]),
+      [56, 26.5, 0, 4.6], [78, 13.5, 0, 4.6],
+    ];
+    across.forEach(([x, z, turned, width], i) => {
       const g = new THREE.Group();
       g.position.set(x, 0, z);
       g.rotation.y = turned ? 0 : Math.PI / 2;
+      g.scale.x = width / 4.6;
       root.add(g);
       const [text, bg, fg] = banners[i % banners.length];
       for (const face of [0, Math.PI]) art.sign(g, text, 0, 3.25, face ? -0.012 : 0.012, 4.2, 0.5, bg, fg).rotation.y = face;
@@ -750,7 +826,7 @@ function tree(
   scale: number,
 ) {
   // Where the streets are built up wall to wall, nothing grows through a building.
-  if (THEME.terraces && insideFootprint(x, z, 0.45)) return;
+  if (THEME.terraces && (insideFootprint(x, z, 0.45) || (x < 40 && roadClearance(x, z) < 0.3))) return;
   const pick = random(x * 3.1 + z * 7.7);
   // Lucknow has no pines: neem, peepal and mango, with gulmohar in flower where Nakameguro has cherry.
   const kind = blossom ? "sakura" : nearShrine(x, z) && !isLucknow ? "pine" : pick < (isLucknow ? 0.5 : 0.3) ? "oak" : "keyaki";

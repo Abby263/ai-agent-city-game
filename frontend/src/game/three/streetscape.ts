@@ -1,21 +1,30 @@
 import * as THREE from "three";
 import { EAST } from "./district";
 import { THEME } from "./theme";
+import { CHOWK, GATE, at, roadClearance, span } from "./streets";
 
 // Tokyo's overhead wires: concrete utility poles along the pavements, a crossarm with three power lines and a lower
 // telecom cable, a pole-mounted transformer every few poles, and the wires sagging between them.
 
-type Run = { axis: "x" | "z"; at: number; from: number; to: number; crossings: number[] };
+type Run = { axis: "x" | "z"; at: (s: number) => number; from: number; to: number; kerb: number; clear: (x: number, z: number) => boolean };
 
 const TOWN_ROADS = [13.5, 26.5];
-const RUNS: Run[] = [
-  ...TOWN_ROADS.map((at) => ({ axis: "x" as const, at, from: 0.5, to: 39.5, crossings: TOWN_ROADS })),
-  ...TOWN_ROADS.map((at) => ({ axis: "z" as const, at, from: 0.5, to: 39.5, crossings: TOWN_ROADS })),
-  ...EAST.roads.map((at) => ({ axis: "x" as const, at, from: EAST.x0 + 0.5, to: EAST.rail[0] - 1.5, crossings: [EAST.avenue] })),
-  { axis: "z", at: EAST.avenue, from: 0.5, to: 39.5, crossings: EAST.roads },
-];
 // Units: one is about 2 m. Poles stand at the kerb side of the pavement.
 const KERB = 2.25, SPACING = 4, HEIGHT = 5.1;
+const straight = (axis: "x" | "z", at: number, from: number, to: number, crossings: number[]): Run =>
+  ({ axis, at: () => at, from, to, kerb: KERB, clear: (x, z) => !crossings.some((c) => Math.abs((axis === "x" ? x : z) - c) < 3.2) });
+const RUNS: Run[] = [
+  // Lucknow's old city has no pavements: the poles stand in the edge of its bent, narrow roads (see streets.ts).
+  ...(THEME.terraces ? CHOWK.map((street): Run => ({
+    axis: street.axis, at: (s) => at(street, s), from: span(street)[0], to: span(street)[1], kerb: street.half - 0.14,
+    clear: (x, z) => roadClearance(x, z) > -0.3 && Math.hypot(x - GATE.x, z - GATE.z) > 2.6,
+  })) : [
+    ...TOWN_ROADS.map((at) => straight("x", at, 0.5, 39.5, TOWN_ROADS)),
+    ...TOWN_ROADS.map((at) => straight("z", at, 0.5, 39.5, TOWN_ROADS)),
+  ]),
+  ...EAST.roads.map((at) => straight("x", at, EAST.x0 + 0.5, EAST.rail[0] - 1.5, [EAST.avenue])),
+  straight("z", EAST.avenue, 0.5, 39.5, EAST.roads),
+];
 
 export function makeStreetscape(avoid: Array<{ x: number; z: number }>) {
   const root = new THREE.Group();
@@ -24,8 +33,8 @@ export function makeStreetscape(avoid: Array<{ x: number; z: number }>) {
   for (const run of RUNS) {
     const line: THREE.Vector3[] = [];
     for (let s = run.from; s <= run.to; s += SPACING) {
-      if (run.crossings.some((c) => Math.abs(s - c) < 3.2)) continue;
-      const point = run.axis === "x" ? new THREE.Vector3(s, 0, run.at + KERB) : new THREE.Vector3(run.at + KERB, 0, s);
+      const point = run.axis === "x" ? new THREE.Vector3(s, 0, run.at(s) + run.kerb) : new THREE.Vector3(run.at(s) + run.kerb, 0, s);
+      if (!run.clear(point.x, point.z)) continue;
       if (avoid.some((a) => Math.hypot(a.x - point.x, a.z - point.z) < 0.7)) continue;
       line.push(point);
     }
@@ -100,7 +109,7 @@ export function makeStreetscape(avoid: Array<{ x: number; z: number }>) {
         for (let k = 0; k < 9; k++) {
           const seed = r * 97 + i * 13 + k;
           // Near side: straight to the house fronts; far side: across the road.
-          const reach = k % 3 === 0 ? -4.6 - noise(seed) * 0.6 : 0.3 + noise(seed) * 0.5;
+          const reach = k % 3 === 0 ? -(RUNS[r].kerb * 2 + 0.1) - noise(seed) * 0.6 : 0.3 + noise(seed) * 0.5;
           const end = p.clone().addScaledVector(across, reach).addScaledVector(along, (noise(seed + 5) - 0.5) * 6).setY(1.6 + noise(seed + 9) * 2.4);
           drop(top.clone().setY(HEIGHT - 0.4 - noise(seed + 3) * 1.4), end, 0.25 + noise(seed + 7) * 0.5);
         }
