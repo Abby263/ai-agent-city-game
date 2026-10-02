@@ -5,6 +5,9 @@ import { ChevronDown, ChevronUp, LoaderCircle, Mic, Send, Square, Volume2, Volum
 import { askNarrator } from "@/lib/api";
 import { unlockAudio } from "@/lib/conversation-audio";
 import { NARRATOR_HELP, localReply, narrationBeats, narratorRequest, whatsGoingOn, type NarratorAction, type NarratorTurn, type OnStage } from "@/lib/narrator";
+import { kokoroState, loadKokoro, onKokoro } from "@/lib/narrator-kokoro";
+import { activeCity } from "@/lib/cities";
+import { NarratorAvatar } from "./NarratorAvatar";
 import { VOICE_CHANGED, narratorVoiceOn, setNarratorVoice, speakNarration, stopNarration } from "@/lib/narrator-voice";
 import { checkPlayerText } from "@/lib/safety";
 import { describeNow } from "@/lib/session-simulation";
@@ -36,6 +39,14 @@ export function Narrator({ onActions }: {
   const history = useRef<NarratorTurn[]>([]);
   const log = useRef<HTMLDivElement>(null);
   const narration = useGameStore((state) => state.narration);
+  // The natural voice is a large download: fetched in the background once the town is up, on devices that can
+  // run it. Until it is ready (and wherever it can't run) the narrator speaks with the device's voice.
+  const natural = useSyncExternalStore(onKokoro, kokoroState, kokoroState);
+  useEffect(() => {
+    if (!voice) return;
+    const timer = window.setTimeout(() => void loadKokoro(), 4000);
+    return () => window.clearTimeout(timer);
+  }, [voice]);
 
   useEffect(() => {
     const sync = () => setVoice(narratorVoiceOn());
@@ -138,6 +149,7 @@ export function Narrator({ onActions }: {
   return (
     <section className="narrator" aria-label="Narrator" data-open={open} data-listening={listening} data-telling={Boolean(telling)}>
       <div className="narrator-bar">
+        {natural.status === "ready" && voice && <NarratorAvatar city={activeCity().id} />}
         <button className="narrator-mic" aria-label={listening ? "Stop listening" : "Talk to the narrator"} aria-pressed={listening}
           title={canListen ? (listening ? "Stop listening (V)" : "Talk to the narrator (V)") : "This browser can't listen: type instead"}
           disabled={!canListen || thinking} onClick={toggleMic}>
@@ -146,7 +158,7 @@ export function Narrator({ onActions }: {
         {/* While it is telling, a tap moves it along; otherwise the caption opens the conversation. */}
         <button className="narrator-caption" aria-expanded={open} title={telling ? "Tap to skip what the narrator is saying" : "Show the conversation with the narrator"}
           onClick={() => (telling ? stopNarration() : setOpen(!open))}>
-          <small>Narrator{speaking ? " · speaking" : listening ? " · listening" : ""}
+          <small>Narrator{speaking ? " · speaking" : listening ? " · listening" : natural.status === "loading" && voice ? ` · natural voice loading ${Math.round(natural.progress * 100)}%` : ""}
             {telling && telling.count > 1 && <i aria-hidden="true">{Array.from({ length: telling.count }, (_, i) => <b key={i} data-on={i <= telling.index} />)}</i>}</small>
           <span key={telling ? telling.index : "idle"} aria-live="polite">{caption}</span>
         </button>

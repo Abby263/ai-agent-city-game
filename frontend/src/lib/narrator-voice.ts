@@ -1,9 +1,11 @@
 import { activeCity } from "./cities";
+import { kokoroClip, kokoroState, playClip, stopClip, type Clip } from "./narrator-kokoro";
 import { soundAllowed } from "./conversation-audio";
 import { spokenText } from "./voices";
 
-// The narrator's own voice: the device's speech, slower and calmer than the residents', so you always know who is
-// talking. It tells a story one short sentence at a time. Free and instant; it never calls a model.
+// The narrator's own voice. It tells a story one short sentence at a time: in a natural, open-source neural voice
+// run in the browser where the device can (narrator-kokoro.ts), otherwise in the device's own speech, slower and
+// calmer than the residents'. Either way it is free and never calls a server.
 
 const KEY = "agentcity.narratorVoice";
 let run = 0;
@@ -34,6 +36,7 @@ export function narratorVoice(voices: Array<Pick<SpeechSynthesisVoice, "name" | 
 
 export function stopNarration() {
   run++;
+  stopClip();
   if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
@@ -72,26 +75,47 @@ function sayBeat(beat: string, mine: number, voice: SpeechSynthesisVoice | undef
   });
 }
 
+const naturalReady = () => kokoroState().status === "ready" && narratorVoiceOn();
+/** Starts making the natural voice's audio for these beats, so it can begin the moment it is asked to speak. */
+export function prefetchNarration(beats: string[]) {
+  if (typeof window === "undefined" || !naturalReady()) return;
+  for (const beat of beats) if (spokenText(beat)) void kokoroClip(spokenText(beat)).catch(() => undefined);
+}
+/** The beat's audio if it arrives in time, else null: a late voice is worse than a plainer one. */
+const inTime = (promise: Promise<Clip>, ms: number) =>
+  Promise.race([promise.catch(() => null), new Promise<null>((resolve) => window.setTimeout(() => resolve(null), ms))]);
+
 /**
  * Tells the beats one at a time: `onBeat` fires as each begins (so the caption can show just that sentence), then
- * it is spoken, then a breath. Where the device can't speak, or the voice is off, each beat is held long enough to
- * read instead. Resolves when the last is done, or at once if `stopNarration` cuts in.
+ * it is spoken, then a breath. The natural voice is used when it is loaded and keeps up; otherwise the device's;
+ * where nothing can speak, or the voice is off, each beat is held long enough to read instead. Resolves when the
+ * last is done, or at once if `stopNarration` cuts in.
  */
 export async function speakNarration(beats: string[], onBeat: (index: number) => void = () => {}): Promise<void> {
   if (typeof window === "undefined" || !beats.length) return;
-  const canSpeak = "speechSynthesis" in window && narratorVoiceOn() && soundAllowed();
-  if (canSpeak) window.speechSynthesis.cancel();
+  const audible = narratorVoiceOn() && soundAllowed();
+  const device = audible && "speechSynthesis" in window;
+  if (device) window.speechSynthesis.cancel();
+  stopClip();
   const mine = ++run;
-  const voice = canSpeak ? narratorVoice(window.speechSynthesis.getVoices()) as SpeechSynthesisVoice | undefined : undefined;
-  let voiced = canSpeak;
+  let mode: "natural" | "device" | "silent" = audible && naturalReady() ? "natural" : device ? "device" : "silent";
+  if (mode === "natural") prefetchNarration(beats);
+  const voice = device ? narratorVoice(window.speechSynthesis.getVoices()) as SpeechSynthesisVoice | undefined : undefined;
   for (let i = 0; i < beats.length; i++) {
     if (mine !== run) return;
     onBeat(i);
     const began = performance.now();
-    if (voiced) voiced = await sayBeat(beats[i], mine, voice, i);
+    if (mode === "natural") {
+      const text = spokenText(beats[i]);
+      const clip = text ? await inTime(kokoroClip(text), i === 0 ? 5000 : 3500) : null;
+      if (mine !== run) return;
+      if (!clip || !(await playClip(clip))) mode = device ? "device" : "silent";
+    }
+    if (mine !== run) return;
+    if (mode === "device" && !(await sayBeat(beats[i], mine, voice, i))) mode = "silent";
     if (mine !== run) return;
     // Unheard (or cut short by a silent device): leave it up for as long as it takes to read.
-    if (!voiced) await wait(Math.max(0, readingTime(beats[i]) - (performance.now() - began)), mine);
+    if (mode === "silent") await wait(Math.max(0, readingTime(beats[i]) - (performance.now() - began)), mine);
     else if (i < beats.length - 1) await wait(i === 0 ? BREATH + 180 : BREATH, mine);
   }
 }

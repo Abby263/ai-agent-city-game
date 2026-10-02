@@ -9,7 +9,7 @@ import { useGameStore } from "@/lib/store";
 import { ConversationAudio, conversationAudioPreference, soundAllowed, unlockAudio } from "@/lib/conversation-audio";
 import { setAmbienceScene } from "@/lib/ambience";
 import { narrationBeats } from "@/lib/narrator";
-import { stopNarration } from "@/lib/narrator-voice";
+import { prefetchNarration, stopNarration } from "@/lib/narrator-voice";
 import { captureScene } from "@/lib/scene-capture";
 import { shareCard } from "@/lib/share";
 import { STORYLINES } from "@/lib/storyteller";
@@ -145,6 +145,8 @@ export function LiveConversation({ conversation, citizens, location, dateLabel, 
   // The introduction is captioned one sentence at a time, as the narrator says it.
   const narratorBeat = useGameStore((state) => state.narratorBeat);
   const introBeats = useMemo(() => narrationBeats(intro), [intro]);
+  // The narrator's voice is made while the two walk over, so the introduction starts the moment they meet.
+  useEffect(() => { if (!document.hidden) prefetchNarration(introBeats); }, [introBeats]);
   useEffect(() => {
     if (!arrived || introduced || introId.current || document.hidden) return;
     introId.current = useGameStore.getState().narrate(intro);

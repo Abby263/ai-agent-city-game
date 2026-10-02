@@ -15,6 +15,9 @@ parser.add_argument('--output', type=Path, required=True)
 parser.add_argument('--profiles', type=Path, default=Path('frontend/src/lib/generated/citizens.json'),
                     help='Generated resident profiles (age, sex, height, weight, appearance colours).')
 parser.add_argument('--resident', required=True, help='A resident id such as cit_009.')
+parser.add_argument('--talking', action='store_true',
+                    help='A talking avatar for TalkingHead: a Mixamo rig named Armature, teeth and tongue, all 52 '
+                         'ARKit face shapes and the 15 Oculus visemes (see scripts/blender/narrators.json).')
 args = parser.parse_args(sys.argv[sys.argv.index('--') + 1:])
 sys.path.insert(0, str(args.mpfb.resolve() / 'src'))
 # Resolve the source checkout's data to an isolated workspace, without installing an addon or saving preferences.
@@ -86,6 +89,29 @@ ART = {
     'lko_045': dict(hair='short01', clothes='male_casualsuit04', shoes='shoes03', brows='eyebrow011', muscle=0.38),   # Yusuf
     'lko_046': dict(hair='ponytail01', clothes='female_elegantsuit01', shoes='shoes02', brows='eyebrow004'), # Rekha
     'lko_047': dict(hair='long01', clothes='female_casualsuit01', shoes='shoes06', brows='eyebrow010'),      # Ishita
+    # The narrators (profiles: scripts/blender/narrators.json), built with --talking.
+    'narrator_lucknow': dict(hair='braid01', clothes='female_elegantsuit01', shoes='shoes04', brows='eyebrow002'),
+    'narrator_nakameguro': dict(hair='ponytail01', clothes='female_elegantsuit01', shoes='shoes02', brows='eyebrow005'),
+}
+
+# The 15 Oculus visemes (mouth shapes for speech) as mixes of ARKit face shapes: MakeHuman's own viseme pack is a
+# separate download, and these are close enough to read as speech.
+VISEMES = {
+    'viseme_sil': {},
+    'viseme_PP': {'mouthPressLeft': 0.6, 'mouthPressRight': 0.6, 'mouthRollLower': 0.3, 'mouthRollUpper': 0.3},
+    'viseme_FF': {'mouthRollLower': 0.7, 'mouthUpperUpLeft': 0.3, 'mouthUpperUpRight': 0.3, 'jawOpen': 0.05},
+    'viseme_TH': {'jawOpen': 0.2, 'tongueOut': 0.4, 'mouthLowerDownLeft': 0.2, 'mouthLowerDownRight': 0.2},
+    'viseme_DD': {'jawOpen': 0.2, 'mouthUpperUpLeft': 0.2, 'mouthUpperUpRight': 0.2, 'mouthLowerDownLeft': 0.3, 'mouthLowerDownRight': 0.3},
+    'viseme_kk': {'jawOpen': 0.25, 'mouthStretchLeft': 0.2, 'mouthStretchRight': 0.2},
+    'viseme_CH': {'jawOpen': 0.15, 'mouthFunnel': 0.5, 'mouthShrugUpper': 0.2},
+    'viseme_SS': {'jawOpen': 0.08, 'mouthStretchLeft': 0.4, 'mouthStretchRight': 0.4, 'mouthSmileLeft': 0.2, 'mouthSmileRight': 0.2},
+    'viseme_nn': {'jawOpen': 0.15, 'mouthLowerDownLeft': 0.2, 'mouthLowerDownRight': 0.2},
+    'viseme_RR': {'jawOpen': 0.15, 'mouthFunnel': 0.35, 'mouthPucker': 0.2},
+    'viseme_aa': {'jawOpen': 0.6, 'mouthLowerDownLeft': 0.3, 'mouthLowerDownRight': 0.3},
+    'viseme_E': {'jawOpen': 0.3, 'mouthStretchLeft': 0.3, 'mouthStretchRight': 0.3, 'mouthSmileLeft': 0.25, 'mouthSmileRight': 0.25},
+    'viseme_I': {'jawOpen': 0.15, 'mouthStretchLeft': 0.4, 'mouthStretchRight': 0.4, 'mouthSmileLeft': 0.3, 'mouthSmileRight': 0.3},
+    'viseme_O': {'jawOpen': 0.4, 'mouthFunnel': 0.6},
+    'viseme_U': {'jawOpen': 0.2, 'mouthPucker': 0.7, 'mouthFunnel': 0.3},
 }
 
 FACE_SHAPES = {
@@ -238,7 +264,7 @@ years = profile['age']
 stage = 'old' if years >= 60 else 'middleage' if years >= 35 else 'young'
 # Lucknow's residents are South Asian. MakeHuman has no such preset, so they are a blend of its three (mostly the
 # "caucasian" bone structure) under a skin recoloured to each profile's own tone.
-indian = args.resident.startswith('lko_')
+indian = args.resident.startswith('lko_') or args.resident == 'narrator_lucknow'
 skin = f"{stage}_{'caucasian' if indian else 'asian'}_{'male' if gender else 'female'}"
 eyes = 'brown' if indian else 'brownlight' if seeded(args.resident).random() < 0.3 else 'brown'
 
@@ -246,7 +272,8 @@ data = args.assets / 'data'
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
 info = HumanService._create_default_human_info_dict()
-info.update(name=profile['name'].split()[0], rig='game_engine', skin_mhmat=f'{skin}/{skin}.mhmat',
+info.update(name=profile['name'].split()[0], rig='mixamo' if args.talking else 'game_engine',
+            teeth='teeth_base/teeth_base.mhclo' if args.talking else '', tongue='tongue01/tongue01.mhclo' if args.talking else '', skin_mhmat=f'{skin}/{skin}.mhmat',
             skin_material_type='MAKESKIN', eyes='high-poly/high-poly.mhclo', eyes_material_type='MAKESKIN',
             hair=f"{art['hair']}/{art['hair']}.mhclo", eyebrows=f"{art['brows']}/{art['brows']}.mhclo",
             eyelashes='eyelashes01/eyelashes01.mhclo',
@@ -282,6 +309,10 @@ for obj in bpy.context.scene.objects:
     if obj.type != 'MESH':
         continue
     part = obj.name.split('.', 1)[1]
+    if part not in sources and args.talking:
+        # Teeth and tongue: their own textures, untouched.
+        kind_of = 'teeth' if 'teeth' in part else 'tongue'
+        sources[part] = (data / kind_of / part / ('teeth.mhmat' if kind_of == 'teeth' else f'{part}.mhmat'), kind_of, None, 0)
     source, kind, colour, strength = sources[part]
     material(obj, source, kind, colour, strength, SHIRT_AREAS.get(part) if kind == 'clothes' else None)
     for polygon in obj.data.polygons:
@@ -289,11 +320,27 @@ for obj in bpy.context.scene.objects:
     if obj.data.shape_keys:
         for key in list(obj.data.shape_keys.key_blocks)[1:]:
             name = key.name.removeprefix('!').split('/')[-1]
-            if name not in FACE_SHAPES or kind not in ('skin', 'eyebrow', 'eyelash'):
+            if args.talking and kind in ('skin', 'eyebrow', 'eyelash', 'eyes', 'teeth', 'tongue'):
+                key.name = name
+                key.value = 0
+            elif name not in FACE_SHAPES or kind not in ('skin', 'eyebrow', 'eyelash'):
                 obj.shape_key_remove(key)
             else:
                 key.name = name
                 key.value = 0
+        if args.talking and kind not in ('skin', 'eyebrow', 'eyelash', 'eyes', 'teeth', 'tongue'):
+            # Hair, clothes and shoes do not move with the face.
+            obj.shape_key_clear()
+        elif args.talking:
+            blocks = obj.data.shape_keys.key_blocks
+            for viseme, mix in VISEMES.items():
+                for name, value in mix.items():
+                    if name in blocks:
+                        blocks[name].value = value
+                obj.shape_key_add(name=viseme, from_mix=True).value = 0
+                for name in mix:
+                    if name in blocks:
+                        blocks[name].value = 0
     # MPFB's custom properties include source paths, which do not belong in distributed art.
     for key in list(obj.keys()):
         del obj[key]
@@ -306,6 +353,29 @@ for image in bpy.data.images:
         image.scale(max(1, round(image.size[0] * factor)), max(1, round(image.size[1] * factor)))
     image.pack()
 
+if args.talking:
+    # TalkingHead looks for a root object called Armature.
+    for obj in bpy.context.scene.objects:
+        if obj.type == 'ARMATURE':
+            obj.name = 'Armature'
+            obj.data.name = 'Armature'
+            # And for plain Mixamo bone names: Hips, Spine, Head.
+            for bone in obj.data.bones:
+                bone.name = bone.name.replace('mixamorig:', '')
+            # It also wants to know where the eyes are, to meet the viewer's gaze: a bone at the middle of each.
+            from mathutils import Vector
+            eyes = next(o for o in bpy.context.scene.objects if o.type == 'MESH' and o.name.endswith('high-poly'))
+            points = [eyes.matrix_world @ v.co for v in eyes.data.vertices]
+            to_armature = obj.matrix_world.inverted()
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.object.mode_set(mode='EDIT')
+            for name, side in (('LeftEye', 1), ('RightEye', -1)):
+                mine = [p for p in points if p.x * side > 0]
+                bone = obj.data.edit_bones.new(name)
+                bone.head = to_armature @ (sum(mine, Vector()) / len(mine))
+                bone.tail = bone.head + Vector((0, -0.03, 0))
+                bone.parent = obj.data.edit_bones['Head']
+            bpy.ops.object.mode_set(mode='OBJECT')
 args.output.mkdir(parents=True, exist_ok=True)
 bpy.ops.export_scene.gltf(filepath=str(args.output / f'{args.resident}.glb'), export_format='GLB',
                           export_animations=False, export_morph=True, export_extras=False)

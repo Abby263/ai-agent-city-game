@@ -1,0 +1,8 @@
+[
+  { "citizen_id": "narrator_lucknow", "name": "Narrator Lucknow", "age": 34,
+    "life": { "sex": "female", "height_cm": 162, "weight_kg": 58 },
+    "personality": { "appearance": { "hair": "#1c1512", "skin": "#b98562", "shirt": "#9c2f45" } } },
+  { "citizen_id": "narrator_nakameguro", "name": "Narrator Nakameguro", "age": 34,
+    "life": { "sex": "female", "height_cm": 160, "weight_kg": 54 },
+    "personality": { "appearance": { "hair": "#1b1a1c", "skin": "#e4c2a4", "shirt": "#2f5d73" } } }
+]

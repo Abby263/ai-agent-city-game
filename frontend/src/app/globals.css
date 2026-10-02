@@ -2260,6 +2260,12 @@ select {
 .narrator-caption { flex: 1; min-width: 0; padding: 0; text-align: left; color: inherit; background: none; border: 0; cursor: pointer; }
 .narrator-caption small { display: block; font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; color: #89ffe0; }
 .narrator-caption span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; font-size: 13px; line-height: 1.4; }
+/* The narrator in person: a small round window on a talking head. */
+.narrator-avatar { flex-shrink: 0; width: 84px; height: 84px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle at 50% 35%, #3b4a55, #1b2228); border: 2px solid #89ffe066; opacity: 0; transition: opacity 0.5s; }
+.narrator-avatar[data-shown="true"] { opacity: 1; }
+.narrator-avatar canvas { display: block; width: 100% !important; height: 100% !important; }
+.narrator[data-telling="true"] .narrator-avatar { border-color: #89ffe0; }
+@media (max-width: 700px) { .narrator-avatar { width: 60px; height: 60px; } }
 /* While the narrator tells a scene, one sentence at a time is up: bigger, unclipped, fading in as it is said. */
 .narrator[data-telling="true"] .narrator-caption span { display: block; overflow: visible; font-size: 16px; line-height: 1.35; font-weight: 600; animation: narrator-beat 0.35s ease-out; }
 .narrator-caption small i { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: middle; }
