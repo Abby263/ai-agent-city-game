@@ -112,9 +112,13 @@ Tests: `frontend/tests/cases.test.ts`.
 
 A narrator sits at the top of the desk (`Narrator.tsx`). It does two jobs.
 
-- **It explains.** As each scene opens it says who is there and why it matters (`sceneIntro`: the beat, plus the
-  case's backstory the first time); when a case scene ends it says how it went, what is coming and how many nudges
-  are left (`sceneOutro`). These lines are built from what the game already knows: no model call.
+- **It explains, briefly.** As each scene opens it says where we are and what is happening (`sceneIntro`: the
+  place, the case's name the first time, the beat); when a case scene ends it says how it went, what is next and
+  whether you want a word with someone first (`sceneOutro`). The backstory stays on the case board. These lines are
+  built from what the game already knows: no model call.
+- **One sentence at a time.** Whatever it says is split into beats (`narrationBeats`: one short sentence each, a
+  long one broken at a pause). Each beat is shown on its own, large, as it is said, with a breath before the next;
+  dots show how many are left, and a tap on the caption skips. Nothing is ever more than a couple of beats long.
 - **It takes orders, spoken or typed.** Tap the microphone (or press V) and talk: the browser's own speech
   recognition (`voice-input.ts`) turns it into text; browsers without it get the text box. Plain commands are
   understood on the spot (`localReply`: pause, resume, skip, "play as Ren and talk to Aoi", "go to the station",
@@ -126,7 +130,9 @@ A narrator sits at the top of the desk (`Narrator.tsx`). It does two jobs.
   The shell carries them out in order (`runNarratorActions`). If the model can't be reached the narrator falls
   back to a summary the game builds itself.
 
-The narrator speaks with the device's voice (`narrator-voice.ts`), lower and calmer than the residents'. Scenes and
+The narrator speaks with the best voice the device has (`narrator-voice.ts`: a "natural" voice if there is one, an
+Indian English one in Lucknow), a little under normal speed, the place name low and slow like a title, questions
+lifted. Where the device can't speak, each beat stays up long enough to read instead. Scenes and
 the clock wait while it listens, thinks or speaks. Player words pass the same safety checks as typed text, in the
 browser and again on the server.
 

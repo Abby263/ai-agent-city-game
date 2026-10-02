@@ -106,7 +106,7 @@ test("each city keeps its own saved world, and Lucknow opens on its own first ca
   const beat = getSessionCity()!.events.find((e) => e.event_type === "story_beat")!;
   assert.equal(beat.payload?.storyline, "aditya_shayari");
   const scene = (await import("../src/lib/session-simulation")).sessionConversations()[0];
-  assert.match(sceneIntro(getSessionCity()!, scene), /Kamla found a notebook hidden under Aditya's mattress\..*mushaira/);
+  assert.match(sceneIntro(getSessionCity()!, scene), /A new case: Adi Lakhnavi\. Kamla found a notebook hidden under Aditya's mattress\./);
   assert.deepEqual(localReply("play as Kabir and talk to Zoya", getSessionCity()!, null)!.actions.map((a) => a.citizen_id), [kabir, zoya]);
   // Nakameguro, played in the same browser, has its own world and is untouched by a reset here.
   setActiveCity("nakameguro");

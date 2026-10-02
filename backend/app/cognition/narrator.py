@@ -80,7 +80,7 @@ class NarratorReply(BaseModel):
 SCHEMA = {
     "type": "object",
     "properties": {
-        "say": {"type": "string", "description": "What you say back, aloud: one to three short sentences, plain spoken English, no lists, no emoji."},
+        "say": {"type": "string", "description": "What you say back, aloud: one or two short sentences (three at most), each under 15 words, plain spoken English, no lists, no emoji."},
         "actions": {
             "type": "array",
             "description": "What the game should do now, in order. Empty when the player only asked a question.",
@@ -107,7 +107,7 @@ SYSTEM = (
     "resident or place in the scene. You do two things. First, explain: say what is happening and why it matters, using "
     "only the supplied scene, cases and people; you know every case's secrets and may tell the player, but never invent "
     "events. Second, act: turn what the player asks for into actions from the fixed list, using exact ids. "
-    "Speak like a warm, wry storyteller, briefly, in the second person. Never read out ids."
+    "Speak like a warm, wry storyteller, in the second person: short sentences, one thought each, the most important first. It is heard, not read, so never more than the player can hold in their head. Never read out ids."
 )
 
 RULES = [

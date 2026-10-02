@@ -98,10 +98,10 @@ function paintLucknowGround(ctx: CanvasRenderingContext2D, unit: number) {
   const rect = (x: number, z: number, w: number, d: number) => ctx.fillRect(x * unit, z * unit, w * unit, d * unit);
   // The park is watered; the orchard floor is not.
   ctx.fillStyle = "#a9b97f";
-  rect(15.6, 28, 9, 8.8);
+  rect(16.9, 28.4, 7.5, 7.1);
   // Brick-paved lanes between the houses and across the bazaar.
   ctx.fillStyle = "#b5a988";
-  rect(0.8, 9.6, 10.6, 2);
+  rect(0.6, 9.7, 10.8, 1.6);
   rect(5.2, 1.6, 1.6, 9);
   rect(16.2, 16.4, 8.8, 4.6);
   // The ways in to each place, off the streets.
@@ -332,8 +332,8 @@ export function makeTown(art: Art) {
   if (isLucknow) {
     for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) tree(root, art, 2.4 + j * 1.5, 29.4 + i * 2.2, false, 0.62 + random(i * 4 + j) * 0.1);
     for (let i = 0; i < 6; i++) {
-      art.box(root, 9.6 + (i % 3) * 0.5, 0.12 + Math.floor(i / 3) * 0.22, 36.2, 0.44, 0.22, 0.34, 0xb58a52);
-      for (let k = 0; k < 3; k++) art.ball(root, 9.48 + (i % 3) * 0.5 + k * 0.12, 0.26 + Math.floor(i / 3) * 0.22, 36.2, 0.06, 0.05, 0.06, 0xe9c23a);
+      art.box(root, 9.6 + (i % 3) * 0.5, 0.12 + Math.floor(i / 3) * 0.22, 34.7, 0.44, 0.22, 0.34, 0xb58a52);
+      for (let k = 0; k < 3; k++) art.ball(root, 9.48 + (i % 3) * 0.5 + k * 0.12, 0.26 + Math.floor(i / 3) * 0.22, 34.7, 0.06, 0.05, 0.06, 0xe9c23a);
     }
   } else
   for (let i = 0; i < 5; i++) {
@@ -425,6 +425,12 @@ export function makeTown(art: Art) {
     for (const road of [13.5, 26.5]) for (const side of [-1, 1])
       for (let n = 50.5; n < 84; n += 2.6) if (!junction(n, [69])) roadside(n, road + side * 2.05, "x", side);
     for (const side of [-1, 1]) for (let n = 1.5; n < 39; n += 2.6) if (!junction(n, [13.5, 26.5])) roadside(69 + side * 2.05, n, "z", side);
+    // The bazaar is packed: rows of stalls under awnings, vendors on the ground between them, carts wherever one
+    // will fit, and an aisle left down the middle for the crowd.
+    [[18.6, 17.5, 0xd08a2e], [21.6, 17.5, 0x2f8f5a], [24.2, 17.6, 0xb7245c], [17.2, 20.9, 0x1f6f8a], [18.8, 20.9, 0xc8442e], [23, 20.9, 0xe0aa65], [24.3, 20.8, 0x6c9a79]]
+      .forEach(([x, z, color]) => marketStall(root, art, x, z, color));
+    [[16.8, 18.8], [18, 18.9], [19.2, 18.7], [22.7, 18.8], [23.9, 18.9], [16.7, 19.9], [24.4, 19.8]].forEach(([x, z], i) => vendor(art, root, x, 0.03, z, i + 40));
+    [[18.1, 19.9], [19.4, 19.9], [22.6, 19.9], [23.6, 19.8]].forEach(([x, z], i) => handcart(art, root, x, 0.03, z, fruits[i % fruits.length], i + 20));
     // The Akbari Gate across the bazaar road, and the island in the middle of the chauraha.
     akbariGate(art, root, GATE.x, GATE.z, CHOWK[0].half * 2);
     chaurahaIsland(art, root, CHAURAHA.x, CHAURAHA.z, CHAURAHA.island);

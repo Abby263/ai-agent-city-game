@@ -582,6 +582,7 @@ class CitizenCognitionClient:
             "event_context": event_context,
             "rules": [
                 "Write exactly one spoken line for the speaker.",
+                "Keep it short, the way people really talk and because it is heard aloud: one or two sentences, 22 words at most, one thought. Leave the rest for your next turn.",
                 "Answer or acknowledge the latest partner turn in the ACTIVE exchange before adding anything else. A question in a past memory is not a question being asked now.",
                 "When the other person changes subject, follow that change. Only return to an older topic with an explicit spoken transition, after addressing the current one.",
                 "Do not repeat greetings, invitations or agreements already made. Build on them; ask a specific follow-up only when genuinely useful. An unanswered old question can stay unanswered.",

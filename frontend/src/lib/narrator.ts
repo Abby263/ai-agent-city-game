@@ -27,7 +27,6 @@ const plain = (text: string) => text.replace(/[\p{Extended_Pictographic}\u{FE0F}
 const sentence = (text: string) => { const t = plain(text); return /[.!?]$/.test(t) ? t : `${t}.`; };
 const place = (city: CityState, id: string | null | undefined) => city.locations.find((l) => l.location_id === id)?.name ?? city.city_name;
 const person = (city: CityState, id: string) => city.citizens.find((c) => c.citizen_id === id);
-const RESULT: Record<SceneResult, string> = { well: "That went well.", badly: "That went badly.", mixed: "That could go either way." };
 
 function distance(a: string, b: string) {
   const row = Array.from({ length: b.length + 1 }, (_, i) => i);
@@ -74,23 +73,55 @@ export function findPlace(city: CityState, spoken: string) {
   return best ? city.locations.find((l) => l.location_id === best!.id) : undefined;
 }
 
-/** What the narrator says as a scene opens: who, where, and why it matters. */
+/** One of a few ways of saying the same thing, always the same one for the same scene. */
+function pick(key: string, options: string[]) {
+  let hash = 0;
+  for (const char of key) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return options[hash % options.length];
+}
+
+/**
+ * Splits what the narrator has to say into beats: one short sentence each, said (and shown) one at a time with a
+ * breath between, so the player can follow. A long sentence is broken at a natural pause.
+ */
+export function narrationBeats(text: string): string[] {
+  const sentences = plain(text).match(/[^.!?…]+(?:[.!?…]+["”')]*|$)/g)?.map((s) => s.trim()).filter(Boolean) ?? [];
+  return sentences.flatMap((sentence) => {
+    const count = sentence.split(/\s+/).length;
+    if (count <= 16) return [sentence];
+    // Break at the comma, colon or semicolon nearest the middle.
+    const middle = sentence.length / 2;
+    let cut = -1;
+    for (const match of sentence.matchAll(/[,;:]\s/g)) if (cut < 0 || Math.abs(match.index - middle) < Math.abs(cut - middle)) cut = match.index;
+    return cut > 12 && cut < sentence.length - 12 ? [sentence.slice(0, cut + 1), sentence.slice(cut + 2)] : [sentence];
+  });
+}
+
+const RESULT: Record<SceneResult, string[]> = {
+  well: ["That went well.", "Good. That went better than it might have.", "Well, that landed."],
+  badly: ["Ouch. That went badly.", "That did not go well.", "Oh dear. That made things worse."],
+  mixed: ["Hm. That could go either way.", "Not good, not bad. We'll see.", "Hard to say how that went."],
+};
+
+/** What the narrator says as a scene opens: where, and what is happening. Two or three short beats, no more. */
 export function sceneIntro(city: CityState, conversation: Conversation) {
   const [a, b] = conversation.actor_ids.map((id) => person(city, id));
   const where = place(city, conversation.location_id);
+  const key = conversation.conversation_id;
   const staged = conversation.encounter?.story;
   const storyline = staged && STORYLINES.find((s) => s.id === staged.id);
   const beat = storyline?.beats[staged!.beat];
   if (storyline && beat) {
-    // The first scene of a case comes with its backstory; later scenes just pick up the thread.
-    return `${where}. ${sentence(beat.headline)}${staged!.beat === 0 ? ` ${storyline.brief}` : ""}`;
+    // The backstory is on the case board; aloud, the narrator only names the case and says what is happening now.
+    const last = staged!.beat === storyline.beats.length - 1;
+    const lead = staged!.beat === 0 ? `A new case: ${plain(storyline.title)}.` : last ? pick(key, ["This is the one that decides it.", "Here it is. The moment of truth."]) : "";
+    return `${where}. ${lead ? `${lead} ` : ""}${sentence(beat.headline)}${staged!.beat === 0 ? ` ${pick(key, ["Let's listen in.", "Watch how this goes.", "Listen."])}` : ""}`;
   }
-  const reason = conversation.encounter?.reason?.trim();
   if (conversation.encounter?.kind === "planned") return `${where}. ${first(a)} and ${first(b)} kept their plan to meet.`;
-  return `${where}. ${first(a)} goes over to ${first(b)}.${reason ? ` On ${first(a)}'s mind: ${sentence(reason)}` : ""}`;
+  return `${where}. ${pick(key, [`${first(a)} has spotted ${first(b)}.`, `${first(a)} goes over to ${first(b)}.`, `${first(a)} wants a word with ${first(b)}.`])}`;
 }
 
-/** What the narrator says when a scene ends: how it went, what is coming, and what the player can do about it. */
+/** What the narrator says when a scene ends: how it went, what is coming, and the player's move. Short. */
 export function sceneOutro(city: CityState, conversation: Conversation) {
   const staged = conversation.encounter?.story;
   const storyline = staged && STORYLINES.find((s) => s.id === staged.id);
@@ -99,13 +130,12 @@ export function sceneOutro(city: CityState, conversation: Conversation) {
   const result = story.results[storyline.id]?.[staged.beat];
   const closed = story.closed[storyline.id];
   if (closed) return `Case closed. ${closed.outcome === "well" ? storyline.well : storyline.badly}`;
+  const verdict = result ? pick(conversation.conversation_id, RESULT[result]) : "";
   const next = storyline.beats[story.progress[storyline.id] ?? 0];
-  if (!next) return result ? RESULT[result] : "";
-  const left = nudgesLeft(story, city.clock.day);
+  if (!next) return verdict;
   const pair = [next.actor, next.target].map((id) => first(person(city, id)));
-  return `${result ? `${RESULT[result]} ` : ""}Coming up: ${sentence(next.headline)} ${left > 0
-    ? `Want a quiet word with ${pair[0]} or ${pair[1]} first? You have ${left} ${left === 1 ? "nudge" : "nudges"} left.`
-    : "You're out of nudges for today, so we watch."}`;
+  return `${verdict ? `${verdict} ` : ""}Next: ${sentence(next.headline)} ${nudgesLeft(story, city.clock.day) > 0
+    ? `Want a word with ${pair[0]} or ${pair[1]} first?` : "No nudges left today, so we watch."}`;
 }
 
 /** A summary of the moment, from what the game already knows: the fallback when the narrator model can't be reached. */
@@ -115,14 +145,14 @@ export function whatsGoingOn(city: CityState, stage: OnStage) {
   const parts: string[] = [];
   if (stage) {
     const names = stage.conversation.actor_ids.map((id) => first(person(city, id))).join(" and ");
-    parts.push(`${names} are talking at ${place(city, stage.conversation.location_id)}. ${sceneIntro(city, stage.conversation).split(". ").slice(1).join(". ")}`);
+    parts.push(`${names} are talking at ${place(city, stage.conversation.location_id)}.`);
   } else if (city.policy.player_citizen_id) {
     const you = person(city, String(city.policy.player_citizen_id));
     parts.push(`You are ${first(you)}, at ${place(city, you?.current_location_id)}.`);
   }
   if (cases.length) {
     const next = cases[0].beats[story.progress[cases[0].id] ?? 0];
-    parts.push(`You have ${cases.length} open ${cases.length === 1 ? "case" : "cases"}: ${cases.map((c) => c.title).join(", ")}.${next ? ` Next up: ${sentence(next.headline)}` : ""}`);
+    parts.push(`You have ${cases.length} open ${cases.length === 1 ? "case" : "cases"}.${next ? ` Next up: ${sentence(next.headline)}` : ""}`);
   } else parts.push("Every case is closed. The town carries on.");
   return parts.join(" ");
 }
