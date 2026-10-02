@@ -104,3 +104,43 @@ def test_an_edited_prompt_gets_the_same_safety_checks_as_player_text(api):
 def test_the_fixed_rules_are_readable(api):
     rules = api.get("/cognition/rules").json()
     assert "adults" in rules["game_rules"] and rules["safety_rules"]
+
+
+def test_the_narrator_answers_and_only_acts_on_what_is_in_the_scene():
+    from app.cognition.narrator import NarratorRequest, narrate
+
+    request = NarratorRequest(
+        text="let me be Ren and go talk to Aoi, and tell Haruto to come clean", city_time="Monday 08:00", nudges_left=1,
+        people=[{"citizen_id": "ren", "name": "Ren Ishikawa"}, {"citizen_id": "aoi", "name": "Aoi Takahashi"}, {"citizen_id": "haruto", "name": "Haruto Tanaka"}],
+        places=[{"location_id": "cafe", "name": "Sunny Side Cafe"}],
+        cases=[{"case_id": "manga", "title": "Last Train", "goal": "Get Haruto to tell his father.", "next_scene_people": ["haruto", "hana"]}],
+    )
+    seen = {}
+
+    def generate(system, prompt, schema, name):
+        seen.update(system=system, prompt=prompt, name=name)
+        return {"say": "You're Ren now. Off you go.", "actions": [
+            {"type": "play_as", "citizen_id": "ren", "location_id": "", "case_id": "", "text": ""},
+            {"type": "talk_to", "citizen_id": "aoi", "location_id": "", "case_id": "", "text": ""},
+            {"type": "nudge", "citizen_id": "haruto", "location_id": "", "case_id": "manga", "text": "Tell him the truth."},
+            {"type": "talk_to", "citizen_id": "nobody_here", "location_id": "", "case_id": "", "text": ""},
+            {"type": "go_to", "citizen_id": "", "location_id": "the_moon", "case_id": "", "text": ""},
+            {"type": "nudge", "citizen_id": "ren", "location_id": "", "case_id": "manga", "text": "Not in the next scene."},
+            {"type": "speed", "citizen_id": "", "location_id": "", "case_id": "", "text": "9"},
+        ]}
+
+    reply = narrate(SimpleNamespace(_generate_json=generate), request)
+    assert [a.type for a in reply.actions] == ["play_as", "talk_to", "nudge"], "invented people, places and nudges are dropped"
+    assert reply.say.startswith("You're Ren")
+    assert seen["prompt"]["player_said"].startswith("let me be Ren")
+    assert "mishearings" in seen["system"], "the narrator knows it is reading a speech transcript"
+    # No nudges left: the nudge is dropped even if the model returns one.
+    request.nudges_left = 0
+    assert [a.type for a in narrate(SimpleNamespace(_generate_json=generate), request).actions] == ["play_as", "talk_to"]
+
+
+def test_the_narrator_endpoint_checks_what_the_player_said():
+    app = FastAPI()
+    app.include_router(routes.router)
+    response = TestClient(app).post("/cognition/narrator", json={"text": "my phone number is 555 123 4567", "city_time": "now"})
+    assert response.status_code == 400

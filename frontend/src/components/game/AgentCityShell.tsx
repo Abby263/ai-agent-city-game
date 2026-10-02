@@ -46,6 +46,9 @@ import { WorldClock } from "./WorldClock";
 import { GodPanel } from "./GodPanel";
 import { StoryTracker } from "./StoryTracker";
 import { CaseBoard } from "./CaseBoard";
+import { Narrator } from "./Narrator";
+import { sceneOutro, type NarratorAction } from "@/lib/narrator";
+import { setNarratorVoice } from "@/lib/narrator-voice";
 import { CaseResult } from "./CaseResult";
 import { STORYLINES, closedCases, nudgesLeft, openCases, storyState } from "@/lib/storyteller";
 import { captureScene } from "@/lib/scene-capture";
@@ -300,7 +303,20 @@ export function AgentCityShell() {
     if (!chatting) { inlineRun.current++; inlineAudio.current?.stop(); setInlineTalk(null); }
   }, [panel, player, targetId, setInlineTalk]);
   // The town waits while you read the brief, choose your words, or take in how a case ended.
-  useEffect(() => { holdClock.current = welcome || composing || Boolean(result) || introPlaying; }, [welcome, composing, result, introPlaying]);
+  const narratorBusy = useGameStore((state) => state.narratorBusy);
+  const welcomeOpen = useRef(false);
+  useEffect(() => { welcomeOpen.current = welcome; }, [welcome]);
+  useEffect(() => { holdClock.current = welcome || composing || Boolean(result) || introPlaying || narratorBusy; }, [welcome, composing, result, introPlaying, narratorBusy]);
+  // When a case scene ends the narrator says how it went and what is coming, so the player knows their move.
+  const toldScene = useRef("");
+  useEffect(() => {
+    if (!lastScene || !city || toldScene.current === lastScene.conversationId) return;
+    const scene = cityConversations.find((c) => c.conversation_id === lastScene.conversationId);
+    if (!scene) return;
+    toldScene.current = lastScene.conversationId;
+    const outro = sceneOutro(city, scene);
+    if (outro) useGameStore.getState().narrate(outro);
+  }, [lastScene, city, cityConversations]);
   const closedKey = story ? Object.keys(story.closed).sort().join(",") : null;
   useEffect(() => {
     if (closedKey === null) return;
@@ -328,6 +344,7 @@ export function AgentCityShell() {
     // The first tap is also what lets the browser play sound.
     unlockAudio();
     startAmbience();
+    if (welcomeOpen.current) useGameStore.getState().narrate("I'm your narrator. I'll tell you what's going on in every scene. Tap the microphone, or press V, and tell me what you want: ask what's happening, play as someone, talk to someone, or nudge a case.");
     setWelcome(false);
     try { localStorage.setItem(WELCOME_KEY, "1"); } catch { /* the guide can show again next visit */ }
   }, []);
@@ -542,37 +559,34 @@ export function AgentCityShell() {
     if (flight.current) { setMessage("The town is still busy. Try again in a moment."); return; }
     await act(() => api.walkTo(locationId));
   }
-  async function speak(event: FormEvent) {
-    event.preventDefault();
-    const target = nearby.find((citizen) => citizen.citizen_id === targetId);
-    if (!player || !target || !draft.trim()) return;
+  /** Says a line as the resident you play to someone standing with you; the reply arrives as a new exchange. */
+  async function sendLine(you: CitizenAgent, target: CitizenAgent, text: string) {
     // A town moment already in progress finishes first; your line is sent right after, never dropped.
     for (let waited = 0; flight.current && waited < 60; waited++) await new Promise((resolve) => window.setTimeout(resolve, 500));
-    if (flight.current) { setMessage("The town is still busy. Try sending again in a moment."); return; }
-    const text = draft.trim();
+    if (flight.current) { setMessage("The town is still busy. Try sending again in a moment."); return false; }
     if (/sleep/i.test(target.current_activity)) {
       setMessage(`${shortName(target)} is asleep 😴. Try again when they're up, or talk to someone who's awake.`);
-      return;
+      return false;
     }
     const safety = checkPlayerText(text);
     if (!safety.ok) {
       setMessage(safety.message);
-      return;
+      return false;
     }
     const submission: OutgoingSpeech = {
       id: crypto.randomUUID(),
-      actor: player,
+      actor: you,
       target,
       text,
       status: "pending",
     };
     const existingIds = new Set(
-      cityConversations.map((c) => c.conversation_id),
+      useGameStore.getState().cityConversations.map((c) => c.conversation_id),
     );
-    playInline({ conversation_id: submission.id, actor_ids: [player.citizen_id, target.citizen_id], transcript: [{ speaker_id: player.citizen_id, text }] }, 0, true);
+    playInline({ conversation_id: submission.id, actor_ids: [you.citizen_id, target.citizen_id], transcript: [{ speaker_id: you.citizen_id, text }] }, 0, true);
     // Starting a chat brings the two of you into view once, only if you can't already see them.
-    useGameStore.getState().focusOn([player.citizen_id, target.citizen_id], true);
-    await act(async () => {
+    useGameStore.getState().focusOn([you.citizen_id, target.citizen_id], true);
+    return act(async () => {
       // Only clear an accepted submission, never a draft entered during the request.
       setDraft("");
       setFilter("all");
@@ -586,11 +600,11 @@ export function AgentCityShell() {
           .cityConversations.some(
             (c) =>
               !existingIds.has(c.conversation_id) &&
-              c.actor_ids.includes(player.citizen_id) &&
+              c.actor_ids.includes(you.citizen_id) &&
               c.actor_ids.includes(target.citizen_id) &&
               c.transcript.some(
                 (line) =>
-                  line.speaker_id === player.citizen_id && line.text === text,
+                  line.speaker_id === you.citizen_id && line.text === text,
               ),
           );
         if (!confirmed)
@@ -606,6 +620,120 @@ export function AgentCityShell() {
         throw error;
       }
     });
+  }
+  async function speak(event: FormEvent) {
+    event.preventDefault();
+    const target = nearby.find((citizen) => citizen.citizen_id === targetId);
+    if (!player || !target || !draft.trim()) return;
+    await sendLine(player, target, draft.trim());
+  }
+  const whenFree = async () => {
+    for (let waited = 0; flight.current && waited < 60; waited++) await new Promise((resolve) => window.setTimeout(resolve, 500));
+    return !flight.current;
+  };
+  /** Carries out what the narrator understood, in order. Returns what could not be done, in words. */
+  async function runNarratorActions(actions: NarratorAction[]) {
+    const first = (id: string) => shortName(useGameStore.getState().city?.citizens.find((c) => c.citizen_id === id));
+    for (const action of actions) {
+      const store = useGameStore.getState();
+      const current = store.city;
+      if (!current) return "The town isn't ready yet.";
+      const youId = current.policy.player_citizen_id ? String(current.policy.player_citizen_id) : "";
+      const you = current.citizens.find((c) => c.citizen_id === youId);
+      const them = current.citizens.find((c) => c.citizen_id === action.citizen_id);
+      try {
+        switch (action.type) {
+          case "play_as":
+            if (!them || them.age < 3) return "I can't put you in their shoes.";
+            setCity(await api.takeControl(them.citizen_id));
+            setPersonId(null);
+            store.focusOn([them.citizen_id]);
+            break;
+          case "stop_playing":
+            setCity(await api.takeControl(null));
+            break;
+          case "talk_to": {
+            if (!you) return `Tell me who you want to be first, for example “play as Ren and talk to ${first(action.citizen_id)}”.`;
+            if (!them || them.citizen_id === youId) return "I couldn't find them.";
+            if (you.current_location_id !== them.current_location_id) {
+              if (!(await whenFree())) return "The town is busy. Try again in a moment.";
+              if (!(await act(() => api.approach(them.citizen_id)))) return `You couldn't get to ${shortName(them)} just now.`;
+            }
+            openChat(them.citizen_id);
+            store.focusOn([them.citizen_id, youId]);
+            break;
+          }
+          case "say_to": {
+            if (!you) return "Tell me who you want to be first, then I can say it for you.";
+            if (!them) return "I couldn't find them.";
+            if (you.current_location_id !== them.current_location_id || current.policy.player_destination) {
+              // Not together yet: walk over with the words ready to send on arrival.
+              if (!(await whenFree()) || !(await act(() => api.approach(them.citizen_id)))) return `You couldn't get to ${shortName(them)} just now.`;
+              openChat(them.citizen_id);
+              setDraft(action.text);
+              return `You're walking over to ${shortName(them)}. Your words are ready: press send when you arrive.`;
+            }
+            openChat(them.citizen_id);
+            if (!(await sendLine(you, them, action.text))) return "That didn't go through.";
+            break;
+          }
+          case "go_to":
+            if (!action.location_id) break;
+            if (you) await goTo(action.location_id);
+            else store.focusOn([], false, action.location_id);
+            break;
+          case "nudge":
+            if (!(await whenFree()) || !(await act(() => api.nudge(action.case_id, action.citizen_id, action.text)))) return "That nudge didn't land.";
+            break;
+          case "watch":
+            if (them) store.focusOn([them.citizen_id]);
+            break;
+          case "pause":
+            if (current.clock.running) await pause();
+            break;
+          case "resume": {
+            const tasks = current.citizens.some((c) => (c.personality.player_task as { status?: string } | undefined)?.status === "active");
+            if (!current.clock.running && (await whenFree())) await act(() => (current.simulation_mode === "manual" && !tasks ? api.setMode("autonomous") : api.start()));
+            break;
+          }
+          case "speed":
+            setSpeed(Number(action.text) || 1);
+            if (current.policy.time_mode === "live" && (await whenFree())) await act(() => api.setTimeMode("fast"));
+            break;
+          case "street_view":
+            store.requestCamera("street", action.location_id || them?.current_location_id || undefined);
+            break;
+          case "overview":
+            store.requestCamera("overview");
+            break;
+          case "make_happen":
+            runAct(action.citizen_id || null, null, action.text);
+            break;
+          case "replay_scene": {
+            const lastId = store.cityConversations.filter((c) => !c.player_chat).at(-1)?.conversation_id;
+            if (!lastId) return "There's no scene to replay yet.";
+            store.replayConversation(lastId);
+            break;
+          }
+          case "skip_scene":
+            if (store.playbackQueue[0]) store.finishPlayback(store.playbackQueue[0].conversation_id);
+            break;
+          case "mute":
+          case "unmute": {
+            const on = action.type === "unmute";
+            setAmbienceEnabled(on);
+            setSoundOn(on);
+            conversationAudioPreference.remember(on);
+            setVoiceOn(on);
+            setNarratorVoice(on);
+            break;
+          }
+        }
+      } catch (error) {
+        return error instanceof Error ? error.message : "That didn't work.";
+      }
+    }
+    return "";
   }
   function download() {
     const url = URL.createObjectURL(
@@ -791,6 +919,7 @@ export function AgentCityShell() {
               onGoTo={(locationId) => { setPersonId(null); void goTo(locationId); }} />
           )}
           <div className="desk">
+          {city && !welcome && !introPlaying && <Narrator onActions={runNarratorActions} />}
           {city && !scenePlaying && !player && (
             <CaseBoard city={city} busy={busy} spotlight={sceneCase} onComposing={setComposing} onMessage={setMessage}
               onWatch={(ids) => useGameStore.getState().focusOn(ids)}
@@ -1598,6 +1727,8 @@ function ConversationThread({
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const [following, setFollowing] = useState(!focusedConversation);
+  // Scenes are listed by what happened; their lines open on request. Your own chats stay open, like any chat.
+  const [opened, setOpened] = useState<string[]>([]);
   const names = Object.fromEntries(
     city.citizens.map((citizen) => [citizen.citizen_id, citizen]),
   );
@@ -1701,8 +1832,19 @@ function ConversationThread({
                   }
                 </span>
               </div>}
-              {entry.conversation.encounter && <p className="exchange-context">{entry.conversation.encounter.reason}</p>}
-              {entry.conversation.transcript.map((line, index) => (
+              {(() => {
+                const c = entry.conversation!;
+                const folded = !c.player_chat && focusedConversation !== entry.key && !opened.includes(entry.key);
+                return !c.player_chat && (
+                  <button className="exchange-fold" aria-expanded={!folded} onClick={() => setOpened(folded ? [...opened, entry.key] : opened.filter((id) => id !== entry.key))}>
+                    <strong>{c.actor_ids.map((id) => shortName(names[id])).join(" & ")}</strong>
+                    <span>{displayText(c.summary || c.encounter?.topic || c.transcript[0]?.text || "")}</span>
+                    <small>{folded ? `Show ${c.transcript.length} lines` : "Hide lines"}</small>
+                  </button>
+                );
+              })()}
+              {(entry.conversation.player_chat || focusedConversation === entry.key || opened.includes(entry.key)) && entry.conversation.encounter && <p className="exchange-context">{entry.conversation.encounter.reason}</p>}
+              {(entry.conversation.player_chat || focusedConversation === entry.key || opened.includes(entry.key)) && entry.conversation.transcript.map((line, index) => (
                 <article
                   className="dialogue-line"
                   key={`${entry.key}-${index}`}

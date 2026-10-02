@@ -108,6 +108,34 @@ date"), a brief (what the player knows that the residents don't) and two endings
 
 Tests: `frontend/tests/cases.test.ts`.
 
+## The narrator: explanation and voice control
+
+A narrator sits at the top of the desk (`Narrator.tsx`). It does two jobs.
+
+- **It explains.** As each scene opens it says who is there and why it matters (`sceneIntro`: the beat, plus the
+  case's backstory the first time); when a case scene ends it says how it went, what is coming and how many nudges
+  are left (`sceneOutro`). These lines are built from what the game already knows: no model call.
+- **It takes orders, spoken or typed.** Tap the microphone (or press V) and talk: the browser's own speech
+  recognition (`voice-input.ts`) turns it into text; browsers without it get the text box. Plain commands are
+  understood on the spot (`localReply`: pause, resume, skip, "play as Ren and talk to Aoi", "go to the station",
+  "nudge Haruto to tell the truth"). Everything else, including any question, goes to the narrator model
+  (`POST /cognition/narrator`, `backend/app/cognition/narrator.py`) with what is on screen, the open cases and who
+  is around; it replies with something to say and up to four actions from a fixed list (`play_as`, `talk_to`,
+  `say_to`, `go_to`, `nudge`, `watch`, `pause`, `resume`, `speed`, `street_view`, `overview`, `make_happen`,
+  `replay_scene`, `skip_scene`, `mute`, `unmute`). Actions naming anyone or anywhere outside the scene are dropped.
+  The shell carries them out in order (`runNarratorActions`). If the model can't be reached the narrator falls
+  back to a summary the game builds itself.
+
+The narrator speaks with the device's voice (`narrator-voice.ts`), lower and calmer than the residents'. Scenes and
+the clock wait while it listens, thinks or speaks. Player words pass the same safety checks as typed text, in the
+browser and again on the server.
+
+**Transcripts are folded by default.** Under a scene the written dialogue is one truncated line; the chevron opens
+the full text (remembered). In Talk, each scene is a summary row whose lines open on request; the player's own
+chats stay open.
+
+Tests: `frontend/tests/narrator.test.ts`, `backend/tests/test_player_control.py`.
+
 ## Scenes, sound and sharing
 
 - Subtitles are a lower-third strip, so the scene keeps the screen. Speakers are framed over the listener's
