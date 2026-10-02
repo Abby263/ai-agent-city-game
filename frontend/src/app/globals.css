@@ -2260,6 +2260,14 @@ select {
 .narrator-caption { flex: 1; min-width: 0; padding: 0; text-align: left; color: inherit; background: none; border: 0; cursor: pointer; }
 .narrator-caption small { display: block; font-size: 10.5px; letter-spacing: 0.07em; text-transform: uppercase; color: #89ffe0; }
 .narrator-caption span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; font-size: 13px; line-height: 1.4; }
+/* While the narrator tells a scene, one sentence at a time is up: bigger, unclipped, fading in as it is said. */
+.narrator[data-telling="true"] .narrator-caption span { display: block; overflow: visible; font-size: 16px; line-height: 1.35; font-weight: 600; animation: narrator-beat 0.35s ease-out; }
+.narrator-caption small i { display: inline-flex; gap: 3px; margin-left: 8px; vertical-align: middle; }
+.narrator-caption small i b { width: 5px; height: 5px; border-radius: 50%; background: #89ffe040; }
+.narrator-caption small i b[data-on="true"] { background: #89ffe0; }
+.encounter-introduction p { animation: narrator-beat 0.35s ease-out; }
+@keyframes narrator-beat { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .narrator[data-telling="true"] .narrator-caption span, .encounter-introduction p { animation: none; } }
 .narrator-bar .icon-button { width: 28px; height: 28px; min-width: 28px; color: #cfd8d2; background: transparent; border-color: transparent; }
 .narrator-log { max-height: 220px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 12px 8px; border-top: 1px solid #ffffff1c; display: grid; gap: 6px; }
 .narrator-log p { margin: 0; font-size: 12.5px; line-height: 1.45; }
@@ -2269,7 +2277,7 @@ select {
 .narrator-type input { flex: 1; min-width: 0; min-height: 34px; border-radius: 8px; border: 1px solid #ffffff38; background: #ffffff14; color: #fff; padding: 0 10px; font-size: 13px; }
 .narrator-type input::placeholder { color: #cfd8d2aa; }
 .narrator-type .icon-button { color: #89ffe0; background: transparent; border-color: #89ffe066; }
-.conversation-on-stage .narrator-caption span { -webkit-line-clamp: 2; }
+.conversation-on-stage .narrator:not([data-telling="true"]) .narrator-caption span { -webkit-line-clamp: 2; }
 @media (max-width: 760px), (max-width: 1024px) and (max-height: 500px) {
   .narrator-mic { width: 44px; height: 44px; }
   .narrator-caption span { -webkit-line-clamp: 2; }
@@ -2282,7 +2290,8 @@ select {
 .live-dialogue[data-compact="true"] .live-subtitle > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; flex: 1; }
 .live-dialogue[data-compact="true"] .live-subtitle strong { flex-shrink: 0; }
 .live-dialogue[data-compact="true"] .live-subtitle p,
-.live-dialogue[data-compact="true"] .encounter-introduction p { margin: 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: none; color: #cfdcd8; }
+/* The narrator's sentence of the moment: one at a time, so it can be large and never clipped. */
+.live-dialogue[data-compact="true"] .encounter-introduction p { margin: 2px 0 0; font-size: 17px; line-height: 1.35; font-weight: 600; max-height: none; color: #f4f7f3; }
 .live-dialogue[data-compact="true"] .live-subtitle .citizen-portrait { width: 28px !important; height: 28px !important; }
 .live-dialogue[data-compact="true"] .encounter-introduction { padding-top: 4px; align-items: center; }
 .live-dialogue[data-compact="true"] .overhear-far { flex-wrap: wrap; }

@@ -347,7 +347,7 @@ export function AgentCityShell() {
     // The first tap is also what lets the browser play sound.
     unlockAudio();
     startAmbience();
-    if (welcomeOpen.current) useGameStore.getState().narrate("I'm your narrator. I'll tell you what's going on in every scene. Tap the microphone, or press V, and tell me what you want: ask what's happening, play as someone, talk to someone, or nudge a case.");
+    if (welcomeOpen.current) useGameStore.getState().narrate("I'm your narrator. I'll set up each scene as it comes. Tap the mic, or press V, to ask me anything.");
     setWelcome(false);
     try { localStorage.setItem(WELCOME_KEY, "1"); } catch { /* the guide can show again next visit */ }
   }, []);

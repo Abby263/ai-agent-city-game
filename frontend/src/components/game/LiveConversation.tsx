@@ -8,6 +8,7 @@ import { CitizenPortrait } from "./CitizenPortrait";
 import { useGameStore } from "@/lib/store";
 import { ConversationAudio, conversationAudioPreference, soundAllowed, unlockAudio } from "@/lib/conversation-audio";
 import { setAmbienceScene } from "@/lib/ambience";
+import { narrationBeats } from "@/lib/narrator";
 import { stopNarration } from "@/lib/narrator-voice";
 import { captureScene } from "@/lib/scene-capture";
 import { shareCard } from "@/lib/share";
@@ -141,6 +142,9 @@ export function LiveConversation({ conversation, citizens, location, dateLabel, 
   // The narrator sets the scene; the dialogue starts when it has finished (or the player moves on).
   const introId = useRef(0);
   const narrationDone = useGameStore((state) => state.narrationDone);
+  // The introduction is captioned one sentence at a time, as the narrator says it.
+  const narratorBeat = useGameStore((state) => state.narratorBeat);
+  const introBeats = useMemo(() => narrationBeats(intro), [intro]);
   useEffect(() => {
     if (!arrived || introduced || introId.current || document.hidden) return;
     introId.current = useGameStore.getState().narrate(intro);
@@ -195,7 +199,7 @@ export function LiveConversation({ conversation, citizens, location, dateLabel, 
         <button aria-label="Focus on speakers" title="Focus on speakers" onClick={onFocus}><Focus size={17} /></button>
         <button aria-label="Skip conversation playback" title="Skip playback; keep conversation in history" onClick={() => { audio.current?.stop(); onFinish(conversation.conversation_id); }}><SkipForward size={17} /></button>
       </div>
-      {arrived && !introduced ? <div className="encounter-introduction"><div><small>{conversation.encounter?.kind === "planned" ? "A promise kept" : "What's going on"}</small><p>{intro}</p></div>
+      {arrived && !introduced ? <div className="encounter-introduction"><div><small>{conversation.encounter?.kind === "planned" ? "A promise kept" : "What's going on"}</small><p key={narratorBeat}>{narratorBeat || introBeats[0]}</p></div>
         <div className="live-dialogue-controls"><button aria-label={paused ? "Resume introduction" : "Pause introduction"} title="Pause or resume" onClick={togglePause}>{paused ? <Play size={17} /> : <Pause size={17} />}</button><button aria-label="Begin conversation" title="Begin conversation" onClick={() => { stopNarration(); setIntroduced(true); }}><ArrowRight size={18} /></button></div></div> : arrived && line ? (
         <div className="live-line">
           <div className="live-subtitle" aria-live="polite" aria-atomic="true">

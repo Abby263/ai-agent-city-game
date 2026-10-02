@@ -52,6 +52,10 @@ those have in common, and what the town therefore does (`theme.ts`, `infill.ts`,
   washing, air conditioners, bare-brick party walls, a black water tank on every roof and the odd rooftop hoarding.
   Behind the streets the same houses line narrow lanes, with steel gates instead of shops. Hazratganj's are cream
   colonial terraces with round-arched arcades, a balustrade and uniform black-and-white boards.
+- **No spare ground.** The blocks are packed in several passes: rows facing their lane, rows standing back to back
+  with those, houses side-on, then single-room-deep ones in whatever strip is left. The park and the orchard are
+  smaller than Nakameguro's, and the bazaar is rows of stalls, vendors and carts with one aisle through. Every
+  place and front door keeps a brick lane to the nearest street, routed round the buildings.
 - **Walled plots.** Anything left open to the road has a compound wall (brick or plaster, with painted notices)
   or iron railings, with a gap wherever people need to get in.
 - **Homes.** Most families live in a three-storey house in a lane like their neighbours'; two old families keep

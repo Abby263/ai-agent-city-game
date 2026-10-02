@@ -61,6 +61,8 @@ type GameStore = {
   /** Something for the narrator to say (and show); `narrationDone` is the last one it finished saying. */
   narration: { id: number; text: string } | null;
   narrationDone: number;
+  /** The sentence the narrator is saying right now ("" when silent), shown wherever the narration is captioned. */
+  narratorBeat: string;
   narrate: (text: string) => number;
   finishNarration: (id: number) => void;
   /** The narrator is listening, thinking or speaking: scenes and the clock wait. */
@@ -150,6 +152,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   lastScene: null,
   narration: null,
   narrationDone: 0,
+  narratorBeat: "",
   narrate: (text) => {
     const id = (get().narration?.id ?? 0) + 1;
     set({ narration: { id, text } });

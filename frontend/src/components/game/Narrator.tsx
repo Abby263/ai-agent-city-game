@@ -4,8 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { ChevronDown, ChevronUp, LoaderCircle, Mic, Send, Square, Volume2, VolumeX } from "lucide-react";
 import { askNarrator } from "@/lib/api";
 import { unlockAudio } from "@/lib/conversation-audio";
-import { subtitleDuration } from "@/lib/conversation-playback";
-import { NARRATOR_HELP, localReply, narratorRequest, whatsGoingOn, type NarratorAction, type NarratorTurn, type OnStage } from "@/lib/narrator";
+import { NARRATOR_HELP, localReply, narrationBeats, narratorRequest, whatsGoingOn, type NarratorAction, type NarratorTurn, type OnStage } from "@/lib/narrator";
 import { VOICE_CHANGED, narratorVoiceOn, setNarratorVoice, speakNarration, stopNarration } from "@/lib/narrator-voice";
 import { checkPlayerText } from "@/lib/safety";
 import { describeNow } from "@/lib/session-simulation";
@@ -30,6 +29,8 @@ export function Narrator({ onActions }: {
   const [thinking, setThinking] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [voice, setVoice] = useState(true);
+  /** The sentence being said right now, and where it falls among the others. */
+  const [beat, setBeat] = useState<{ index: number; count: number; text: string } | null>(null);
   const canListen = useSyncExternalStore(noSubscription, voiceInputSupported, () => false);
   const stopListening = useRef<(() => void) | null>(null);
   const history = useRef<NarratorTurn[]>([]);
@@ -51,15 +52,20 @@ export function Narrator({ onActions }: {
     history.current = [...history.current, turn].slice(-12);
     setTurns(history.current);
   }, []);
-  /** Shows a line and says it; resolves when it has been said (or read, with the voice off). */
+  /** Tells it one short sentence at a time, each shown as it is said; resolves when the last has been said or read. */
   const say = useCallback(async (text: string) => {
     add({ role: "narrator", text });
+    const beats = narrationBeats(text);
     setSpeaking(true);
     try {
-      if (narratorVoiceOn()) await speakNarration(text);
-      else await new Promise((resolve) => window.setTimeout(resolve, Math.min(6000, subtitleDuration(text) * 0.6)));
+      await speakNarration(beats, (index) => {
+        setBeat({ index, count: beats.length, text: beats[index] });
+        useGameStore.setState({ narratorBeat: beats[index] });
+      });
     } finally {
       setSpeaking(false);
+      setBeat(null);
+      useGameStore.setState({ narratorBeat: "" });
     }
   }, [add]);
 
@@ -91,7 +97,7 @@ export function Narrator({ onActions }: {
         reply = await askNarrator(narratorRequest(text, city, stage, history.current.slice(0, -1), describeNow(city)));
       } catch {
         // The narrator model can't be reached: say what the game itself knows, and what can be said.
-        reply = { say: `${whatsGoingOn(city, stage)} ${NARRATOR_HELP}`, actions: [] };
+        reply = { say: whatsGoingOn(city, stage), actions: [] };
       } finally {
         setThinking(false);
       }
@@ -127,18 +133,22 @@ export function Narrator({ onActions }: {
     return () => window.removeEventListener("keydown", key);
   }, []);
   const latest = [...turns].reverse().find((t) => t.role === "narrator");
-  const caption = listening ? interim || "Listening…" : thinking ? "Thinking…" : latest?.text ?? "I'm your narrator. Tap the mic and ask me anything, or tell me what to do.";
+  const telling = speaking && beat && !listening && !thinking ? beat : null;
+  const caption = listening ? interim || "Listening…" : thinking ? "Thinking…" : telling?.text ?? latest?.text ?? "I'm your narrator. Tap the mic and ask me anything.";
   return (
-    <section className="narrator" aria-label="Narrator" data-open={open} data-listening={listening}>
+    <section className="narrator" aria-label="Narrator" data-open={open} data-listening={listening} data-telling={Boolean(telling)}>
       <div className="narrator-bar">
         <button className="narrator-mic" aria-label={listening ? "Stop listening" : "Talk to the narrator"} aria-pressed={listening}
           title={canListen ? (listening ? "Stop listening (V)" : "Talk to the narrator (V)") : "This browser can't listen: type instead"}
           disabled={!canListen || thinking} onClick={toggleMic}>
           {thinking ? <LoaderCircle size={19} className="reply-spinner" /> : listening ? <Square size={16} /> : <Mic size={19} />}
         </button>
-        <button className="narrator-caption" aria-expanded={open} title="Show the conversation with the narrator" onClick={() => setOpen(!open)}>
-          <small>Narrator{speaking ? " · speaking" : listening ? " · listening" : ""}</small>
-          <span aria-live="polite">{caption}</span>
+        {/* While it is telling, a tap moves it along; otherwise the caption opens the conversation. */}
+        <button className="narrator-caption" aria-expanded={open} title={telling ? "Tap to skip what the narrator is saying" : "Show the conversation with the narrator"}
+          onClick={() => (telling ? stopNarration() : setOpen(!open))}>
+          <small>Narrator{speaking ? " · speaking" : listening ? " · listening" : ""}
+            {telling && telling.count > 1 && <i aria-hidden="true">{Array.from({ length: telling.count }, (_, i) => <b key={i} data-on={i <= telling.index} />)}</i>}</small>
+          <span key={telling ? telling.index : "idle"} aria-live="polite">{caption}</span>
         </button>
         <button className="icon-button" aria-label={voice ? "Mute the narrator's voice" : "Turn on the narrator's voice"} aria-pressed={voice}
           title={voice ? "Mute the narrator's voice" : "Turn on the narrator's voice"} onClick={() => setNarratorVoice(!voice)}>

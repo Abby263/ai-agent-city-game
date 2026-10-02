@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { createInitialCity } from "../src/lib/initial-city";
-import { findPerson, findPlace, localReply, narratorRequest, sceneIntro, sceneOutro, whatsGoingOn } from "../src/lib/narrator";
+import { findPerson, findPlace, localReply, narrationBeats, narratorRequest, sceneIntro, sceneOutro, whatsGoingOn } from "../src/lib/narrator";
 import { getSessionCity, saveSessionCity, seedSession, sessionStartStory, sessionTakeControl } from "../src/lib/session-simulation";
 import { STORYLINES, storyState } from "../src/lib/storyteller";
 import type { Conversation } from "../src/lib/types";
@@ -70,17 +70,18 @@ test("a nudge by voice reaches someone in a case's next scene, in the player's w
 test("the narrator sets up each scene and says how it went", () => {
   const opening = sceneIntro(city(), scene({ id: "haruto_manga", beat: 0 }));
   assert.match(opening, /Station/i);
-  assert.match(opening, /Aiko found something hidden under Haruto's futon\./);
-  assert.match(opening, /secretly entered a manga contest/, "the first scene of a case comes with its backstory");
+  assert.match(opening, /A new case: Last Train\. Aiko found something hidden under Haruto's futon\./);
+  assert.doesNotMatch(opening, /secretly entered a manga contest/, "the backstory stays on the case board");
   assert.doesNotMatch(opening, /📒/, "nothing the voice can't say");
-  assert.doesNotMatch(sceneIntro(city(), scene({ id: "haruto_manga", beat: 1 })), /secretly entered a manga contest/);
-  assert.match(sceneIntro(city(), scene()), /Aiko goes over to Haruto\. On Aiko's mind: I found Haruto's manga pages\./);
+  assert.ok(narrationBeats(opening).length <= 4 && narrationBeats(opening).every((b) => b.split(" ").length <= 16), "a few short beats");
+  assert.doesNotMatch(sceneIntro(city(), scene({ id: "haruto_manga", beat: 1 })), /A new case/);
+  assert.match(sceneIntro(city(), scene()), /\. Aiko (has spotted|goes over to|wants a word with) Haruto\.$/);
   const played = city();
   played.policy.story = { ...storyState(played.policy), progress: { haruto_manga: 1 }, results: { haruto_manga: ["well"] } };
   saveSessionCity(played);
   const outro = sceneOutro(city(), scene({ id: "haruto_manga", beat: 0 }));
-  assert.match(outro, /^That went well\. Coming up: Haruto secretly asks Hana to look at his manga\./);
-  assert.match(outro, /quiet word with Haruto or Hana.*3 nudges left/);
+  assert.match(outro, /Next: Haruto secretly asks Hana to look at his manga\. Want a word with Haruto or Hana first\?$/);
+  assert.ok(outro.split(" ").length <= 28, "said in a breath or two");
   assert.equal(sceneOutro(city(), scene()), "", "ordinary scenes need no verdict");
 });
 
@@ -91,5 +92,26 @@ test("the narrator model is told what is on screen, the cases and who is around"
   assert.deepEqual(request.cases[0].next_scene_people.length, 2);
   assert.equal(request.nudges_left, 3);
   assert.ok(request.people.some((p) => p.name.startsWith("Haruto")) && request.places.some((p) => p.location_id === "loc_station"));
-  assert.match(whatsGoingOn(city(), null), /You have 3 open cases: Last Train/);
+  assert.match(whatsGoingOn(city(), null), /You have 3 open cases\. Next up:/);
+});
+
+test("the narrator speaks in short beats, one sentence at a time", () => {
+  assert.deepEqual(narrationBeats("Charbagh Station. A new case: Adi Lakhnavi. Kamla found a notebook! Listen."), ["Charbagh Station.", "A new case: Adi Lakhnavi.", "Kamla found a notebook!", "Listen."]);
+  const long = narrationBeats("Aditya is reciting at Sunday's mushaira under a pen name, and his father Rajendra, the station superintendent, thinks he is revising for the railway exam.");
+  assert.equal(long.length, 2, "a long sentence is broken at a pause");
+  assert.deepEqual(narrationBeats("  "), []);
+  assert.deepEqual(narrationBeats("No full stop"), ["No full stop"]);
+});
+
+test("the narrator picks the most natural voice the device has, and a local one in Lucknow", async () => {
+  const { narratorVoice, readingTime } = await import("../src/lib/narrator-voice");
+  const voices = [
+    { name: "Fred", lang: "en-US", default: true }, { name: "Daniel", lang: "en-GB", default: false },
+    { name: "Microsoft Ryan Online (Natural)", lang: "en-GB", default: false }, { name: "Rishi", lang: "en-IN", default: false }, { name: "Kyoko", lang: "ja-JP", default: false },
+  ];
+  assert.equal(narratorVoice(voices, "nakameguro")?.name, "Microsoft Ryan Online (Natural)");
+  assert.equal(narratorVoice(voices, "lucknow")?.name, "Rishi");
+  assert.equal(narratorVoice(voices.slice(0, 2), "lucknow")?.name, "Daniel");
+  assert.equal(narratorVoice([voices[4]], "lucknow"), undefined, "never a voice that can't read English");
+  assert.ok(readingTime("Charbagh Station.") >= 1700 && readingTime("Kamla found a notebook hidden under Aditya's mattress.") > 3000);
 });
