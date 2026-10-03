@@ -30,6 +30,7 @@ import {
   Volume2,
   VolumeX,
   X,
+  MoreHorizontal,
 } from "lucide-react";
 import { GameCanvas } from "./GameCanvas";
 import { CitizenPortrait } from "./CitizenPortrait";
@@ -168,7 +169,6 @@ export function AgentCityShell() {
   // Cases: the one that just closed (shown once), and whether you're choosing your words for a nudge.
   const [composing, setComposing] = useState(false);
   const [result, setResult] = useState<string | null>(null);
-  const [everyone, setEveryone] = useState(false);
   const knownClosed = useRef<Set<string> | null>(null);
   const holdClock = useRef(false);
   const [soundOn, setSoundOn] = useState(true);
@@ -265,7 +265,6 @@ export function AgentCityShell() {
   const story = city ? storyState(city.policy) : null;
   const resultCase = result ? STORYLINES.find((s) => s.id === result) : undefined;
   const closedList = story ? closedCases(story) : [];
-  const caseCast = new Set(story ? openCases(story).flatMap((c) => c.beats.flatMap((b) => [b.actor, b.target])) : []);
   const sceneChoices = showScene ? nextMoves(city!, cityConversations.find((c) => c.conversation_id === lastScene!.conversationId)) : [];
   const scenePeople = (lastScene?.actorIds ?? []).map((id) => city?.citizens.find((c) => c.citizen_id === id)).filter((c) => c !== undefined);
   const sceneNames = (lastScene?.actorIds ?? []).map((id) => shortName(city?.citizens.find((c) => c.citizen_id === id))).join(" and ");
@@ -752,6 +751,15 @@ export function AgentCityShell() {
     setMessage("World snapshot downloaded.");
   }
 
+  // The two "more" menus close when you tap anywhere else.
+  const moreControls = useRef<HTMLDetailsElement>(null), moreViews = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      for (const menu of [moreControls.current, moreViews.current]) if (menu?.open && !menu.contains(event.target as Node)) menu.removeAttribute("open");
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, []);
   return (
     <main className="city-game" ref={viewport}>
       <header className="game-header">
@@ -768,28 +776,6 @@ export function AgentCityShell() {
         </div>
         <WorldClock city={city} />
         <div className="header-actions">
-          <div className="mode-switch" aria-label="World mode">
-            <button
-              aria-pressed={city?.simulation_mode === "manual"}
-              disabled={busy}
-              onClick={() => void act(() => api.setMode("manual"))}
-            >
-              Manual
-            </button>
-            <button
-              aria-pressed={city?.simulation_mode === "autonomous"}
-              disabled={busy}
-              onClick={() => {
-                setPanel(null);
-                setFilter("all");
-                setFocusedConversation(null);
-                void act(() => api.setMode("autonomous"));
-              }}
-            >
-              <Sparkles size={13} />
-              Auto
-            </button>
-          </div>
           <button
             className="icon-button"
             aria-label={city?.clock.running ? "Pause" : "Play"}
@@ -805,42 +791,70 @@ export function AgentCityShell() {
               {city?.clock.running ? <Pause size={18} /> : <Play size={18} />}
             </span>
           </button>
+          {/* Everything else lives behind one button, so the town stays in view. */}
+          <details className="header-more" ref={moreControls}>
+            <summary className="icon-button" aria-label="More controls" title="Mode, pace, sound and help"><span><MoreHorizontal size={18} /></span></summary>
+            <div className="header-more-menu" onClick={(event) => { if ((event.target as HTMLElement).closest("button")) moreControls.current?.removeAttribute("open"); }}>
+          <div className="mode-switch" aria-label="World mode">
+              <button
+                aria-pressed={city?.simulation_mode === "manual"}
+                disabled={busy}
+                onClick={() => void act(() => api.setMode("manual"))}
+              >
+                Manual
+              </button>
+              <button
+                aria-pressed={city?.simulation_mode === "autonomous"}
+                disabled={busy}
+                onClick={() => {
+                  setPanel(null);
+                  setFilter("all");
+                  setFocusedConversation(null);
+                  void act(() => api.setMode("autonomous"));
+                }}
+              >
+                <Sparkles size={13} />
+                Auto
+              </button>
+            </div>
           <select
-            className="speed-select"
-            aria-label="Time"
-            title={`Story pace keeps something happening; Live follows real ${activeCity().metro} time`}
-            value={live ? "live" : String(speed)}
-            onChange={(event) => {
-              const value = event.target.value;
-              if (value === "live") return void act(() => api.setTimeMode("live"));
-              setSpeed(Number(value));
-              if (live) void act(() => api.setTimeMode("fast"));
-            }}
-          >
-            <option value="1">▶ Story</option>
-            <option value="2">⏩ 2x</option>
-            <option value="4">⏩ 4x</option>
-            <option value="live">🔴 Live</option>
-          </select>
-          <button
-            className="icon-button"
-            aria-label={soundOn ? "Mute town sound" : "Turn on town sound"}
-            aria-pressed={soundOn}
-            title={soundOn ? "Mute town sound and music" : "Turn on town sound and music"}
-            onClick={() => { setAmbienceEnabled(!soundOn); setSoundOn(!soundOn); }}
-          >
-            <span>{soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}</span>
-          </button>
-          <button
-            className="icon-button"
-            aria-label="How to play"
-            title="How to play"
-            onClick={() => setWelcome(true)}
-          >
-            <span>
-              <CircleHelp size={18} />
-            </span>
-          </button>
+              className="speed-select"
+              aria-label="Time"
+              title={`Story pace keeps something happening; Live follows real ${activeCity().metro} time`}
+              value={live ? "live" : String(speed)}
+              onChange={(event) => {
+                const value = event.target.value;
+                if (value === "live") return void act(() => api.setTimeMode("live"));
+                setSpeed(Number(value));
+                if (live) void act(() => api.setTimeMode("fast"));
+              }}
+            >
+              <option value="1">▶ Story</option>
+              <option value="2">⏩ 2x</option>
+              <option value="4">⏩ 4x</option>
+              <option value="live">🔴 Live</option>
+            </select>
+            <button
+              className="icon-button"
+              aria-label={soundOn ? "Mute town sound" : "Turn on town sound"}
+              aria-pressed={soundOn}
+              title={soundOn ? "Mute town sound and music" : "Turn on town sound and music"}
+              onClick={() => { setAmbienceEnabled(!soundOn); setSoundOn(!soundOn); }}
+            >
+              <span>{soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}</span>
+            </button>
+            <button
+              className="icon-button"
+              aria-label="How to play"
+              title="How to play"
+              onClick={() => setWelcome(true)}
+            >
+              <span>
+                <CircleHelp size={18} />
+              </span>
+            </button>
+            </div>
+          </details>
         </div>
       </header>
 
@@ -946,49 +960,15 @@ export function AgentCityShell() {
           {!city && (
             <div className="world-loading">{error || `Opening ${activeCity().name}...`}</div>
           )}
-          <div className="citizen-strip" aria-label="Citizens">
-            {city?.citizens.filter((citizen) => everyone || !caseCast.size || caseCast.has(citizen.citizen_id) || citizen.citizen_id === player?.citizen_id).map((citizen) => (
-              <button
-                key={citizen.citizen_id}
-                aria-label={`Meet ${citizen.name}`}
-                aria-pressed={
-                  selected?.citizen_id === citizen.citizen_id &&
-                  panel === "citizens"
-                }
-                onClick={() => tap(citizen.citizen_id)}
-              >
-                <CitizenPortrait citizen={citizen} size={44} />
-                <span>
-                  <strong>{shortName(citizen)}</strong>
-                  <small>
-                    {citizen.citizen_id === player?.citizen_id
-                      ? "Playing as"
-                      : citizen.mood}
-                  </small>
-                </span>
-                {citizen.citizen_id === player?.citizen_id && (
-                  <span className="you-dot" />
-                )}
-              </button>
-            ))}
-            {caseCast.size > 0 && city && (
-              <button className="strip-more" aria-pressed={everyone} title={everyone ? "Only the people in your cases" : "Show all residents"} onClick={() => setEveryone(!everyone)}>
-                <span><strong>{everyone ? "Cases" : `+${city.citizens.length - city.citizens.filter((c) => caseCast.has(c.citizen_id)).length}`}</strong><small>{everyone ? "only" : "everyone"}</small></span>
-              </button>
-            )}
-          </div>
         </section>
 
         <nav className="game-nav" aria-label="Game views">
           {(
             [
               { id: "city", icon: Compass, label: "City" },
-              { id: "create", icon: Wand2, label: "Create" },
               { id: "citizens", icon: Users, label: "People" },
               { id: "journal", icon: MessageCircle, label: "Talk" },
               { id: "news", icon: Newspaper, label: "News" },
-              { id: "social", icon: Heart, label: "Bonds" },
-              { id: "badges", icon: Trophy, label: "Badges" },
             ] as const
           ).map(({ id, icon: Icon, label }) => (
             <button
@@ -1005,20 +985,29 @@ export function AgentCityShell() {
               {id === "journal" && cityConversations.length > 0 && (
                 <i>{cityConversations.length}</i>
               )}
-              {id === "badges" && Object.keys(unlocked).length > 0 && (
-                <i>{Object.keys(unlocked).length}</i>
-              )}
             </button>
           ))}
-          <button
-            className="save-button"
-            onClick={download}
-            aria-label="Download world snapshot"
-            title="Download world snapshot"
-          >
-            <Download size={19} />
-            <span>Save</span>
-          </button>
+          <details className="nav-more" ref={moreViews}>
+            <summary aria-label="More" title="Create, bonds, badges and save">
+              <MoreHorizontal size={21} /><span>More</span>
+              {Object.keys(unlocked).length > 0 && <i>{Object.keys(unlocked).length}</i>}
+            </summary>
+            <div className="nav-more-menu" onClick={(event) => { if ((event.target as HTMLElement).closest("button")) moreViews.current?.removeAttribute("open"); }}>
+              {([
+                { id: "create", icon: Wand2, label: "Create" },
+                { id: "social", icon: Heart, label: "Bonds" },
+                { id: "badges", icon: Trophy, label: "Badges" },
+              ] as const).map(({ id, icon: Icon, label }) => (
+                <button key={id} aria-label={label} aria-pressed={panel === id} onClick={() => setPanel(panel === id ? null : id)}>
+                  <Icon size={18} /><span>{label}</span>
+                  {id === "badges" && Object.keys(unlocked).length > 0 && <i>{Object.keys(unlocked).length}</i>}
+                </button>
+              ))}
+              <button className="save-button" onClick={download} aria-label="Download world snapshot" title="Download world snapshot">
+                <Download size={18} /><span>Save</span>
+              </button>
+            </div>
+          </details>
         </nav>
 
         {panel && (

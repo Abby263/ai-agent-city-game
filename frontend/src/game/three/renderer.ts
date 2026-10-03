@@ -873,7 +873,8 @@ export class CityRenderer {
         model.label.hidden = true;
         continue;
       }
-      if (cameraDistance > 40 && model.citizen.citizen_id !== this.selected) {
+      // Name tags only close up, or for whoever you picked: from further off they are a cloud of words.
+      if (cameraDistance > 22 && model.citizen.citizen_id !== this.selected) {
         model.label.hidden = true;
         continue;
       }
