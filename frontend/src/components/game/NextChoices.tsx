@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Send, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Send, X } from "lucide-react";
 import type { NextMove } from "@/lib/next-moves";
 import type { CitizenAgent } from "@/lib/types";
 
@@ -56,15 +56,22 @@ export function NextMoveCard({ names, moves, people, busy, onPick, onWrite, onDi
   onWrite: (actorId: string | null, text: string) => void;
   onDismiss: () => void;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <section className="next-move" aria-label="What happens next?">
+    <section className="next-move" aria-label="What happens next?" data-open={open}>
       <header>
-        <span className="story-live"><i />What happens next?</span>
+        <button className="story-fold" aria-expanded={open} title={open ? "Fold" : "Choose what happens next"} onClick={() => setOpen(!open)}>
+          <span className="story-live"><i />What happens next?</span>
+          {!open && <span className="story-fold-title">{moves.length ? `${moves.length} ${moves.length === 1 ? "choice" : "choices"} for ${names}` : `You decide for ${names}`}</span>}
+        </button>
+        <button className="icon-button" aria-label={open ? "Collapse" : "Expand"} onClick={() => setOpen(!open)}>{open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</button>
         <button className="icon-button" aria-label="Let it be" title="Let it be" onClick={onDismiss}><X size={15} /></button>
       </header>
-      <p>{moves.length ? `What ${names} want to do now. Make one happen, or write your own.` : `You decide what ${names} do now.`} <em>Costs one nudge.</em></p>
-      <MoveButtons moves={moves} busy={busy} onPick={onPick} />
-      <WriteWhatHappens people={people} busy={busy} onWrite={onWrite} />
+      {open && <>
+        <p>{moves.length ? `What ${names} want to do now. Make one happen, or write your own.` : `You decide what ${names} do now.`} <em>Costs one nudge.</em></p>
+        <MoveButtons moves={moves} busy={busy} onPick={onPick} />
+        <WriteWhatHappens people={people} busy={busy} onWrite={onWrite} />
+      </>}
     </section>
   );
 }

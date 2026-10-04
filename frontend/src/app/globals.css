@@ -2397,3 +2397,14 @@ select {
 /* Folded cases sit as a pill under the narrator rather than a full-width bar. */
 .case-board[data-collapsed="true"] { align-self: flex-start; }
 .header-more-menu > .icon-button, .header-more-menu .speed-select { color: #eef2ee; border-color: #ffffff30; }
+/* "Happening now" and "What happens next?" fold to one line, like the cases: tap to open. */
+.story-tracker[data-open="false"], .next-move[data-open="false"] { padding-block: 6px; }
+.story-tracker > header, .next-move > header { display: flex; align-items: center; gap: 4px; }
+.story-fold { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.story-fold .story-live { flex-shrink: 0; }
+.story-fold-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.case-board[data-fresh="true"] { border-color: #89ffe0; box-shadow: 0 0 0 3px #89ffe033, 0 8px 24px #0005; animation: case-news 1.6s ease-in-out 3; }
+@keyframes case-news { 50% { box-shadow: 0 0 0 6px #89ffe022, 0 8px 24px #0005; } }
+@media (prefers-reduced-motion: reduce) { .case-board[data-fresh="true"] { animation: none; } }
+.case-board[data-collapsed="true"] > header { cursor: pointer; }
+.story-fold .story-live { white-space: nowrap; }

@@ -27,17 +27,18 @@ export function CaseBoard({ city, busy, spotlight, onNudge, onWatch, onComposing
   const cases = openCases(story), closed = closedCases(story);
   const left = nudgesLeft(story, city.clock.day);
   const [picked, setPicked] = useState<string | null>(null);
-  // On a phone the desk starts folded, so the town is what you see first.
   // Folded to one line until you open it, so the town stays in view.
   const [collapsed, setCollapsed] = useState(true);
   const [whisper, setWhisper] = useState<{ storyline: string; who: string } | null>(null);
   const [text, setText] = useState("");
-  // A scene that just played takes over from whatever you had open, once.
+  // A scene that just played is the case you see when you open the board; the folded line glows to say there is
+  // news (the narrator has already said how it went), but the board stays folded.
   const [seen, setSeen] = useState<string | null>(null);
+  const [fresh, setFresh] = useState(false);
   const spotKey = spotlight ? `${spotlight.id}:${spotlight.beat}` : null;
   if (spotKey !== seen) {
     setSeen(spotKey);
-    if (spotlight) { setPicked(spotlight.id); setCollapsed(false); }
+    if (spotlight) { setPicked(spotlight.id); setFresh(true); }
   }
   if (!cases.length && !closed.length) return null;
   const name = (id: string) => city.citizens.find((c) => c.citizen_id === id)?.name.split(" ")[0] ?? "Someone";
@@ -56,15 +57,16 @@ export function CaseBoard({ city, busy, spotlight, onNudge, onWatch, onComposing
     </span>
   );
   return (
-    <section className="case-board" aria-label="Your cases" data-collapsed={collapsed}>
-      <header>
+    <section className="case-board" aria-label="Your cases" data-collapsed={collapsed} data-fresh={collapsed && fresh}>
+      {/* The whole folded line opens it, not just the arrow. */}
+      <header onClick={(event) => { if (collapsed && !(event.target as HTMLElement).closest("button")) { setCollapsed(false); setFresh(false); } }}>
         <span className="case-kicker">Your cases</span>
         <span className="case-nudges" title={`${left} of ${NUDGES_PER_DAY} nudges left today`} aria-label={`${left} of ${NUDGES_PER_DAY} nudges left today`}>
           {Array.from({ length: NUDGES_PER_DAY }, (_, i) => <i key={i} data-spent={i >= left} />)}
           <small>{left} {left === 1 ? "nudge" : "nudges"}</small>
         </span>
         {closed.length > 0 && <span className="case-record" title="Cases that ended well, of those closed">{wins}/{closed.length} ended well</span>}
-        <button className="icon-button" aria-label={collapsed ? "Show cases" : "Hide cases"} onClick={() => setCollapsed(!collapsed)}>{collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}</button>
+        <button className="icon-button" aria-label={collapsed ? "Show cases" : "Hide cases"} onClick={() => { setCollapsed(!collapsed); setFresh(false); }}>{collapsed ? <ChevronDown size={15} /> : <ChevronUp size={15} />}</button>
       </header>
       {!collapsed && !cases.length && <p className="case-empty">Every case is closed. {wins} of {closed.length} ended well.</p>}
       {!collapsed && cases.map((storyline) => {
