@@ -25,25 +25,31 @@ export function StoryTracker({ city, conversations = [], onOpenAll, busy = false
 }) {
   const stories = activeStories(city);
   const [hidden, setHidden] = useState<string[]>([]);
-  const [open, setOpen] = useState(true);
+  // Folded to one line until you open it; a ballot waiting for you opens it by itself.
+  const [open, setOpen] = useState(false);
   const story = stories.find((s) => !hidden.includes(s.id));
   if (!story) return null;
   const election = story.kind === "election" ? liveElection(city) : undefined;
   const turn = election ? playerTurn(city) : undefined;
   const me = turn && city.citizens.find((c) => c.citizen_id === turn.voterId)?.name.split(" ")[0];
+  const expanded = open || Boolean(turn?.waiting) || Boolean(election?.error);
   const latestTalk = [...story.beats].reverse().find((b) => b.conversation_id);
   // What happens next comes from what the people in it now want, plus anything the player writes.
-  const deciding = !election && open && Boolean(onChoose && onWrite);
+  const deciding = !election && expanded && Boolean(onChoose && onWrite);
   const choices = deciding ? nextMoves(city, conversations.find((c) => c.conversation_id === latestTalk?.conversation_id)) : [];
   const people = story.focus_ids.map((id) => city.citizens.find((c) => c.citizen_id === id)).filter((c) => c !== undefined);
-  const beats = story.beats.slice(open ? (deciding ? -2 : -3) : -1);
+  const beats = story.beats.slice(deciding ? -2 : -3);
   return (
-    <section className="story-tracker" aria-label="Happening now" aria-live="polite">
+    <section className="story-tracker" aria-label="Happening now" aria-live="polite" data-open={expanded}>
       <header>
-        <span className="story-live"><i />Happening now{stories.length > 1 ? ` · ${stories.length} stories` : ""}</span>
-        <button className="icon-button" aria-label={open ? "Collapse" : "Expand"} onClick={() => setOpen(!open)}>{open ? <ChevronDown size={15} /> : <ChevronUp size={15} />}</button>
+        <button className="story-fold" aria-expanded={expanded} title={expanded ? "Fold" : "Show what is happening"} onClick={() => setOpen(!open)}>
+          <span className="story-live"><i />Happening now{stories.length > 1 ? ` · ${stories.length}` : ""}</span>
+          {!expanded && <span className="story-fold-title"><span aria-hidden="true">{story.icon}</span> {story.title}</span>}
+        </button>
+        <button className="icon-button" aria-label={expanded ? "Collapse" : "Expand"} onClick={() => setOpen(!open)}>{expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</button>
         <button className="icon-button" aria-label="Hide this story" onClick={() => setHidden([...hidden, story.id])}><X size={15} /></button>
       </header>
+      {expanded && <>
       <strong className="story-title"><span aria-hidden="true">{story.icon}</span>{story.title}</strong>
       <ol className="story-beats">
         {beats.map((beat, i) => (
@@ -104,6 +110,7 @@ export function StoryTracker({ city, conversations = [], onOpenAll, busy = false
         )}
         <button className="text-action" onClick={onOpenAll}>All stories</button>
       </div>
+      </>}
     </section>
   );
 }
