@@ -145,9 +145,17 @@ export function Narrator({ onActions }: {
   }, []);
   const latest = [...turns].reverse().find((t) => t.role === "narrator");
   const telling = speaking && beat && !listening && !thinking ? beat : null;
+  // When it has nothing to say it shrinks to its face and a microphone; what it last said stays a few seconds first.
+  const [lingering, setLingering] = useState(false);
+  useEffect(() => {
+    if (speaking || thinking || listening) return;
+    const show = window.setTimeout(() => setLingering(true), 0), hide = window.setTimeout(() => setLingering(false), 5000);
+    return () => { window.clearTimeout(show); window.clearTimeout(hide); };
+  }, [speaking, thinking, listening]);
   const caption = listening ? interim || "Listening…" : thinking ? "Thinking…" : telling?.text ?? latest?.text ?? "I'm your narrator. Tap the mic and ask me anything.";
   return (
-    <section className="narrator" aria-label="Narrator" data-open={open} data-listening={listening} data-telling={Boolean(telling)}>
+    <section className="narrator" aria-label="Narrator" data-open={open} data-listening={listening} data-telling={Boolean(telling)}
+      data-quiet={!open && !speaking && !listening && !thinking && !lingering}>
       <div className="narrator-bar">
         {natural.status === "ready" && voice && <NarratorAvatar city={activeCity().id} />}
         <button className="narrator-mic" aria-label={listening ? "Stop listening" : "Talk to the narrator"} aria-pressed={listening}

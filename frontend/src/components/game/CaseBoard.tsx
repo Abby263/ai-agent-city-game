@@ -28,7 +28,8 @@ export function CaseBoard({ city, busy, spotlight, onNudge, onWatch, onComposing
   const left = nudgesLeft(story, city.clock.day);
   const [picked, setPicked] = useState<string | null>(null);
   // On a phone the desk starts folded, so the town is what you see first.
-  const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 760px)").matches);
+  // Folded to one line until you open it, so the town stays in view.
+  const [collapsed, setCollapsed] = useState(true);
   const [whisper, setWhisper] = useState<{ storyline: string; who: string } | null>(null);
   const [text, setText] = useState("");
   // A scene that just played takes over from whatever you had open, once.
@@ -55,7 +56,7 @@ export function CaseBoard({ city, busy, spotlight, onNudge, onWatch, onComposing
     </span>
   );
   return (
-    <section className="case-board" aria-label="Your cases">
+    <section className="case-board" aria-label="Your cases" data-collapsed={collapsed}>
       <header>
         <span className="case-kicker">Your cases</span>
         <span className="case-nudges" title={`${left} of ${NUDGES_PER_DAY} nudges left today`} aria-label={`${left} of ${NUDGES_PER_DAY} nudges left today`}>

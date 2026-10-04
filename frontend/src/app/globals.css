@@ -2335,3 +2335,65 @@ select {
 .city-card b { justify-self: start; margin-top: 8px; padding: 8px 14px; border-radius: 999px; background: #ffffff22; font-size: 13px; font-weight: 600; }
 .city-picker-close { margin-top: 18px; color: #c5cdd0; }
 @media (max-width: 760px) { .city-switch { font-size: 8.5px; margin-top: 3px; } }
+
+/* ------------------------------------------------------------------------------------------------------------
+   Less on screen. The town is the game: the header keeps the clock and play; everything else is one tap away
+   behind "more". The narrator shrinks to its face when quiet, cases fold to one line, the portrait strip is gone
+   (People has everyone), and the map's buttons are one slim column.
+   ------------------------------------------------------------------------------------------------------------ */
+.header-more { position: relative; }
+.header-more > summary { list-style: none; cursor: pointer; }
+.header-more > summary::-webkit-details-marker { display: none; }
+.header-more[open] > summary { background: #ffffff18; }
+.header-more-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; display: grid; gap: 10px; min-width: 230px;
+  padding: 12px; border-radius: 12px; background: #1e2227f7; border: 1px solid #ffffff26; box-shadow: 0 12px 32px #0007; }
+.header-more-menu .mode-switch { justify-content: stretch; }
+.header-more-menu .mode-switch button { flex: 1; justify-content: center; }
+.header-more-menu .speed-select { width: 100%; }
+.header-more-menu > .icon-button { width: 100%; justify-content: flex-start; gap: 10px; padding: 0 10px; }
+.header-more-menu > .icon-button::after { font-size: 13px; }
+.header-more-menu > .icon-button[aria-label="How to play"]::after { content: "How to play"; }
+.header-more-menu > .icon-button[aria-label="Mute town sound"]::after { content: "Town sound on"; }
+.header-more-menu > .icon-button[aria-label="Turn on town sound"]::after { content: "Town sound off"; }
+
+.nav-more { position: relative; flex-shrink: 0; }
+.nav-more > summary { list-style: none; cursor: pointer; position: relative; width: 56px; min-height: 60px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px; border-radius: 6px; color: #bec4cf; }
+.nav-more > summary::-webkit-details-marker { display: none; }
+.nav-more > summary span { font-size: 11px; }
+.nav-more[open] > summary { background: #ffffff14; color: #fff; }
+.nav-more-menu { position: absolute; right: calc(100% + 10px); bottom: 0; z-index: 60; display: grid; gap: 4px; min-width: 170px; padding: 8px;
+  border-radius: 12px; background: #1e2227f7; border: 1px solid #ffffff26; box-shadow: 0 12px 32px #0007; }
+.game-nav .nav-more-menu button { width: 100%; min-height: 40px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 0 10px; margin: 0; }
+.game-nav .nav-more-menu button span { font-size: 13px; }
+.game-nav .nav-more-menu i { position: static; margin-left: auto; }
+
+.narrator[data-quiet="true"] { align-self: flex-start; }
+.narrator[data-quiet="true"] .narrator-caption,
+.narrator[data-quiet="true"] .narrator-bar > .icon-button[aria-pressed] { display: none; }
+
+.map-zoom { bottom: 20px; }
+.map-zoom .camera-modes { position: static; display: flex; flex-direction: column; padding: 0; border: 0; border-radius: 0; background: none;
+  border-bottom: 1px solid #ffffff30; }
+.map-zoom .camera-modes button { width: 40px; height: 40px; padding: 0; justify-content: center; border-radius: 0; }
+
+@media (max-width: 760px) {
+  .header-actions { gap: 6px; }
+  .nav-more > summary { width: auto; min-width: 44px; min-height: 44px; }
+  .nav-more-menu { position: fixed; right: 8px; bottom: 76px; }
+  .map-zoom { bottom: 12px; right: 8px; }
+  .map-zoom button, .map-zoom .camera-modes button { width: 38px; height: 38px; min-width: 38px; min-height: 38px; }
+}
+@media (max-width: 760px) {
+  /* One header row on phones: name, clock, play and more. */
+  .city-game { grid-template-rows: 60px minmax(0, 1fr) 24px; }
+  .game-header { flex-wrap: nowrap; }
+  .header-actions { width: auto; justify-content: flex-end; }
+  .world-clock { min-width: 0; }
+}
+@media (max-width: 420px) {
+  .clock-weather, .clock-mode { display: none; }
+}
+/* Folded cases sit as a pill under the narrator rather than a full-width bar. */
+.case-board[data-collapsed="true"] { align-self: flex-start; }
+.header-more-menu > .icon-button, .header-more-menu .speed-select { color: #eef2ee; border-color: #ffffff30; }

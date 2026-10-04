@@ -15,7 +15,6 @@ import {
   Minus,
   Orbit,
   Plus,
-  RotateCw,
 } from "lucide-react";
 import type { CityState } from "@/lib/types";
 import { HEARING, type CameraMode, type CityRenderer } from "@/game/three/renderer";
@@ -200,35 +199,6 @@ export function GameCanvas({
           )}
         </div>
       )}
-      <div className="camera-modes" aria-label="Camera mode">
-        <button
-          aria-pressed={mode === "orbit"}
-          title="Orbit: drag to rotate, pinch or scroll to zoom"
-          disabled={!ready}
-          onClick={() => setCamera("orbit")}
-        >
-          <Orbit size={15} />
-          Explore
-        </button>
-        <button
-          aria-pressed={mode === "follow"}
-          title="Follow selected citizen"
-          disabled={!ready || !selectedCitizenId}
-          onClick={() => setCamera("follow")}
-        >
-          <Focus size={15} />
-          Follow
-        </button>
-        <button
-          aria-pressed={mode === "street"}
-          title="Street view: stand in the street and look around"
-          disabled={!ready}
-          onClick={() => setCamera(mode === "street" ? "orbit" : "street")}
-        >
-          <PersonStanding size={15} />
-          Street
-        </button>
-      </div>
       {mode === "street" && ready && (
         <div className="street-view-controls" role="group" aria-label="Street view controls">
           <p>Drag to look around · click the street to walk · arrow keys or WASD · Esc to leave</p>
@@ -246,6 +216,35 @@ export function GameCanvas({
         </div>
       )}
       <div className="map-zoom" aria-label="3D map controls">
+        <div className="camera-modes" role="group" aria-label="Camera mode">
+          <button
+            aria-label="Explore"
+            aria-pressed={mode === "orbit"}
+            title="Orbit: drag to rotate, pinch or scroll to zoom"
+            disabled={!ready}
+            onClick={() => setCamera("orbit")}
+          >
+            <Orbit size={16} />
+          </button>
+          <button
+            aria-label="Follow"
+            aria-pressed={mode === "follow"}
+            title="Follow selected citizen"
+            disabled={!ready || !selectedCitizenId}
+            onClick={() => setCamera("follow")}
+          >
+            <Focus size={16} />
+          </button>
+          <button
+            aria-label="Street"
+            aria-pressed={mode === "street"}
+            title="Street view: stand in the street and look around"
+            disabled={!ready}
+            onClick={() => setCamera(mode === "street" ? "orbit" : "street")}
+          >
+            <PersonStanding size={16} />
+          </button>
+        </div>
         <button
           disabled={!ready}
           aria-label="Zoom in"
@@ -261,14 +260,6 @@ export function GameCanvas({
           onClick={() => renderer.current?.zoom(-1)}
         >
           <Minus size={17} />
-        </button>
-        <button
-          disabled={!ready}
-          aria-label="Rotate town"
-          title="Rotate town"
-          onClick={() => renderer.current?.rotate()}
-        >
-          <RotateCw size={16} />
         </button>
         <button
           disabled={!ready}
