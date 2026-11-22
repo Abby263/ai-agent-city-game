@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "agentcity",
+  "repository": "Abby263/ai-agent-city-game",
+  "catalog": "listed",
+  "availability": "request_integration",
+  "name": "AgentCity Simulation",
+  "category": "Simulation",
+  "description": "Explore the behavior of AI residents in a shared simulated city.",
+  "request": "A simulation scenario or action in a city.",
+  "response": "World state changes and relevant events.",
+  "integration": {
+    "operation": "Read a synthetic city state and summarize recent events.",
+    "readiness": "Create an isolated simulation session and define a read-only state contract before accepting external callers."
+  }
+}
